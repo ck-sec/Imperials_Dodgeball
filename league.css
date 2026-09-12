@@ -54,6 +54,44 @@
 .league-points { font-size: 1.5rem; font-weight: 800; font-family: 'Barlow Condensed', sans-serif; text-align: right; }
 .league-points small { display: block; font-family: 'Inter', sans-serif; font-size: .65rem; font-weight: 500; color: var(--league-muted); }
 .league-bonus { display: inline-block; margin-top: .35rem; padding: .15rem .4rem; border: 1px solid #647ca3; border-radius: 5px; color: #d0daeb; font: 600 .7rem/1.5 'Inter', sans-serif; white-space: nowrap; }
+.league-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.league-table-wrap { min-width: 0; margin: .75rem 0; overflow: hidden; border: 1px solid #2a436d; border-radius: 8px; background: rgba(12,27,58,.4); }
+.league-ranking-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; }
+.league-ranking-table thead th { padding: 11px 10px; border-bottom: 1px solid #2a436d; color: #b5c2da; background: rgba(12,27,58,.5); font: 700 .7rem/1.3 'Barlow Condensed',sans-serif; letter-spacing: .06em; text-align: left; text-transform: uppercase; white-space: normal; }
+.league-ranking-table tbody tr { border-bottom: 1px solid rgba(53,103,192,.18); }
+.league-ranking-table tbody tr:last-child { border-bottom: 0; }
+.league-ranking-table tbody tr:hover { background: rgba(53,103,192,.1); }
+.league-ranking-table tbody :is(td,th) { padding: 10px; vertical-align: middle; font-size: .85rem; line-height: 1.35; overflow-wrap: anywhere; }
+.league-ranking-table .league-table-rank { width: 4rem; text-align: left; }
+.league-ranking-table .league-rank { color: #b5c2da; font-size: 1.2rem; white-space: nowrap; }
+.league-ranking-table .league-place-1 .league-rank { color: #f5c518; }
+.league-ranking-table .league-place-2 .league-rank { color: #c0c0c0; }
+.league-ranking-table .league-place-3 .league-rank { color: #cd7f32; }
+.league-ranking-table .league-table-number { width: 4.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+.league-ranking-table .league-table-total { width: 5.2rem; }
+.league-ranking-table .league-table-bp { width: 3.5rem; }
+.league-ranking-table .league-table-player { text-align: left; font-weight: 400; }
+.league-ranking-table .league-player-name { font: 800 .95rem/1.3 'Barlow Condensed',sans-serif; letter-spacing: .025em; text-transform: uppercase; }
+.league-table-points { color: #f4f7ff; font: 800 1.05rem/1.3 'Barlow Condensed',sans-serif; }
+.league-table-tier { display: inline-block; margin-left: .4rem; color: #b5c2da; font-size: .65rem; font-weight: 500; }
+.league-table-change { color: #b5c2da; font-size: .75rem; font-weight: 600; }
+.league-change-up { color: #86efac; }
+.league-change-down { color: #fda4af; }
+.league-change-new { color: #f0b830; }
+.league-ranking-table .league-bonus { margin: 0; padding: 0; border: 0; font-size: .75rem; white-space: normal; }
+.league-table-mobile { display: none; }
+@media (max-width: 680px) {
+  .league-ranking-table .league-table-secondary { display: none; }
+  .league-table-mobile { display: block; }
+  .league-ranking-table .league-table-rank { width: 3rem; }
+  .league-ranking-table .league-rank { font-size: 1.05rem; }
+  .league-ranking-table .league-table-total { width: 3.8rem; }
+  .league-ranking-table .league-table-bp { width: 2.7rem; }
+  .league-ranking-table tbody :is(td,th), .league-ranking-table thead th { padding: 8px 6px; }
+  .league-ranking-table .league-player-meta { font-size: .65rem; line-height: 1.35; margin-top: .2rem; }
+  .league-table-tier { margin-left: .3rem; font-size: .6rem; }
+  .league-table-change { font-size: .65rem; }
+}
 .league-matchday-link { margin: .5rem 0 .5rem .5rem; }
 .member-team > .league-matchday-link { margin-left: 0; }
 .league-team-grid { display: grid; gap: .85rem; margin-top: 1rem; }

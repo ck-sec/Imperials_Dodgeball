@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const DRAFT_KEY = 'vi_matchday_drafts';
   const text = {
     de: {
       title: 'Spieltag', choose: 'Spieltag auswählen', empty: 'Noch kein Donnerstag-Spieltag freigegeben.',
@@ -13,7 +13,7 @@
       pending: 'Ausstehend', provisional: 'Vorläufig', finalized: 'Abgeschlossen',
       future: 'Ergebnisse können erst am Trainingstag eingetragen werden.',
       finalReadOnly: 'Abgeschlossen · Ergebnisse sind schreibgeschützt.',
-      publicReadOnly: 'Öffentliche Ansicht · Zum Eintragen als Spielleiter oder Admin anmelden.',
+      publicReadOnly: 'Öffentliche Ansicht · Head Refs melden sich mit ihrem normalen Konto an.',
       scoring: 'Ergebnisse pro Spiel speichern. Korrekturen sind bis zum Abschluss möglich.',
       noSchedule: 'Noch kein Spielplan freigegeben.', round: 'Runde', court: 'Feld', game: 'Spiel',
       bye: 'Pause', score: 'Punkte', save: 'Speichern', saving: 'Wird gespeichert …', saved: 'Gespeichert',
@@ -25,15 +25,14 @@
       review: 'Erst vergleichen, dann bewusst übernehmen oder erneut speichern.',
       scheduleChanged: 'Der Spielplan wurde geändert. Ungespeicherte Eingaben bleiben sichtbar, bis du die aktuellen Werte übernimmst.',
       fixtureChanged: 'Spielplan geändert · Dieses Spiel ist bis zur aktualisierten Anzeige schreibgeschützt.',
-      signIn: 'Ergebnisse eintragen · Anmelden', admin: 'Admin · angemeldet', scorekeeper: 'Spielleiter · angemeldet',
-      member: 'Mitglied · angemeldet', loginFailed: 'Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen.',
-      emailInvalid: 'Bitte eine gültige E-Mail-Adresse und ein Passwort eingeben.',
+      signIn: 'Ergebnisse eintragen', admin: 'Admin · angemeldet', scorekeeper: 'Head Ref · angemeldet',
+      member: 'Mitglied · angemeldet',
       expired: 'Sitzung abgelaufen. Bitte erneut anmelden. Deine Eingaben bleiben erhalten.',
       restored: 'Sitzung erneuert. Bitte prüfen und erneut speichern.',
-      forbidden: 'Keine Schreibberechtigung. Nur Admins und freigeschaltete Spielleiter können Ergebnisse ändern.',
+      forbidden: 'Keine Schreibberechtigung. Admins ernennen Head Refs; nur Head Refs und Admins können Ergebnisse ändern.',
       pendingApproval: 'Dein Konto wartet auf Freischaltung.',
-      rejected: 'Dein Konto wurde nicht freigeschaltet. Bitte kontaktiere den Club.',
-      signedIn: 'Angemeldet.', signedOut: 'Abgemeldet.', signingIn: 'Anmeldung läuft …',
+      draftRestored: 'Ungespeicherte Eingaben wiederhergestellt. Bitte vor dem Speichern prüfen.',
+      draftNewTab: 'Anmeldung in einem neuen Tab öffnen. Deine Eingaben bleiben hier erhalten.',
       retry: 'Bitte erneut versuchen in', seconds: 'Sekunden.', noStandings: 'Noch keine Saisonpunkte.',
       noResults: 'Keine Spieler gefunden.', copied: 'Spieltag-Link kopiert.',
       saveFailed: 'Nicht gespeichert. Bitte Eingaben prüfen und erneut versuchen.',
@@ -48,7 +47,7 @@
       pending: 'Pending', provisional: 'Provisional', finalized: 'Finalized',
       future: 'Scores can be entered from the training day onwards.',
       finalReadOnly: 'Finalized · Scores are read-only.',
-      publicReadOnly: 'Public view · Sign in as a scorekeeper or admin to enter scores.',
+      publicReadOnly: 'Public view · Head Refs sign in with their normal account.',
       scoring: 'Save each game separately. Scores can be corrected until finalization.',
       noSchedule: 'No published schedule yet.', round: 'Round', court: 'Court', game: 'Game',
       bye: 'Rest', score: 'Score', save: 'Save', saving: 'Saving …', saved: 'Saved',
@@ -60,15 +59,14 @@
       review: 'Compare first, then choose the current scores or save your entries again.',
       scheduleChanged: 'The schedule changed. Unsaved entries remain visible until you choose the current scores.',
       fixtureChanged: 'Fixture changed · This game is read-only until the updated fixture is displayed.',
-      signIn: 'Enter scores · Sign in', admin: 'Admin · signed in', scorekeeper: 'Scorekeeper · signed in',
-      member: 'Member · signed in', loginFailed: 'Sign-in failed. Please check your email and password.',
-      emailInvalid: 'Please enter a valid email address and a password.',
+      signIn: 'Enter scores', admin: 'Admin · signed in', scorekeeper: 'Head Ref · signed in',
+      member: 'Member · signed in',
       expired: 'Session expired. Sign in again. Your entries are safe.',
       restored: 'Session renewed. Please review and save again.',
-      forbidden: 'No write permission. Only admins and designated scorekeepers can change scores.',
+      forbidden: 'No write permission. Admins appoint Head Refs; only Head Refs and admins can change scores.',
       pendingApproval: 'Your account is awaiting approval.',
-      rejected: 'Your account is not approved. Please contact the club.',
-      signedIn: 'Signed in.', signedOut: 'Signed out.', signingIn: 'Signing in …',
+      draftRestored: 'Unsaved entries restored. Please review before saving.',
+      draftNewTab: 'Open sign-in in a new tab. Your entries remain safe here.',
       retry: 'Please try again in', seconds: 'seconds.', noStandings: 'No season points yet.',
       noResults: 'No players found.', copied: 'Matchday link copied.',
       saveFailed: 'Not saved. Please check your entries and try again.',
@@ -105,6 +103,68 @@
       invalid: values.length > 0 && !(values.length === 1 && UUID.test(values[0])) };
   }
 
+  function memberLoginHref(id) {
+    const target = '/spieltag' + (UUID.test(id || '') ? '?event=' + id.toLowerCase() : '');
+    return '/member?return_to=' + encodeURIComponent(target);
+  }
+
+  function draftSnapshot(state) {
+    const entries = [...state.drafts].filter(([, draft]) => draft.dirty).map(([key, draft]) => [key, {
+      a: draft.a, b: draft.b, version: draft.version, identity: draft.identity, base: draft.base,
+      pair: draft.pair, teamNames: draft.teamNames, court: draft.court
+    }]);
+    const value = JSON.stringify(entries);
+    if (entries.length > 100 || value.length > 100000) throw new Error('Draft storage limit');
+    return entries.length ? value : '';
+  }
+
+  function restoreDrafts(value) {
+    const drafts = new Map();
+    if (value === undefined || value === null || value === '') return drafts;
+    if (typeof value !== 'string' || value.length > 100000) {
+      console.error('Stored matchday drafts have an invalid size or type.');
+      return drafts;
+    }
+    let rejected = 0;
+    try {
+      const entries = JSON.parse(value);
+      if (!Array.isArray(entries) || entries.length > 100) {
+        console.error('Stored matchday drafts have an invalid entry list.');
+        return drafts;
+      }
+      for (const entry of entries) {
+        if (!Array.isArray(entry) || entry.length !== 2) { rejected++; continue; }
+        const [key, draft] = entry;
+        if (typeof key !== 'string' || !UUID.test(key.slice(0, 36)) || !/^:[1-9]\d{0,2}$/.test(key.slice(36))
+          || !draft || !Number.isSafeInteger(draft.version) || draft.version < 1
+          || !['a', 'b'].every(side => typeof draft[side] === 'string' && /^[0-9eE.+-]{0,16}$/.test(draft[side]))
+          || !Array.isArray(draft.teamNames) || draft.teamNames.length !== 2
+          || !draft.teamNames.every(name => typeof name === 'string' && name.length <= 200)
+          || ![1, 2].includes(draft.court)
+          || !['identity', 'base', 'pair'].every(field => typeof draft[field] === 'string' && draft[field].length <= 2000)) { rejected++; continue; }
+        let identity;
+        try { identity = JSON.parse(draft.identity); } catch (error) {
+          if (!(error instanceof SyntaxError)) throw error;
+          rejected++;
+          continue;
+        }
+        if (!Array.isArray(identity) || identity[0] !== key.slice(0, 36) || identity[1] !== Number(key.slice(37))
+          || JSON.stringify(identity[4]) !== JSON.stringify(draft.teamNames)
+          || identity[5] !== draft.court || JSON.stringify([identity[2], identity[3]]) !== draft.pair) { rejected++; continue; }
+        drafts.set(key, {
+          a: draft.a, b: draft.b, version: draft.version, identity: draft.identity, base: draft.base,
+          pair: draft.pair, teamNames: draft.teamNames, court: draft.court,
+          dirty: true, focused: false, conflict: true, reviewReady: false, remote: null, message: 'draftRestored'
+        });
+      }
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      console.error('Stored matchday drafts could not be parsed:', error.name);
+    }
+    if (rejected) console.error('Invalid stored matchday drafts were ignored:', rejected);
+    return drafts;
+  }
+
   function publishedThursday(event) {
     return event && UUID.test(event.id) && ['published', 'finalized'].includes(event.status)
       && new Date(String(event.session_date).slice(0, 10) + 'T12:00:00Z').getUTCDay() === 4;
@@ -125,7 +185,7 @@
     let refreshDenied = false;
     const state = {
       requested: UUID.test(options.eventId || '') ? options.eventId.toLowerCase() : '',
-      data: null, drafts: new Map(), loading: false, saving: null, authBusy: false,
+      data: null, drafts: restoreDrafts(options.drafts), loading: false, saving: null,
       memberKnown: false, authNotice: '', error: '', lastUpdated: 0, retryUntil: 0, authRetryUntil: 0
     };
     const notify = () => { if (options.onChange) options.onChange(state); };
@@ -182,6 +242,7 @@
       if (state.requested && data.event && data.event.id.toLowerCase() !== state.requested) throw new Error('Wrong event response');
       state.data = data;
       if (data.permissions.is_scorekeeper) { state.memberKnown = true; refreshDenied = false; }
+      if ((data.permissions.is_admin || data.permissions.is_scorekeeper) && state.authNotice === 'expired') state.authNotice = '';
       if (data.event && !state.requested) {
         state.requested = data.event.id.toLowerCase();
         if (options.onDefaultEvent) options.onDefaultEvent(state.requested);
@@ -223,7 +284,7 @@
 
     async function load(force = false) {
       if (now() < state.retryUntil) return false;
-      if (state.saving || state.authBusy) { readQueued = true; return false; }
+      if (state.saving) { readQueued = true; return false; }
       if (readTask) { if (force) readQueued = true; return readTask; }
       const generation = epoch;
       const wasScorekeeper = !!(state.data && state.data.permissions.is_scorekeeper);
@@ -242,17 +303,27 @@
           }
           if (generation !== epoch) return false;
           const missingMember = !token && !refreshDenied && (response.status === 401 || (response.ok && !response.data.permissions.is_scorekeeper
-            && (!refreshProbed || wasScorekeeper)));
+            && (!refreshProbed || wasScorekeeper || state.memberKnown)));
           if (missingMember && now() >= state.authRetryUntil) {
             refreshProbed = true;
             // Keep the anonymous table usable even if session renewal is unavailable.
             if (response.ok) { merge(response.data); notify(); }
             let renewed = false;
-            try { renewed = await refresh(); }
+            try {
+              const account = await request('/api/member/stats?view=account');
+              if (account.ok && account.data.user) state.memberKnown = true;
+              else if (account.status === 401) {
+                state.memberKnown = false;
+                renewed = await refresh();
+              } else if (account.status === 403) {
+                state.memberKnown = false;
+                state.authNotice = 'pendingApproval';
+              } else throw new Error('Session check unavailable');
+            }
             catch { state.authNotice = 'network'; }
             if (generation !== epoch) return false;
             if (renewed) response = await leagueRequest();
-            else if (wasScorekeeper || response.status === 401) {
+            else if ((!state.memberKnown && wasScorekeeper) || response.status === 401) {
               state.authNotice = 'expired';
               if (!response.ok) response = await leagueRequest(undefined, true);
             }
@@ -277,7 +348,7 @@
           readTask = null;
           state.loading = false;
           notify();
-          if ((readQueued || generation !== epoch) && !state.saving && !state.authBusy) {
+          if ((readQueued || generation !== epoch) && !state.saving) {
             readQueued = false;
             void load();
           }
@@ -297,7 +368,7 @@
     }
 
     function edit(number, side, value, identity) {
-      if (!['a', 'b'].includes(side) || !canEditMatch(number, identity) || state.authBusy
+      if (!['a', 'b'].includes(side) || !canEditMatch(number, identity)
         || state.saving === keyFor(event().id, number)) return;
       const draft = draftFor(number);
       if (!draft) return;
@@ -317,7 +388,7 @@
       const selected = event();
       const draft = draftFor(number);
       if (!selected || !draft || !draft.dirty || draft.conflict || !canEditMatch(number, identity)
-        || state.saving || state.authBusy || now() < state.retryUntil) return false;
+        || state.saving || now() < state.retryUntil) return false;
       if (!validScore(draft.a) || !validScore(draft.b)) { draft.message = 'invalidScore'; notify(); return false; }
       const key = keyFor(selected.id, number);
       state.saving = key;
@@ -344,8 +415,11 @@
           refreshProbed = true;
           if (token) { setToken(''); state.authNotice = 'expired'; }
           else {
-            try { state.authNotice = await refresh() ? 'restored' : 'expired'; }
-            catch { state.authNotice = 'expired'; }
+            try {
+              const renewed = await refresh();
+              state.memberKnown = renewed;
+              state.authNotice = renewed ? 'restored' : 'expired';
+            } catch { state.memberKnown = false; state.authNotice = 'expired'; }
           }
           return false;
         }
@@ -404,64 +478,8 @@
       notify();
     }
 
-    async function login(mode, email, password, remember) {
-      if (state.authBusy || state.saving || now() < state.authRetryUntil) return false;
-      if (!password || (mode !== 'admin' && (!EMAIL.test(email.trim()) || email.trim().length > 254))) {
-        state.authNotice = 'emailInvalid'; notify(); return false;
-      }
-      state.authBusy = true;
-      state.authNotice = '';
-      epoch++;
-      notify();
-      try {
-        if (readTask) await readTask;
-        const response = await request(mode === 'admin' ? '/api/admin-login' : '/api/auth/login', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(mode === 'admin' ? { password } : { email: email.trim().toLowerCase(), password, remember_me: !!remember })
-        });
-        if (response.status === 429) {
-          state.authRetryUntil = now() + retrySeconds(response.data) * 1000;
-          return false;
-        }
-        if (!response.ok) {
-          state.authNotice = response.data.code === 'PENDING_APPROVAL' ? 'pendingApproval'
-            : response.data.code === 'REJECTED' ? 'rejected' : 'loginFailed';
-          return false;
-        }
-        if (mode === 'admin') {
-          if (typeof response.data.token !== 'string' || !response.data.token) throw new Error('Missing token');
-          setToken(response.data.token);
-        } else {
-          if (!response.data.user) throw new Error('Missing user');
-          setToken('');
-          state.memberKnown = true;
-          refreshProbed = true;
-          refreshDenied = false;
-        }
-        state.authNotice = 'signedIn';
-        return true;
-      } catch { state.authNotice = 'network'; return false; }
-      finally { state.authBusy = false; notify(); await load(true); }
-    }
-
-    async function logout() {
-      if (state.authBusy || state.saving) return;
-      state.authBusy = true;
-      epoch++;
-      notify();
-      try {
-        if (readTask) await readTask;
-        const response = await request('/api/auth/logout', { method: 'POST' });
-        if (!response.ok) throw new Error('Logout failed');
-        setToken('');
-        state.memberKnown = false;
-        refreshProbed = true;
-        state.authNotice = 'signedOut';
-      } catch { state.authNotice = 'network'; }
-      finally { state.authBusy = false; notify(); await load(true); }
-    }
-
-    return { state, load, select, edit, focus, save, review, login, logout, canScore, canEditMatch, matchesFixture, draftFor,
+    return { state, load, select, edit, focus, save, review, canScore, canEditMatch, matchesFixture, draftFor,
+      async waitForRead() { while (readTask) await readTask; },
       hasDrafts: () => [...state.drafts.values()].some(draft => draft.dirty) };
   }
 
@@ -516,23 +534,42 @@
     let renderedLanguage = '';
     let transientMessage = '';
     let pollTimer;
+    let leavingForLogin = false;
     const initial = readEvent(window.location.search);
     let invalidLink = initial.invalid;
     let token = '';
-    try { token = sessionStorage.getItem('vi_admin_token') || ''; } catch { /* In-memory login remains available. */ }
+    let storedDrafts = '';
+    let draftStorageWarning = false;
+    try { token = sessionStorage.getItem('vi_admin_token') || ''; } catch { /* Existing admin sessions are optional. */ }
+    try { storedDrafts = sessionStorage.getItem(DRAFT_KEY) || ''; } catch (error) {
+      console.error('Stored matchday drafts could not be read:', error.name);
+      draftStorageWarning = true;
+    }
     function urlFor(id) { return '/spieltag' + (id ? '?event=' + encodeURIComponent(id) : ''); }
     function historyEvent(id, replace) {
       window.history[replace ? 'replaceState' : 'pushState'](null, '', urlFor(id));
     }
     const controller = createController({
-      fetch: window.fetch.bind(window), eventId: initial.id, token,
+      fetch: window.fetch.bind(window), eventId: initial.id, token, drafts: storedDrafts,
       storeToken(value) {
         try { if (value) sessionStorage.setItem('vi_admin_token', value); else sessionStorage.removeItem('vi_admin_token'); } catch { /* Never persist passwords. */ }
       },
       onDefaultEvent(id) { historyEvent(id, true); },
-      onChange: render
+      onChange() { persistDrafts(); render(); }
     });
     const state = controller.state;
+    function persistDrafts() {
+      try {
+        const value = draftSnapshot(controller.state);
+        if (value) sessionStorage.setItem(DRAFT_KEY, value);
+        else sessionStorage.removeItem(DRAFT_KEY);
+        return true;
+      } catch (error) {
+        if (!draftStorageWarning) console.error('Matchday drafts could not be stored:', error.name);
+        draftStorageWarning = true;
+        return false;
+      }
+    }
     function message(code) {
       if (code === 'rate') return t().retry + ' ' + Math.max(1, Math.ceil((state.retryUntil - Date.now()) / 1000)) + ' ' + t().seconds;
       return t()[code] || '';
@@ -598,7 +635,7 @@
         const identity = form.dataset.fixtureIdentity || '';
         const stale = !controller.matchesFixture(number, identity) || !controller.matchesFixture(number, draft.identity);
         const saving = state.saving === keyFor(event.id, number);
-        const canEdit = controller.canEditMatch(number, identity) && !state.authBusy;
+        const canEdit = controller.canEditMatch(number, identity);
         const showInputs = canEdit || draft.dirty || form.contains(document.activeElement);
         const label = form.querySelector('.matchday-game-label');
         label.textContent = t().game + ' ' + number + ' · ' + t().court + ' ' + label.dataset.court;
@@ -643,9 +680,9 @@
       const data = state.data;
       const event = data && data.event;
       const permissions = data && data.permissions || {};
-      $('matchdayRefresh').disabled = state.loading || !!state.saving || state.authBusy || Date.now() < state.retryUntil;
+      $('matchdayRefresh').disabled = state.loading || !!state.saving || Date.now() < state.retryUntil;
       $('matchdayRefresh').setAttribute('aria-busy', String(state.loading));
-      $('matchdaySelect').disabled = !data || !data.events.length || !!state.saving || state.authBusy;
+      $('matchdaySelect').disabled = !data || !data.events.length || !!state.saving;
       $('matchdayShare').disabled = !event;
       if (data) setHTML($('matchdaySelect'), '<option value="">' + esc(t().choose) + '</option>' + data.events.filter(publishedThursday).map(item =>
         '<option value="' + esc(item.id) + '">' + esc(window.LeagueUI.date(item.session_date, lang()) + ' · ' + item.title) + '</option>').join(''));
@@ -673,16 +710,15 @@
       $('matchdayAuthSummary').textContent = t()[role];
       const authMessage = Date.now() < state.authRetryUntil
         ? t().retry + ' ' + Math.ceil((state.authRetryUntil - Date.now()) / 1000) + ' ' + t().seconds
-        : state.authBusy ? t().signingIn : message(state.authNotice);
+        : message(state.authNotice);
       $('matchdayAuthMessage').textContent = authMessage || (state.memberKnown && !permissions.is_admin && !permissions.is_scorekeeper ? t().forbidden : '');
-      $('matchdayLogin').hidden = !!permissions.is_admin || !!permissions.is_scorekeeper;
+      const signedIn = !!permissions.is_admin || state.memberKnown;
+      $('matchdayLoginLink').hidden = signedIn;
+      $('matchdayLoginLink').href = memberLoginHref(state.requested);
+      $('matchdayLoginLink').setAttribute('aria-disabled', String(!!state.saving));
+      $('matchdayFooterLogin').href = signedIn ? '/member' : memberLoginHref(state.requested);
+      $('matchdayMemberLink').hidden = !signedIn;
       $('matchdayAdmin').hidden = !permissions.is_admin;
-      $('matchdayLogout').hidden = !permissions.is_admin && !state.memberKnown;
-      $('matchdayLogout').disabled = state.authBusy || !!state.saving;
-      $('matchdayLoginButton').disabled = state.authBusy || !!state.saving || Date.now() < state.authRetryUntil;
-      $('matchdayLoginButton').setAttribute('aria-busy', String(state.authBusy));
-      ['matchdayLoginMode', 'matchdayEmail', 'matchdayPassword', 'matchdayRemember'].forEach(id => { $(id).disabled = state.authBusy; });
-      if (['expired', 'forbidden', 'restored'].includes(state.authNotice)) $('matchdayAuth').open = true;
       renderStandings();
     }
     function applyLanguage() {
@@ -747,20 +783,36 @@
         render();
       }, 0);
     });
-    $('matchdayLoginMode').addEventListener('change', () => {
-      const admin = $('matchdayLoginMode').value === 'admin';
-      $('matchdayEmailField').hidden = admin;
-      $('matchdayEmail').required = !admin;
-      $('matchdayRememberField').hidden = admin;
-      $('matchdayPassword').value = '';
-    });
-    $('matchdayLogin').addEventListener('submit', async event => {
+    async function openMemberLogin(event) {
+      const link = event.currentTarget;
+      if (event.button > 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      if (link.id === 'matchdayFooterLogin' && (state.memberKnown || (state.data && state.data.permissions.is_admin))) return;
+      if (!state.saving && controller.hasDrafts() && !persistDrafts()) {
+        link.target = '_blank';
+        link.rel = 'noopener';
+        state.authNotice = 'draftNewTab';
+        render();
+        return;
+      }
       event.preventDefault();
-      const password = $('matchdayPassword').value;
-      $('matchdayPassword').value = '';
-      await controller.login($('matchdayLoginMode').value, $('matchdayEmail').value, password, $('matchdayRemember').checked);
-    });
-    $('matchdayLogout').addEventListener('click', () => { void controller.logout(); });
+      if (state.saving) return;
+      clearTimeout(pollTimer);
+      await controller.waitForRead();
+      if (state.saving) { poll(); return; }
+      const href = memberLoginHref(state.requested);
+      if (!persistDrafts() && controller.hasDrafts()) {
+        link.target = '_blank';
+        link.rel = 'noopener';
+        state.authNotice = 'draftNewTab';
+        render();
+        poll();
+        return;
+      }
+      leavingForLogin = true;
+      window.location.assign(href);
+    }
+    $('matchdayLoginLink').addEventListener('click', openMemberLogin);
+    $('matchdayFooterLogin').addEventListener('click', openMemberLogin);
     $('matchdayShare').addEventListener('click', async () => {
       const event = state.data && state.data.event;
       if (!event) return;
@@ -786,7 +838,7 @@
       poll();
     });
     window.addEventListener('beforeunload', event => {
-      if (!controller.hasDrafts()) return;
+      if (!controller.hasDrafts() || leavingForLogin) return;
       event.preventDefault();
       event.returnValue = '';
     });
@@ -807,7 +859,8 @@
     });
   }
 
-  window.Matchday = { createController, readEvent, publishedThursday, validScore, fixtureIdentity, fixtures, retrySeconds, start };
+  window.Matchday = { createController, readEvent, memberLoginHref, draftSnapshot, restoreDrafts,
+    publishedThursday, validScore, fixtureIdentity, fixtures, retrySeconds, start };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();
 })();

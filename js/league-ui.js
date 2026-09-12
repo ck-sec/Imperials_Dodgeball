@@ -104,53 +104,102 @@ window.LeagueUI = (function() {
       </details>`;
   }
 
-  function bonus(entry, lang = 'en') {
+  function bonus(entry, lang = 'en', compact = false) {
     const t = text[lang] || text.en;
     const value = entry && entry.bonus_points !== undefined ? entry.bonus_points : 0;
     const formatted = typeof value === 'number'
       ? value.toLocaleString(lang === 'de' ? 'de-AT' : 'en-GB', { maximumFractionDigits: 6 })
       : value;
-    return `<span class="league-bonus" aria-label="${escape(t.bonus + ': ' + formatted + '. ' + t.bonusIncluded)}">BP ${escape(formatted)}</span>`;
+    return `<span class="league-bonus" aria-label="${escape(t.bonus + ': ' + formatted + '. ' + t.bonusIncluded)}">${compact ? '' : 'BP '}${escape(formatted)}</span>`;
   }
 
-  function movement(entry, lang = 'en') {
+  function movementData(entry, lang = 'en') {
     if (!entry || !Number.isFinite(entry.points_gain) || !Number.isInteger(entry.rank) || entry.rank < 1
       || !(entry.previous_rank === null || (Number.isInteger(entry.previous_rank) && entry.previous_rank > 0))
-      || !(entry.previous_rank === null ? entry.rank_gain === null : Number.isInteger(entry.rank_gain))) return '';
+      || !(entry.previous_rank === null ? entry.rank_gain === null : Number.isInteger(entry.rank_gain))) return null;
+    return changeData(entry.points_gain, entry.rank_gain, entry.previous_rank === null, lang);
+  }
+
+  function changeData(pointsGain, rankGain, isNew, lang, context) {
     const t = text[lang] || text.en;
     const format = value => value.toLocaleString(lang === 'de' ? 'de-AT' : 'en-GB', { maximumFractionDigits: 6 });
-    const points = entry.points_gain === 0 ? 0 : entry.points_gain;
-    const pointsText = (points > 0 ? '+' : '') + format(points) + ' ' + t.points;
-    const pointsClass = points > 0 ? ' league-movement-up' : points < 0 ? ' league-movement-down' : '';
-    const gain = entry.rank_gain;
-    let rankText = t.newRank, rankClass = ' league-movement-new', arrow = '';
-    if (entry.previous_rank !== null) {
+    const points = pointsGain === 0 ? 0 : pointsGain;
+    const pointsShort = (points > 0 ? '+' : '') + format(points);
+    const gain = rankGain;
+    let rankText = t.newRank, direction = 'new', arrow = '', rankShort = t.newRank;
+    if (!isNew) {
       const count = Math.abs(gain);
       rankText = gain === 0 ? t.rankUnchanged : format(count) + ' '
         + (gain > 0 ? (count === 1 ? t.rankUpOne : t.rankUp) : (count === 1 ? t.rankDownOne : t.rankDown));
-      rankClass = gain > 0 ? ' league-movement-up' : gain < 0 ? ' league-movement-down' : '';
-      arrow = gain === 0 ? '' : `<span aria-hidden="true">${gain > 0 ? '\u2191' : '\u2193'}</span> `;
+      direction = gain > 0 ? 'up' : gain < 0 ? 'down' : '';
+      arrow = gain === 0 ? '' : (gain > 0 ? '\u2191' : '\u2193');
+      rankShort = gain === 0 ? '\u2013' : arrow + format(count);
     }
+    return {
+      context: context || t.movementCompared,
+      points: { short: pointsShort, text: pointsShort + ' ' + t.points, direction: points > 0 ? 'up' : points < 0 ? 'down' : '' },
+      rank: { short: rankShort, text: rankText, direction, arrow }
+    };
+  }
+
+  function movement(entry, lang = 'en') {
+    const value = movementData(entry, lang);
+    if (!value) return '';
+    const color = field => field.direction ? ' league-movement-' + field.direction : '';
     return `<span class="league-movement">
-      <span class="league-movement-context">${escape(t.movementCompared)}</span>
-      <span class="league-movement-value${pointsClass}">${escape(pointsText)}</span>
-      <span class="league-movement-value${rankClass}">${arrow}${escape(rankText)}</span>
+      <span class="league-movement-context">${escape(value.context)}</span>
+      <span class="league-movement-value${color(value.points)}">${escape(value.points.text)}</span>
+      <span class="league-movement-value${color(value.rank)}">${value.rank.arrow ? `<span aria-hidden="true">${value.rank.arrow}</span> ` : ''}${escape(value.rank.text)}</span>
     </span>`;
   }
 
-  function standings(players, lang) {
-    const t = text[lang];
-    return `<ol class="league-standings">${players.map(p => `<li class="league-standing">
-      <span class="league-rank">#${escape(p.rank)}</span>
-      <div><div class="league-player-name">${escape(p.display_name)}</div>
-        <div class="league-player-meta">${escape(p.played)} ${escape(t.played)}${p.wins === undefined ? '' : ' &middot; ' + escape(p.wins) + ' ' + escape(t.wins)}</div>${movement(p, lang)}</div>
-      <div class="league-points">${escape(p.points)}<small>${escape(t.totalPoints)}</small>${bonus(p, lang)}</div>
-      ${p.legacy ? `<details class="league-standing-details"><summary>Details</summary><div class="league-player-meta">
-        ${escape(p.legacy.tier)} &middot; Streak: ${escape(p.legacy.streak)} &middot; BP: ${escape(p.legacy.bp)}
-        &middot; ${lang === 'de' ? 'Letzter Gewinn' : 'Last gain'}: ${escape(p.legacy.gain)}
-        &middot; ${lang === 'de' ? 'Rangver\u00e4nderung' : 'Rank change'}: ${escape(p.legacy.change)}
-      </div></details>` : ''}
-    </li>`).join('')}</ol>`;
+  function tableChange(data, field) {
+    if (!data) return '<span aria-hidden="true">&ndash;</span>';
+    const value = data[field];
+    return `<span class="league-table-change${value.direction ? ' league-change-' + value.direction : ''}" title="${escape(data.context + ': ' + value.text)}"><span aria-hidden="true">${escape(value.short)}</span><span class="league-sr-only">${escape(value.text)}</span></span>`;
+  }
+
+  function standings(players, lang = 'en') {
+    const t = text[lang] || text.en;
+    const archived = players.length > 0 && players.every(p => p.legacy);
+    const format = value => typeof value === 'number'
+      ? value.toLocaleString(lang === 'de' ? 'de-AT' : 'en-GB', { maximumFractionDigits: 6 }) : value;
+    const record = archived ? 'Streak' : t.wins;
+    return `<div class="league-table-wrap"><table class="league-ranking-table">
+      <caption class="league-sr-only">${escape(t.standings)}${archived ? ' - Season 1' : '. ' + escape(t.bonusIncluded)}</caption>
+      <thead><tr>
+        <th scope="col" class="league-table-rank" aria-label="${escape(t.place)}">#</th>
+        <th scope="col">${lang === 'de' ? 'Spieler' : 'Player'}</th>
+        <th scope="col" class="league-table-number league-table-total">${escape(archived ? t.points : t.totalPoints)}</th>
+        <th scope="col" class="league-table-number league-table-secondary">${lang === 'de' ? 'Zuwachs' : 'Gain'}</th>
+        <th scope="col" class="league-table-number league-table-secondary">${escape(t.played)}</th>
+        <th scope="col" class="league-table-number league-table-secondary">${escape(record)}</th>
+        <th scope="col" class="league-table-number league-table-bp" title="${escape(t.bonus)}">BP</th>
+        <th scope="col" class="league-table-number league-table-secondary">${lang === 'de' ? 'Rang +/-' : 'Rank +/-'}</th>
+      </tr></thead>
+      <tbody>${players.map(p => {
+        const changes = p.legacy
+          ? (Number.isFinite(p.legacy.gain) && Number.isInteger(p.legacy.change)
+            ? changeData(p.legacy.gain, p.legacy.change, false, lang, lang === 'de' ? 'Archivierte Ver\u00e4nderung' : 'Archived movement') : null)
+          : movementData(p, lang);
+        const recordValue = p.legacy ? p.legacy.streak : p.wins;
+        const rankColor = [1, 2, 3].includes(p.rank) ? ' league-place-' + p.rank : '';
+        const meta = p.played + ' ' + t.played
+          + (recordValue === undefined ? '' : ' - ' + recordValue + ' ' + record);
+        const shortMeta = escape(p.played) + (lang === 'de' ? ' Tr.' : ' played')
+          + (recordValue === undefined ? '' : ' &middot; ' + escape(recordValue) + ' ' + escape(record));
+        return `<tr>
+          <td class="league-table-rank${rankColor}"><span class="league-rank">#${escape(p.rank)}</span><span class="league-table-mobile">${tableChange(changes, 'rank')}</span></td>
+          <th scope="row" class="league-table-player"><span class="league-player-name">${escape(p.display_name)}</span>${p.legacy && p.legacy.tier ? `<span class="league-table-tier">${escape(p.legacy.tier)}</span>` : ''}<small class="league-table-mobile league-player-meta" title="${escape(meta)}">${shortMeta}</small></th>
+          <td class="league-table-number"><span class="league-table-points">${escape(format(p.points))}</span><span class="league-table-mobile">${tableChange(changes, 'points')}</span></td>
+          <td class="league-table-number league-table-secondary">${tableChange(changes, 'points')}</td>
+          <td class="league-table-number league-table-secondary">${escape(format(p.played))}</td>
+          <td class="league-table-number league-table-secondary">${recordValue === undefined ? '&ndash;' : escape(format(recordValue))}</td>
+          <td class="league-table-number league-table-bp">${p.legacy ? `<span title="${lang === 'de' ? 'Archivierte BP' : 'Archived BP'}">${escape(format(p.legacy.bp))}</span>` : bonus(p, lang, true)}</td>
+          <td class="league-table-number league-table-secondary">${tableChange(changes, 'rank')}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
   }
 
   function matchdayLink(eventData, lang = 'en') {

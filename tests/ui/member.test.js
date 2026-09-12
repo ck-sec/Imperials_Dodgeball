@@ -70,12 +70,17 @@ function fixtureApp(options = {}) {
   };
   const requests = [];
   const history = [];
+  const redirects = [];
+  const storage = options.storage || new Map();
   const timers = [];
   const logs = [];
   const windowEvents = new EventTarget();
   let lang = options.lang || 'de';
   const window = {
-    location: { hash: options.hash || '', pathname: '/member.html', search: '?from=mail' },
+    location: {
+      hash: options.hash || '', pathname: '/member.html', search: options.search === undefined ? '?from=mail' : options.search,
+      replace: target => redirects.push(target)
+    },
     history: { replaceState(...args) { history.push(args); window.location.hash = ''; } },
     addEventListener: (...args) => windowEvents.addEventListener(...args),
     dispatchEvent: event => windowEvents.dispatchEvent(event),
@@ -87,6 +92,11 @@ function fixtureApp(options = {}) {
   const context = vm.createContext({
     window, document, URLSearchParams, Intl, Date, Set, Map, Event,
     console: { error: (...args) => logs.push(args), warn: (...args) => logs.push(args) },
+    sessionStorage: {
+      getItem(key) { if (options.blockStorage) throw new Error('Storage blocked'); return storage.get(key) || null; },
+      setItem(key, value) { if (options.blockStorage) throw new Error('Storage blocked'); storage.set(key, value); },
+      removeItem(key) { if (options.blockStorage) throw new Error('Storage blocked'); storage.delete(key); }
+    },
     setTimeout: fn => { timers.push(fn); return timers.length; },
     fetch: async (url, opts) => {
       requests.push({ url, opts });
@@ -97,7 +107,7 @@ function fixtureApp(options = {}) {
     vm.runInContext(source(name), context, { filename: name + '.js' }));
   vm.runInContext(source('member-init').replace(/\ninitMember\(\);\s*$/, ''), context, { filename: 'member-init.js' });
   return {
-    context, window, elements, requests, history, timers, logs, translated, tabs, panels, tablist, resetToggle,
+    context, window, elements, requests, history, redirects, storage, timers, logs, translated, tabs, panels, tablist, resetToggle,
     hashChange(hash) {
       window.location.hash = hash;
       window.dispatchEvent(new Event('hashchange'));
@@ -139,11 +149,147 @@ test('member page is German-first, training-first and versions every local style
   assert.match(html, /data-tab="training" role="tab"[^>]+aria-selected="true"/);
   assert.doesNotMatch(html, /href="\/#training-league"|data-tab="stats"|data-tab="settings"/);
   assert.match(html, /<details[^>]+id="seasonOneArchive"/);
-  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=20260912b?$/);
-  for (const asset of ['/league.css', '/js/league-ui.js', '/js/member-league.js']) assert.ok(html.includes(asset + '?v=20260912b'));
+  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=20260912[bc]?$/);
+  for (const asset of ['/league.css', '/js/league-ui.js', '/js/member-core.js', '/js/member-dashboard.js', '/js/member-init.js']) assert.ok(html.includes(asset + '?v=20260912c'));
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
   assert.ok(html.indexOf('member-recovery-token.js') < html.indexOf('<link'));
-  assert.doesNotMatch(source('member-core') + source('member-auth') + source('member-init'), /localStorage|sessionStorage/);
+  assert.doesNotMatch(source('member-auth') + source('member-init') + source('member-recovery-token'), /localStorage|sessionStorage/);
+  assert.doesNotMatch(source('member-core'), /localStorage/);
+});
+
+const returnEvent = '11111111-1111-4111-8111-111111111111';
+const returnPath = '/spieltag?event=' + returnEvent;
+const returnQuery = '?return_to=' + encodeURIComponent(returnPath);
+function loginFields(app) {
+  app.node('loginEmail').value = 'member@example.test';
+  app.node('loginPassword').value = 'normalPassword123';
+}
+
+test('central login allowlists only local matchday targets and rejects redirect tricks', () => {
+  const app = fixtureApp();
+  assert.equal(app.context.safeMemberReturn(returnPath), returnPath);
+  assert.equal(app.context.safeMemberReturn('/spieltag'), '/spieltag');
+  for (const target of [
+    '//evil.example', 'https://evil.example/spieltag', 'https://vienna-imperials.at/spieltag',
+    '/\\evil.example', '/member', '/admin', '/spieltag/../admin', '/spieltag#token=x',
+    '/spieltag?event=' + returnEvent + '&next=https://evil.example',
+    '/spieltag?event=' + returnEvent + '&event=' + returnEvent,
+    '/spieltag?event=bad', '/spieltag\n', '%2Fspieltag', null, {}
+  ]) assert.equal(app.context.safeMemberReturn(target), '');
+});
+
+test('successful normal login returns to the same event without replacing the existing login request', async () => {
+  const app = fixtureApp({ search: returnQuery, fetch: () => response({ user: { id: 'approved', display_name: 'Member' } }) });
+  app.context.initMemberReturn();
+  loginFields(app);
+  app.node('rememberMe').checked = true;
+  await app.context.handleLogin(submit);
+  assert.deepEqual(app.redirects, [returnPath]);
+  assert.equal(app.requests.length, 1);
+  assert.equal(app.requests[0].url, '/api/auth/login');
+  assert.equal(app.requests[0].opts.credentials, 'include');
+  assert.deepEqual(JSON.parse(app.requests[0].opts.body), { email: 'member@example.test', password: 'normalPassword123', remember_me: true });
+  assert.equal(app.node('loginPassword').value, '');
+  assert.equal(app.storage.has('vi_member_return'), false);
+});
+
+test('an already signed-in member returns immediately after the normal approved-account check', async () => {
+  const app = fixtureApp({ search: returnQuery, fetch: () => response({ user: { id: 'approved' } }) });
+  await app.context.initMember();
+  assert.deepEqual(app.redirects, [returnPath]);
+  assert.deepEqual(app.requests.map(request => request.url), ['/api/member/stats?view=account']);
+  assert.equal(app.node('memberReturnLink').href, returnPath);
+});
+
+test('failed, rate-limited and pending-approval sign-ins never follow the return target', async () => {
+  for (const [status, body] of [[401, {}], [429, { retry_after: 5 }], [403, { code: 'PENDING_APPROVAL' }]]) {
+    const app = fixtureApp({ search: returnQuery, fetch: () => response(body, status) });
+    app.context.initMemberReturn();
+    loginFields(app);
+    await app.context.handleLogin(submit);
+    assert.deepEqual(app.redirects, []);
+    assert.equal(app.run('memberReturnTo'), returnPath);
+    assert.equal(app.run('currentUser'), null);
+    if (status === 403) assert.equal(app.run('currentView'), 'pending');
+  }
+  const pending = fixtureApp({ search: returnQuery, fetch: () => response({}, 403) });
+  await pending.context.initMember();
+  assert.deepEqual(pending.redirects, []);
+  assert.equal(pending.run('currentView'), 'pending');
+});
+
+test('signup keeps the return flow pending until approval and a subsequent successful login', async () => {
+  const app = fixtureApp({
+    search: returnQuery,
+    fetch: url => url === '/api/auth/register' ? response({ pending: true }) : response({ user: { id: 'approved' } })
+  });
+  app.context.initMemberReturn();
+  app.context.showView('register');
+  app.node('regName').value = 'New member';
+  app.node('regEmail').value = 'new@example.test';
+  app.node('regPassword').value = 'newPassword123';
+  app.node('regConfirm').value = 'newPassword123';
+  await app.context.handleRegister(submit);
+  assert.equal(app.run('currentView'), 'pending');
+  assert.deepEqual(app.redirects, []);
+  assert.equal(app.node('memberReturnLink').href, returnPath);
+  app.context.showView('login');
+  loginFields(app);
+  await app.context.handleLogin(submit);
+  assert.deepEqual(app.redirects, [returnPath]);
+});
+
+test('password reset retains only the allowlisted target, never redirects before the new login', async () => {
+  const token = 'a'.repeat(64);
+  const app = fixtureApp({
+    search: returnQuery, hash: '#reset=' + token,
+    fetch: url => url === '/api/auth/password-reset' ? response({ success: true }) : response({ user: { id: 'approved' } })
+  });
+  await app.context.initMember();
+  assert.equal(app.run('currentView'), 'reset');
+  assert.equal(app.requests.length, 0);
+  assert.deepEqual(app.redirects, []);
+  assert.doesNotMatch(JSON.stringify([...app.storage]), new RegExp(token + '|password|email'));
+  app.node('resetPassword').value = 'changedPassword123';
+  app.node('resetConfirm').value = 'changedPassword123';
+  await app.context.handleResetPassword(submit);
+  assert.equal(app.run('currentView'), 'login');
+  assert.deepEqual(app.redirects, []);
+  loginFields(app);
+  await app.context.handleLogin(submit);
+  assert.deepEqual(app.redirects, [returnPath]);
+});
+
+test('same-tab reset links can recover a short-lived return target but ordinary member visits do not auto-redirect', async () => {
+  const storage = new Map([['vi_member_return', JSON.stringify({ target: returnPath, expires: Date.now() + 60000 })]]);
+  const reset = fixtureApp({ storage, search: '', hash: '#reset=' + 'b'.repeat(64) });
+  await reset.context.initMember();
+  assert.equal(reset.run('memberReturnTo'), returnPath);
+  assert.deepEqual(reset.redirects, []);
+  const ordinary = fixtureApp({ storage, search: '' });
+  ordinary.context.initMemberReturn();
+  ordinary.run("currentUser = { id: 'member' }");
+  assert.equal(ordinary.context.completeMemberReturn(), false);
+  const expired = fixtureApp({
+    search: '', hash: '#reset=' + 'b'.repeat(64),
+    storage: new Map([['vi_member_return', JSON.stringify({ target: returnPath, expires: 1 })]])
+  });
+  await expired.context.initMember();
+  assert.equal(expired.run('memberReturnTo'), '');
+});
+
+test('invalid or duplicate return parameters clear old targets; disabled storage does not break a valid login return', async () => {
+  const storage = new Map([['vi_member_return', JSON.stringify({ target: returnPath, expires: Date.now() + 60000 })]]);
+  const invalid = fixtureApp({ storage, search: returnQuery + '&return_to=%2Fadmin' });
+  invalid.context.initMemberReturn();
+  invalid.run("currentUser = { id: 'member' }");
+  assert.equal(invalid.context.completeMemberReturn(), false);
+  assert.equal(storage.has('vi_member_return'), false);
+  const app = fixtureApp({ search: returnQuery, blockStorage: true, fetch: () => response({ user: { id: 'approved' } }) });
+  app.context.initMemberReturn();
+  loginFields(app);
+  await app.context.handleLogin(submit);
+  assert.deepEqual(app.redirects, [returnPath]);
 });
 
 test('reset tokens are captured only in memory and fragments stripped before init', async () => {

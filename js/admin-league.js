@@ -414,7 +414,7 @@
     const filtered = list.filter(p => p.display_name.toLocaleLowerCase().includes(state.profileSearch.toLocaleLowerCase()));
     const player = list.find(p => p.id === state.profileId);
     return `<details class="al-details" id="al-profiles-details"${state.profilesOpen ? ' open' : ''}>
-      <summary>Player profiles, private skill & Spielleiter</summary>
+      <summary>Player profiles, private skill & Head Ref</summary>
       <p class="al-muted">Use gender, real beginner experience and private skill together for fair teams. Do not infer gender from a name. Profiles persist across trainings and seasons.</p>
       <div class="al-grid">
         <div class="al-field">${label('al-profile-search', 'Find a player profile')}
@@ -451,11 +451,11 @@
     const members = state.data.members.filter(eligibleScorekeeper).filter(m =>
       m.display_name.toLocaleLowerCase().includes(state.profileSearch.toLocaleLowerCase()));
     return `<section class="al-details">
-      <h4>Permanent Spielleiter role</h4>
-      <p class="al-small">Approved active members only; guests cannot receive this role. A Spielleiter may save match scores for every Thursday training, but cannot edit teams, BP, settings or final results. This role persists until an admin removes it. Use the profile search above to filter.</p>
+      <h4>Permanent Head Ref role</h4>
+      <p class="al-small">Approved active members only; guests cannot receive this role. A Head Ref uses the normal website login and may save match scores for every Thursday training, but cannot edit teams, BP, settings or final results. This role persists until an admin removes it. Use the profile search above to filter.</p>
       <div class="al-role-list" id="al-role-list">${members.map(m => `<label class="al-check al-role-row" for="al-role-${esc(m.id)}">
         <input type="checkbox" id="al-role-${esc(m.id)}" data-al-scorekeeper="${esc(m.id)}"${m.league_scorekeeper ? ' checked' : ''}>
-        <span>${esc(m.display_name)} <span class="al-small">· Spielleiter</span></span>
+        <span>${esc(m.display_name)} <span class="al-small">· Head Ref</span></span>
       </label>`).join('') || '<p class="al-small">No matching approved active members.</p>'}</div>
     </section>`;
   }
@@ -791,7 +791,7 @@
     const e = event();
     const rules = bonusSettings();
     return `<section class="al-card" id="al-bonus"><h3>Bonus points (BP) · admin only</h3>
-      <p class="al-muted">Individual awards for this training, added to each player’s season total when results are finalized. Spielleiter cannot award BP.</p>
+      <p class="al-muted">Individual awards for this training, added to each player’s season total when results are finalized. Head Refs cannot award BP.</p>
       ${!e ? '<p class="al-empty">Generate a draft first to award BP.</p>' : `
         <p class="al-callout">Saved training rules: maximum <strong>${rules.max} BP</strong> per player, in <strong>${rules.step} BP</strong> steps. Later Season 2 setting changes do not alter this training.</p>
         ${e.status === 'finalized' ? `<p class="al-notice">Finalized BP are read-only. Reopen results before editing; finalize again when corrections are complete.</p>${action('reopen-results', 'Reopen results to correct BP', disabled(cancelled()))}` : ''}
@@ -1521,11 +1521,11 @@
       const member = state.data.members.find(m => m.id === input.dataset.alScorekeeper && eligibleScorekeeper(m));
       if (!member) { input.checked = false; return; }
       const enabled = input.checked;
-      if (!window.confirm(`${enabled ? 'Grant' : 'Remove'} the permanent Spielleiter role ${enabled ? 'for' : 'from'} ${member.display_name}? This permits only match-score entry for Thursday trainings.`)) {
+      if (!window.confirm(`${enabled ? 'Grant' : 'Remove'} the permanent Head Ref role ${enabled ? 'for' : 'from'} ${member.display_name}? This permits only match-score entry for Thursday trainings.`)) {
         input.checked = !!member.league_scorekeeper;
         return;
       }
-      write('set_scorekeeper', { user_id: member.id, enabled }, { preserve: true, message: 'Spielleiter role updated.' })
+      write('set_scorekeeper', { user_id: member.id, enabled }, { preserve: true, message: 'Head Ref role updated.' })
         .then(saved => { if (!saved) input.checked = !!member.league_scorekeeper; }).catch(error => {
           input.checked = !!member.league_scorekeeper; showError(error);
         });

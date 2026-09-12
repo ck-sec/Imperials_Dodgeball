@@ -12,6 +12,7 @@ function renderAccount(user) {
 }
 
 function enterDashboard(prefetchedData) {
+  if (completeMemberReturn()) return;
   showView('dashboard');
   renderAccount(prefetchedData ? prefetchedData.user : currentUser);
   switchTab('training');

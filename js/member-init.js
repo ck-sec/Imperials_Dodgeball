@@ -103,6 +103,7 @@ document.addEventListener('site-language-change', () => {
 });
 
 async function initMember() {
+  initMemberReturn();
   applyMemberLanguage();
   if (window.MemberRecovery.present) {
     openMemberReset();

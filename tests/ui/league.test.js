@@ -79,7 +79,7 @@ test('standings preserve shared ranks, zero points and server totals', () => {
   ], 'en');
   assert.equal((html.match(/#1</g) || []).length, 2);
   assert.match(html, /9 Trainings/);
-  assert.match(html, /league-points">0</);
+  assert.match(html, /league-table-points">0</);
 });
 
 test('movement renders localized signed points and rank direction without relying only on arrows', () => {
@@ -147,10 +147,11 @@ test('standings render server-provided movements for shared ranks and nonpartici
     { rank: 1, display_name: 'B', points: 5, played: 2, wins: 1, points_gain: 2, previous_rank: 2, rank_gain: 1 },
     { rank: 3, display_name: '<Guest>', points: 4, played: 1, wins: 1, points_gain: 0, previous_rank: 1, rank_gain: -2 },
   ], 'en');
-  assert.equal((html.match(/class="league-movement"/g) || []).length, 3);
+  assert.equal((html.match(/class="league-table-change/g) || []).length, 12);
   assert.equal((html.match(/#1</g) || []).length, 2);
   assert.match(html, /&lt;Guest&gt;/);
   assert.match(html, /0 Points[\s\S]*2 places down/);
+  assert.doesNotMatch(html, /class="league-movement-context"/);
 });
 
 test('custom scoring describes whole-season accumulation, not best-N scoring', () => {
@@ -209,13 +210,45 @@ test('season totals include a separately labelled BP amount without adding it ag
     { rank: 1, display_name: 'Bonus player', points: 3.5, base_points: 3, bonus_points: 0.5, played: 1, wins: 1 },
     { rank: 2, display_name: 'No bonus', points: 3, bonus_points: 0, played: 1, wins: 1 }
   ], 'de');
-  assert.match(html, /league-points">3.5<small>Punkte gesamt/);
-  assert.match(html, /BP 0,5<\/span>/);
-  assert.match(html, /BP 0<\/span>/);
+  assert.match(html, /<th[^>]*>Punkte gesamt<\/th>/);
+  assert.match(html, /league-table-points">3,5<\/span>/);
+  assert.match(html, /aria-label="Bonuspunkte: 0,5[^"]*">0,5<\/span>/);
+  assert.match(html, /aria-label="Bonuspunkte: 0\.[^"]*">0<\/span>/);
   assert.match(html, /BP sind in der Gesamtpunktzahl enthalten/);
-  assert.doesNotMatch(html, /league-points">4</);
+  assert.doesNotMatch(html, /league-table-points">4</);
   assert.match(ui.bonus({ bonus_points: '<img src=x>' }, 'en'), /&lt;img src=x&gt;/);
   assert.doesNotMatch(ui.bonus({ bonus_points: '<img src=x>' }, 'en'), /<img/);
+});
+
+test('rankings use compact table columns rather than repeated player cards and detail controls', () => {
+  const html = ui.standings([
+    { rank: 1, display_name: 'One', points: 3.5, bonus_points: 0.5, played: 1, wins: 1,
+      points_gain: 3.5, previous_rank: null, rank_gain: null },
+  ], 'en');
+  assert.match(html, /<table class="league-ranking-table">/);
+  assert.equal((html.match(/scope="col"/g) || []).length, 8);
+  assert.match(html, /<th scope="row" class="league-table-player">/);
+  assert.match(html, />Total points<\/th>/);
+  assert.match(html, />Gain<\/th>/);
+  assert.match(html, />Rank \+\/-<\/th>/);
+  assert.doesNotMatch(html, /<ol|<details|league-standing-details/);
+  assert.match(html, /league-table-mobile/);
+  assert.match(html, /league-sr-only">New<\/span>/);
+});
+
+test('archive table preserves original BP, gain, streak and rank change without live-season assumptions', () => {
+  const player = { rank: 1, display_name: '<Archived>', points: 70, played: 26,
+    legacy: { tier: 'platinum', bp: 2, gain: 2, streak: 11, change: -1 } };
+  const before = JSON.stringify(player);
+  const html = ui.standings([player], 'en');
+  assert.match(html, /&lt;Archived&gt;/);
+  assert.match(html, /Archived BP">2<\/span>/);
+  assert.match(html, />Streak<\/th>/);
+  assert.match(html, /Archived movement: \+2 Points/);
+  assert.match(html, /1 place down/);
+  assert.match(html, /league-table-points">70</);
+  assert.doesNotMatch(html, /BP are included|BP 0|From the last scored training/);
+  assert.equal(JSON.stringify(player), before);
 });
 
 test('bonus rules explain configurable limits and the disabled state', () => {

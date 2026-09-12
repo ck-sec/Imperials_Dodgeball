@@ -48,6 +48,7 @@ function setup(data = fixture(), custom, extra = {}) {
   let current = data;
   const base = (url, options) => {
     if (url === '/api/auth/refresh') return reply(401, { code: 'NO_REFRESH_TOKEN' });
+    if (url === '/api/member/stats?view=account') return reply(401, {});
     if (url.startsWith('/api/league?')) return reply(200, current);
     if (url === '/api/league' && options.method === 'POST') {
       const body = JSON.parse(options.body);
@@ -75,7 +76,7 @@ function enter(controller, number = 1, a = '0', b = '4') {
   controller.edit(number, 'b', b);
 }
 
-function fixtureApp(data = fixture()) {
+function fixtureApp(data = fixture(), options = {}) {
   const decode = value => value.replace(/&quot;/g, '"').replace(/&#39;/g, "'")
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
   function node() {
@@ -84,10 +85,11 @@ function fixtureApp(data = fixture()) {
       value: '', innerHTML: '', textContent: '', dataset: {}, listeners: {}, hidden: false, disabled: false, readOnly: false,
       classList: { toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); }, contains: name => classes.has(name) },
       addEventListener(type, listener) { this.listeners[type] = listener; },
-      setAttribute() {}, querySelectorAll() { return []; }, contains() { return false; }
+      attributes: {}, setAttribute(name, value) { this.attributes[name] = String(value); },
+      querySelectorAll() { return []; }, contains() { return false; }
     };
   }
-  const elements = new Map([...html.matchAll(/\bid="([^"]+)"/g)].map(match => [match[1], node()]));
+  const elements = new Map([...html.matchAll(/\bid="([^"]+)"/g)].map(match => [match[1], { ...node(), id: match[1] }]));
   const host = elements.get('matchdayMatches');
   let forms = new Map();
   let markup = '';
@@ -142,12 +144,20 @@ function fixtureApp(data = fixture()) {
     getElementById: id => elements.get(id), querySelectorAll: () => [], addEventListener() {}
   };
   const requests = [];
+  const redirects = [];
+  const opened = [];
+  const windowEvents = {};
+  const storage = options.storage || new Map();
   const window = {
-    location: { search: '?event=' + data.event.id }, history: { replaceState() {}, pushState() {} }, addEventListener() {},
+    location: { search: '?event=' + data.event.id, assign: target => redirects.push(target) },
+    history: { replaceState() {}, pushState() {} }, addEventListener(type, listener) { windowEvents[type] = listener; },
+    open: (...args) => opened.push(args),
     SiteLanguage: { get: () => 'en' },
     LeagueUI: { date: value => value, standings: () => '', rules: () => '', matchTable: () => '' },
     fetch: async (url, options) => {
       requests.push({ url, ...options });
+      if (url === '/api/member/stats?view=account') return reply(401, {});
+      if (url === '/api/auth/refresh') return reply(401, {});
       if (url === '/api/league' && options.method === 'POST') {
         const body = JSON.parse(options.body);
         const match = data.event.schedule.rounds.flatMap(round => round.matches).find(match => match.number === body.match_number);
@@ -161,12 +171,17 @@ function fixtureApp(data = fixture()) {
   };
   const appContext = vm.createContext({
     window, document, URLSearchParams, AbortController,
-    sessionStorage: { getItem: () => null }, setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {}
+    sessionStorage: {
+      getItem: key => storage.get(key) || null,
+      setItem(key, value) { if (options.blockStorage) throw new Error('Storage blocked'); storage.set(key, value); },
+      removeItem(key) { if (options.blockStorage) throw new Error('Storage blocked'); storage.delete(key); }
+    },
+    setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {}
   });
   vm.runInContext(source, appContext);
   window.Matchday.start();
   return {
-    requests, document, elements,
+    requests, document, elements, redirects, opened, storage, windowEvents,
     form: number => forms.get(number),
     async refresh() { elements.get('matchdayRefresh').listeners.click(); await tick(); },
     async select(nextData) {
@@ -185,6 +200,12 @@ function fixtureApp(data = fixture()) {
     },
     review(number, keep) {
       host.listeners.click({ target: forms.get(number).querySelector('[data-review="' + (keep ? 'keep' : 'current') + '"]') });
+    },
+    async login() {
+      const link = elements.get('matchdayLoginLink');
+      let prevented = false;
+      await link.listeners.click({ button: 0, currentTarget: link, preventDefault() { prevented = true; } });
+      if (!prevented && link.target === '_blank') opened.push([link.href, link.target, link.rel]);
     }
   };
 }
@@ -202,16 +223,18 @@ test('standalone page uses versioned local assets, external scripts, rewrite, an
   const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
   assert.ok(config.rewrites.some(rule => rule.source === '/spieltag' && rule.destination === '/spieltag.html'));
   assert.match(html, /viewport/);
-  assert.match(html, /fonts\/fonts.css\?v=20260912b/);
-  assert.match(html, /league.css\?v=20260912b/);
-  assert.match(html, /matchday.css\?v=20260912b/);
+  assert.match(html, /fonts\/fonts.css\?v=20260912c/);
+  assert.match(html, /league.css\?v=20260912c/);
+  assert.match(html, /matchday.css\?v=20260912c/);
   assert.doesNotMatch(html, /publicsite.css|admin-auth.js|member-auth.js|\son[a-z]+=/);
   for (const script of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
-    assert.match(script[1], /src="\/js\/[^"]+\?v=20260912b"/);
+    assert.match(script[1], /src="\/js\/[^"]+\?v=20260912c"/);
     assert.equal(script[2].trim(), '');
   }
-  assert.match(html, /<details[^>]*id="matchdayAuth">/);
-  assert.match(html, /autocomplete="current-password"/);
+  assert.match(html, /id="matchdayLoginLink" href="\/member\?return_to=/);
+  assert.doesNotMatch(html, /<form|type="password"|matchdayLoginMode|matchdayEmail|Spielleiter|scorekeepers?/i);
+  assert.match(html, /Head Refs/);
+  assert.doesNotMatch(source, /\/api\/auth\/login|\/api\/admin-login|\/api\/auth\/logout|matchdayPassword/);
   assert.match(html, /data-site-language="de"/);
   assert.match(html, /data-site-language="en"/);
   assert.match(css, /min-height: 62px/);
@@ -669,47 +692,40 @@ test('rate-limited scores honor retry_after without overwriting the draft or ret
   assert.equal(ui.retrySeconds({ retry_after: Infinity }), 86400);
 });
 
-test('member sign-in uses existing body/cookies and admin sign-in uses the existing storage token, not a new JWT', async () => {
+test('member login links contain only the allowlisted matchday and safe event identifier', () => {
+  assert.equal(ui.memberLoginHref(A), '/member?return_to=' + encodeURIComponent('/spieltag?event=' + A));
+  assert.equal(ui.memberLoginHref(A.toUpperCase()), ui.memberLoginHref(A));
+  for (const input of ['', undefined, 'https://evil.example', A + '&token=secret', '../admin']) {
+    assert.equal(ui.memberLoginHref(input), '/member?return_to=%2Fspieltag');
+  }
+});
+
+test('already signed-in ordinary members are recognized without refresh loops or another login', async () => {
   const data = fixture(A, false);
-  const stored = [];
   const { controller, requests } = setup(data, (url, options, base) => {
-    if (url === '/api/auth/login') {
-      data.permissions = { is_admin: false, is_scorekeeper: true, can_score: true };
-      return reply(200, { user: { id: 'member' } });
-    }
-    if (url === '/api/admin-login') {
-      data.permissions = { is_admin: true, is_scorekeeper: false, can_score: true };
-      return reply(200, { token: 'existing-admin-format' });
-    }
+    if (url === '/api/member/stats?view=account') return reply(200, { user: { id: 'member' } });
     return base(url, options);
-  }, { storeToken: value => stored.push(value) });
-  assert.equal(await controller.login('member', ' NAME@EXAMPLE.COM ', 'member-password', true), true);
-  const member = requests.find(request => request.url === '/api/auth/login');
-  assert.deepEqual(JSON.parse(member.body), { email: 'name@example.com', password: 'member-password', remember_me: true });
-  assert.equal(member.credentials, 'include');
-  assert.equal(await controller.login('admin', '', 'admin-password', false), true);
-  assert.equal(stored.at(-1), 'existing-admin-format');
-  assert.deepEqual(JSON.parse(requests.find(request => request.url === '/api/admin-login').body), { password: 'admin-password' });
-  assert.match(source, /const password = \$\('matchdayPassword'\)\.value;\s+\$\('matchdayPassword'\)\.value = '';/);
-  assert.doesNotMatch(source, /localStorage|jwt\.|atob\(/);
+  });
+  await controller.load();
+  await controller.load();
+  assert.equal(controller.state.memberKnown, true);
+  assert.equal(controller.canScore(), false);
+  assert.equal(requests.filter(request => request.url === '/api/auth/refresh').length, 0);
+  assert.equal(controller.login, undefined);
 });
 
-test('login errors and rate limits do not retain passwords or invent an authenticated session', async () => {
-  let now = 1;
-  const { controller, requests } = setup(fixture(A, false), (url, options, base) => url === '/api/auth/login'
-    ? reply(429, { retry_after: 5 }) : base(url, options), { now: () => now });
-  assert.equal(await controller.login('member', 'bad', 'pass', false), false);
-  assert.equal(requests.length, 0);
-  assert.equal(await controller.login('member', 'member@example.com', 'pass', false), false);
-  assert.equal(controller.state.authRetryUntil, 5001);
-  assert.equal(controller.state.memberKnown, false);
-  assert.equal(await controller.login('member', 'member@example.com', 'pass', false), false);
-  assert.equal(requests.filter(request => request.url === '/api/auth/login').length, 1);
-  assert.doesNotMatch(JSON.stringify(controller.state), /"password"/);
-  now = 6000;
+test('Head Ref is only a display label and existing permission responses activate scoring immediately', async () => {
+  const app = fixtureApp();
+  await tick();
+  assert.equal(app.elements.get('matchdayAuthSummary').textContent, 'Head Ref · signed in');
+  assert.equal(app.elements.get('matchdayLoginLink').hidden, true);
+  assert.equal(app.form(1).querySelectorAll('input[data-side]').every(input => !input.readOnly), true);
+  assert.equal(app.requests.some(request => request.url.startsWith('/api/auth/')), false);
+  assert.match(source, /permissions\.is_scorekeeper/);
+  assert.doesNotMatch(source, /set_scorekeeper|league_head_ref|is_head_ref/);
 });
 
-test('sign-in waits for pending cookie renewal, preventing late refresh cookies from replacing a new session', async () => {
+test('central navigation can drain a pending refresh before the normal login engine starts', async () => {
   const pending = deferred();
   const order = [];
   const data = fixture(A, false);
@@ -720,23 +736,104 @@ test('sign-in waits for pending cookie renewal, preventing late refresh cookies 
       order.push('refresh end');
       return response;
     }
-    if (url === '/api/auth/login') {
-      order.push('login');
-      data.permissions.is_scorekeeper = true;
-      data.permissions.can_score = true;
-      return reply(200, { user: { id: 'new-member' } });
-    }
     return base(url, options);
   });
   const loading = controller.load();
   await tick();
-  const signingIn = controller.login('member', 'new@example.com', 'password', true);
+  let ready = false;
+  const navigation = controller.waitForRead().then(() => { ready = true; });
+  await tick();
+  assert.equal(ready, false);
   assert.deepEqual(order, ['refresh start']);
   pending.resolve(reply(200, { user: { id: 'old-member' } }));
   await loading;
-  assert.equal(await signingIn, true);
-  assert.deepEqual(order, ['refresh start', 'refresh end', 'login']);
-  assert.equal(controller.canScore(), true);
+  await navigation;
+  assert.equal(ready, true);
+  assert.deepEqual(order, ['refresh start', 'refresh end']);
+});
+
+test('central sign-in preserves local drafts and requires review after returning to the same event', async () => {
+  const data = fixture();
+  const app = fixtureApp(data);
+  await tick();
+  app.edit(1, '7', '2');
+  data.permissions = { is_admin: false, is_scorekeeper: false, can_score: false };
+  await app.refresh();
+  assert.equal(app.elements.get('matchdayLoginLink').hidden, false);
+  await app.login();
+  assert.deepEqual(app.redirects, [ui.memberLoginHref(A)]);
+  assert.equal(app.storage.has('vi_matchday_drafts'), true);
+  let warned = false;
+  app.windowEvents.beforeunload({ preventDefault() { warned = true; } });
+  assert.equal(warned, false);
+
+  const restored = fixtureApp(fixture(), { storage: app.storage });
+  await tick();
+  assert.deepEqual(restored.form(1).querySelectorAll('input[data-side]').map(input => input.value), ['7', '2']);
+  assert.equal(restored.form(1).querySelector('.matchday-save').disabled, true);
+  assert.match(restored.form(1).querySelector('.matchday-game-message').textContent, /restored/i);
+  assert.equal(writes(restored.requests).length, 0);
+  restored.review(1, true);
+  await restored.save(1);
+  assert.equal(writes(restored.requests).length, 1);
+  assert.equal(app.storage.has('vi_matchday_drafts'), false);
+});
+
+test('unavailable draft storage opens central sign-in separately without abandoning the original drafts', async () => {
+  const app = fixtureApp(fixture(), { blockStorage: true });
+  await tick();
+  app.edit(1, '5', '1');
+  await app.login();
+  assert.deepEqual(app.redirects, []);
+  assert.deepEqual(app.opened, [[ui.memberLoginHref(A), '_blank', 'noopener']]);
+  assert.deepEqual(app.form(1).querySelectorAll('input[data-side]').map(input => input.value), ['5', '1']);
+  let warned = false;
+  app.windowEvents.beforeunload({ preventDefault() { warned = true; } });
+  assert.equal(warned, true);
+});
+
+test('login retains its clicked link when storage becomes unavailable after the pending read', async () => {
+  const options = {};
+  const app = fixtureApp(fixture(), options);
+  await tick();
+  app.edit(1, '5', '1');
+  const link = app.elements.get('matchdayLoginLink');
+  const event = { button: 0, currentTarget: link, preventDefault() {} };
+  const navigation = link.listeners.click(event);
+  event.currentTarget = null;
+  options.blockStorage = true;
+  await navigation;
+  assert.equal(link.target, '_blank');
+  assert.deepEqual(app.redirects, []);
+  assert.deepEqual(app.form(1).querySelectorAll('input[data-side]').map(input => input.value), ['5', '1']);
+  await app.login();
+  assert.deepEqual(app.opened, [[ui.memberLoginHref(A), '_blank', 'noopener']]);
+});
+
+test('draft serialization excludes authentication data and restored revoked members remain read-only', async () => {
+  const { controller } = setup();
+  await controller.load();
+  enter(controller, 1, '9', '3');
+  controller.draftFor(1).token = 'never-store-this';
+  controller.draftFor(1).password = 'never-store-this';
+  const saved = ui.draftSnapshot(controller.state);
+  assert.doesNotMatch(saved, /never-store-this|password|token/);
+  const { controller: returned, requests } = setup(fixture(A, false), null, { drafts: saved });
+  await returned.load();
+  assert.equal(returned.canScore(), false);
+  assert.equal(returned.draftFor(1).a, '9');
+  assert.equal(returned.draftFor(1).conflict, true);
+  returned.review(1, true);
+  assert.equal(await returned.save(1), false);
+  assert.equal(writes(requests).length, 0);
+  for (const invalid of ['not-json', '{}', JSON.stringify([['__proto__', { a: '1' }]]), 'x'.repeat(100001)]) {
+    assert.equal(ui.restoreDrafts(invalid).size, 0);
+  }
+  const valid = JSON.parse(saved)[0];
+  const corrupt = [valid[0], { ...valid[1], identity: '{broken' }];
+  const recovered = ui.restoreDrafts(JSON.stringify([corrupt, valid]));
+  assert.equal(recovered.size, 1);
+  assert.equal(recovered.get(valid[0]).a, '9');
 });
 
 test('invalid member cookies never prevent the cookie-free public table fallback', async () => {

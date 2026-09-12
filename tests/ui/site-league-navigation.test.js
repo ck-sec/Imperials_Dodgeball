@@ -148,7 +148,8 @@ test('Hall of Fame remains usable when the public API fails; archive failure has
 test('direct hashes select the correct panel, including frozen archive routes', async () => {
   for (const [hash, panel] of [
     ['#hall-of-fame', 'honours'], ['#season-1', 'standings'],
-    ['#training-league-standings', 'standings'], ['#training-league-schedule', 'schedule'], ['#training-league', 'teams']
+    ['#training-league-standings', 'standings'], ['#training-league-schedule', 'schedule'],
+    ['#training-league', 'standings'], ['#rankings', 'standings'], ['#training-league-teams', 'teams']
   ]) {
     const result = await ready(hash);
     active(result, panel);
@@ -159,40 +160,41 @@ test('direct hashes select the correct panel, including frozen archive routes', 
 
 test('Back and Forward restore current panels, Hall of Fame, and the original hashless homepage', async () => {
   const result = await ready();
-  result.trigger('click', '[data-league-tab="standings"]');
-  assert.equal(result.location.hash, '#training-league-standings');
+  active(result, 'standings');
+  result.trigger('click', '[data-league-tab="teams"]');
+  assert.equal(result.location.hash, '#training-league-teams');
   result.trigger('click', '[data-league-hof]');
   result.trigger('change', '[data-league-season]', 'current');
   result.requests[2].resolve(current());
   await settle();
-  active(result, 'teams');
+  active(result, 'standings');
   result.history.back();
   active(result, 'honours');
   result.history.back();
-  active(result, 'standings');
+  active(result, 'teams');
   result.history.back();
   assert.equal(result.location.hash, '');
-  active(result, 'teams');
-  result.history.forward();
   active(result, 'standings');
+  result.history.forward();
+  active(result, 'teams');
   result.hash('#about');
   assert.equal(result.location.hash, '#about');
-  active(result, 'standings');
+  active(result, 'teams');
 });
 
 test('keyboard tabs wrap with arrows and support Home/End; focus survives language and season changes', async () => {
   const result = await ready();
-  result.find('[data-league-tab="teams"]').focus();
-  assert.equal(result.trigger('keydown', '[data-league-tab="teams"]', 'ArrowLeft').prevented, true);
+  result.find('[data-league-tab="standings"]').focus();
+  assert.equal(result.trigger('keydown', '[data-league-tab="standings"]', 'ArrowLeft').prevented, true);
+  active(result, 'schedule');
+  assert.equal(result.document.activeElement.dataset.leagueTab, 'schedule');
+  result.trigger('keydown', '[data-league-tab="schedule"]', 'Home');
   active(result, 'standings');
-  assert.equal(result.document.activeElement.dataset.leagueTab, 'standings');
-  result.trigger('keydown', '[data-league-tab="standings"]', 'Home');
-  active(result, 'teams');
-  result.trigger('keydown', '[data-league-tab="teams"]', 'End');
-  active(result, 'standings');
+  result.trigger('keydown', '[data-league-tab="standings"]', 'End');
+  active(result, 'schedule');
   result.language('de');
-  assert.equal(result.document.activeElement.dataset.leagueTab, 'standings');
-  active(result, 'standings');
+  assert.equal(result.document.activeElement.dataset.leagueTab, 'schedule');
+  active(result, 'schedule');
   result.find('[data-league-season]').focus();
   result.trigger('change', '[data-league-season]', 'season-1');
   assert.equal(result.document.activeElement.hasAttribute('data-league-season'), true);
@@ -202,4 +204,18 @@ test('keyboard tabs wrap with arrows and support Home/End; focus survives langua
   active(result, 'honours');
   assert.match(result.content.innerHTML, /Honouring our top three/);
   assert.equal(read('data/season-1.json'), frozenArchive);
+});
+
+test('Season 2 standings are the homepage default and stay selected after refresh and language changes', async () => {
+  const result = await ready();
+  active(result, 'standings');
+  assert.match(result.content.innerHTML, /option value="current" selected>Season 2/);
+  assert.equal(result.content.querySelectorAll('[data-league-tab]')[0].dataset.leagueTab, 'standings');
+  result.language('de');
+  active(result, 'standings');
+  result.trigger('click', '[data-league-refresh]');
+  assert.equal(result.requests[2].url, '/api/league?view=public&season_id=current');
+  result.requests[2].resolve(current());
+  await settle();
+  active(result, 'standings');
 });

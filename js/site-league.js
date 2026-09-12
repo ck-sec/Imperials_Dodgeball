@@ -8,17 +8,18 @@
   let archive = null;
   let seasons = [];
   const routes = {
-    '': 'teams',
-    '#training-league': 'teams',
+    '': 'standings',
+    '#training-league': 'standings',
+    '#training-league-teams': 'teams',
     '#training-league-schedule': 'schedule',
     '#training-league-standings': 'standings',
-    '#rankings': 'teams',
+    '#rankings': 'standings',
     '#season-1': 'standings',
     '#hall-of-fame': 'honours'
   };
   let selectedSeason = ['#season-1', '#hall-of-fame'].includes(location.hash) ? 'season-1' : '';
   let deepLinkPending = Boolean(location.hash && routes[location.hash]);
-  let activePanel = routes[location.hash] || 'teams';
+  let activePanel = routes[location.hash] || 'standings';
   let selectedEvent = '';
   let search = '';
   let gender = 'all';
@@ -61,7 +62,7 @@
   function updateHash() {
     const hash = selectedSeason === 'season-1'
       ? (activePanel === 'honours' ? '#hall-of-fame' : '#season-1')
-      : (activePanel === 'teams' ? '#training-league' : '#training-league-' + activePanel);
+      : '#training-league-' + activePanel;
     if (location.hash !== hash) history.pushState(null, '', hash);
   }
 
@@ -137,7 +138,7 @@
     if (!events.some(event => event.id === selectedEvent)) selectedEvent = events.length ? events[0].id : '';
     return `<p class="league-copy">${ui.escape(ui.date(data.season.start_date, lang))} &ndash; ${ui.escape(ui.date(data.season.end_date, lang))}</p>
       ${ui.rules(data.season, lang)}
-      ${tabs([['teams', t.teams], ['schedule', t.schedule], ['standings', t.standings]])}
+      ${tabs([['standings', t.standings], ['teams', t.teams], ['schedule', t.schedule]])}
       ${events.length ? `<label class="league-field league-block" data-league-training-control>${ui.escape(t.training)}<select class="league-input" data-league-event-select>${events.map(event =>
           `<option value="${ui.escape(event.id)}"${event.id === selectedEvent ? ' selected' : ''}>${ui.escape(ui.date(event.session_date, lang))} - ${ui.escape(event.title)}</option>`
         ).join('')}</select></label>` : ''}
@@ -265,7 +266,7 @@
       visible = 25;
       search = '';
       gender = 'all';
-      activePanel = selectedSeason === 'season-1' ? 'standings' : 'teams';
+      activePanel = 'standings';
       updateHash();
       if (selectedSeason === 'season-1') render();
       else load(selectedSeason);

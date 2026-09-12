@@ -7,6 +7,44 @@ let trainingLoaded = false;
 let refreshPromise = null;
 const rsvpInFlight = new Set();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MEMBER_RETURN_KEY = 'vi_member_return';
+let memberReturnTo = '';
+
+function safeMemberReturn(value) {
+  if (typeof value !== 'string' || /[\s\\#]/.test(value)) return '';
+  const match = /^\/spieltag(?:\?event=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))?$/i.exec(value);
+  return match ? '/spieltag' + (match[1] ? '?event=' + match[1].toLowerCase() : '') : '';
+}
+
+function initMemberReturn() {
+  const values = new URLSearchParams(window.location.search).getAll('return_to');
+  memberReturnTo = values.length === 1 ? safeMemberReturn(values[0]) : '';
+  if (values.length && !memberReturnTo) console.error('Ignored invalid matchday return target.');
+  try {
+    if (values.length) {
+      if (memberReturnTo) sessionStorage.setItem(MEMBER_RETURN_KEY, JSON.stringify({ target: memberReturnTo, expires: Date.now() + 30 * 60 * 1000 }));
+      else sessionStorage.removeItem(MEMBER_RETURN_KEY);
+    } else if (window.MemberRecovery.present) {
+      const saved = JSON.parse(sessionStorage.getItem(MEMBER_RETURN_KEY) || 'null');
+      if (saved && Number.isFinite(saved.expires) && saved.expires > Date.now()) memberReturnTo = safeMemberReturn(saved.target);
+    }
+  } catch (error) {
+    console.error('Member return state could not be stored or restored:', error.name);
+  }
+  byId('memberReturnNotice').hidden = !memberReturnTo;
+  byId('memberReturnLink').href = memberReturnTo || '/spieltag';
+}
+
+function completeMemberReturn() {
+  const target = safeMemberReturn(memberReturnTo);
+  if (!currentUser || !target || window.MemberRecovery.present) return false;
+  memberReturnTo = '';
+  try { sessionStorage.removeItem(MEMBER_RETURN_KEY); } catch (error) {
+    console.error('Member return state could not be cleared:', error.name);
+  }
+  window.location.replace(target);
+  return true;
+}
 
 function memberLang() { return window.SiteLanguage.get(); }
 function mt(de, en) { return memberLang() === 'de' ? de : en; }

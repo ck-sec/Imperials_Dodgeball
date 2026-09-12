@@ -473,11 +473,13 @@ test('season BP settings submit only the exact existing season and validate cap/
   await assert.rejects(a.api.submit(a.form('season', { ...fields, bonus_points_max: '0.3' })), /multiple/);
 });
 
-test('permanent Spielleiter role only lists eligible members, never guest profiles, and preserves unsaved draft', async () => {
+test('permanent Head Ref role only lists eligible members, never guest profiles, and preserves unsaved draft', async () => {
   const data = dataFixture();
   data.members.push({ id: 'pending', display_name: 'Pending', status: 'pending', is_active: true });
   data.members.push({ id: 'inactive', display_name: 'Inactive', status: 'approved', is_active: false });
   const a = await app({ data });
+  assert.match(a.html(), /Permanent Head Ref role/);
+  assert.doesNotMatch(a.html(), /Spielleiter/);
   assert.match(a.html(), /data-al-scorekeeper="u1"/);
   assert.doesNotMatch(a.html(), /data-al-scorekeeper="(?:pending|inactive|p6)"/);
   await a.action('remove-player:p1');
@@ -493,10 +495,10 @@ test('permanent Spielleiter role only lists eligible members, never guest profil
 test('admin assets cache-busted, role management title preserved, touch targets avoid HTML5-only dragging', () => {
   const html = fs.readFileSync(path.join(rootPath, 'admin.html'), 'utf8');
   const css = fs.readFileSync(path.join(rootPath, 'admin-league.css'), 'utf8');
-  assert.match(html, /admin-league\.js\?v=20260912b/);
+  assert.match(html, /admin-league\.js\?v=20260912c/);
   assert.match(html, /admin-league\.css\?v=20260912b/);
-  assert.match(html, /\/league\.css\?v=20260912b/);
-  assert.match(html, /\/js\/league-ui\.js\?v=20260912b/);
+  assert.match(html, /\/league\.css\?v=20260912c/);
+  assert.match(html, /\/js\/league-ui\.js\?v=20260912c/);
   assert.ok(html.indexOf('admin-auth.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-scoring.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-ui.js') < html.indexOf('admin-league.js'));
