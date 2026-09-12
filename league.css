@@ -53,6 +53,9 @@
 .league-movement .league-movement-new { color: #f0b830; }
 .league-points { font-size: 1.5rem; font-weight: 800; font-family: 'Barlow Condensed', sans-serif; text-align: right; }
 .league-points small { display: block; font-family: 'Inter', sans-serif; font-size: .65rem; font-weight: 500; color: var(--league-muted); }
+.league-bonus { display: inline-block; margin-top: .35rem; padding: .15rem .4rem; border: 1px solid #647ca3; border-radius: 5px; color: #d0daeb; font: 600 .7rem/1.5 'Inter', sans-serif; white-space: nowrap; }
+.league-matchday-link { margin: .5rem 0 .5rem .5rem; }
+.member-team > .league-matchday-link { margin-left: 0; }
 .league-team-grid { display: grid; gap: .85rem; margin-top: 1rem; }
 .league-team { border: 1px solid #375681; border-top: 3px solid #d4961a; border-radius: 10px; padding: 1rem; background: #102447; min-width: 0; }
 .league-team h4 { font-family: 'Barlow Condensed', sans-serif; font-size: 1.3rem; font-weight: 700; margin: 0 0 .5rem; overflow-wrap: anywhere; }

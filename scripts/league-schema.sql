@@ -6,6 +6,8 @@
 -- roster_ids use league IDs; rsvp_user_ids independently freeze source registrations even for manual squads.
 -- Relative scoring interpolates over placement_points, then rounds to points_step.
 -- Fixed mode repeats the last value. Legacy frozen snapshots without a mode remain fixed.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS league_scorekeeper BOOLEAN NOT NULL DEFAULT FALSE;
+-- statement-breakpoint
 CREATE TABLE IF NOT EXISTS league_seasons (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
@@ -14,12 +16,15 @@ CREATE TABLE IF NOT EXISTS league_seasons (
   placement_points JSONB NOT NULL DEFAULT '[3,2.5,2,1,0.5]'::jsonb,
   scoring_mode VARCHAR(8) NOT NULL DEFAULT 'relative' CHECK (scoring_mode IN ('relative', 'fixed')),
   points_step NUMERIC NOT NULL DEFAULT 0.5 CHECK (points_step IN (0.1, 0.25, 0.5, 1)),
+  bonus_points_max NUMERIC NOT NULL DEFAULT 1 CHECK (bonus_points_max BETWEEN 0 AND 10000),
+  bonus_points_step NUMERIC NOT NULL DEFAULT 0.5 CHECK (bonus_points_step > 0 AND bonus_points_step <= 10000),
   k_factor NUMERIC NOT NULL DEFAULT 24 CHECK (k_factor >= 0 AND k_factor <= 200),
   default_rating NUMERIC NOT NULL DEFAULT 1000 CHECK (default_rating >= 0 AND default_rating <= 10000),
   rookie_rating NUMERIC NOT NULL DEFAULT 800 CHECK (rookie_rating >= 0 AND rookie_rating <= 10000),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (jsonb_typeof(placement_points) = 'array' AND jsonb_array_length(placement_points) BETWEEN 1 AND 100)
+  CHECK (jsonb_typeof(placement_points) = 'array' AND jsonb_array_length(placement_points) BETWEEN 1 AND 100),
+  CONSTRAINT league_seasons_bonus_increment_check CHECK (mod(bonus_points_max, bonus_points_step) = 0)
 );
 -- statement-breakpoint
 -- Existing seasons keep their fixed rules; new seasons default to relative.
@@ -49,13 +54,14 @@ CREATE TABLE IF NOT EXISTS league_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   season_id UUID NOT NULL REFERENCES league_seasons(id) ON DELETE RESTRICT,
   session_id UUID NOT NULL UNIQUE REFERENCES training_sessions(id) ON DELETE RESTRICT,
-  team_size INTEGER NOT NULL CHECK (team_size IN (4,5,6)),
+  team_size INTEGER NOT NULL CHECK (team_size IN (2,3,4,5,6)),
   max_teams INTEGER NOT NULL DEFAULT 5 CHECK (max_teams BETWEEN 2 AND 5),
   schedule JSONB CHECK (schedule IS NULL OR jsonb_typeof(schedule) = 'object'),
   roster_locked BOOLEAN NOT NULL DEFAULT FALSE,
   status VARCHAR(10) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','finalized')),
   version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
   settings JSONB NOT NULL,
+  bonus_points JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(bonus_points) = 'array'),
   teams JSONB NOT NULL,
   roster_ids JSONB NOT NULL,
   rsvp_user_ids JSONB NOT NULL,
@@ -83,7 +89,8 @@ CREATE TABLE IF NOT EXISTS league_results (
   display_name VARCHAR(100) NOT NULL,
   team_number INTEGER NOT NULL CHECK (team_number > 0),
   placement INTEGER NOT NULL CHECK (placement > 0),
-  points NUMERIC NOT NULL CHECK (points >= 0 AND points <= 10000),
+  points NUMERIC NOT NULL CHECK (points >= 0 AND points <= 20000),
+  bonus_points NUMERIC NOT NULL DEFAULT 0 CHECK (bonus_points >= 0 AND bonus_points <= 10000 AND bonus_points <= points),
   rating_delta NUMERIC NOT NULL CHECK (rating_delta >= -200 AND rating_delta <= 200),
   PRIMARY KEY (event_id, player_id)
 );

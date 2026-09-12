@@ -8,6 +8,7 @@
     { "source": "/contact/", "destination": "/#cta", "permanent": true }
   ],
   "rewrites": [
+    { "source": "/spieltag", "destination": "/spieltag.html" },
     { "source": "/member", "destination": "/member.html" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/dodgeball-wien", "destination": "/dodgeball-wien.html" },

@@ -24,7 +24,7 @@ function worldFixture() {
 }
 
 function recorder(transaction) {
-  const sql = (strings, ...values) => ({
+  const sql = (strings, ...values) => strings.join('').includes('SELECT id, display_name, ranking_player_name FROM users') ? Promise.resolve([]) : ({
     text: strings.reduce((out, segment, i) => out + (i ? `$${i}` : '') + segment, ''), values,
   });
   sql.query = (text, values) => ({ text, values });
@@ -68,7 +68,7 @@ test('approved account synchronization creates independent profiles without over
   assert.match(queries[0].text, /pg_advisory_xact_lock/);
   assert.match(queries[1].text, /FOR SHARE/);
   const insert = queries.find(q => q.text.includes('INSERT INTO league_players'));
-  assert.match(insert.text, /is_active = true AND status = 'approved'/);
+  assert.match(insert.text, /u.is_active = true AND u.status = 'approved'/);
   assert.match(insert.text, /ON CONFLICT \(user_id\) DO NOTHING/);
   assert(!/DO UPDATE/.test(insert.text));
   const world = worldFixture();

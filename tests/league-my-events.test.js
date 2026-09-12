@@ -74,7 +74,7 @@ test('anonymous events and member fixtures use explicit public projections witho
   assert.equal(event.end_time, '09:20:00');
   assert.equal(event.schedule.rounds[0].matches.length, 1);
   assert.equal(event.match_standings.standings.length, 2);
-  assert.deepEqual(Object.keys(event.teams[1].players[0]), ['display_name']);
+  assert.deepEqual(Object.keys(event.teams[1].players[0]), ['display_name', 'points', 'base_points', 'bonus_points']);
   assert.equal(event.teams[1].players[0].display_name, 'Former guest name');
   assert.doesNotMatch(JSON.stringify(member), /"(rating|rating_delta|initial_rating|gender|is_rookie|user_id|player_id|merged_into|private_note)"/);
   assert(!JSON.stringify(member).includes(canonicalId));

@@ -155,7 +155,7 @@ test('empty and unfinalized seasons have no fabricated comparison or movement fi
   let payload = view(world, id(1001));
   assert.equal(payload.comparison_event, null);
   assert.deepEqual(payload.standings, []);
-  assert.deepEqual(payload.stats, { rank: null, points: 0, played: 0, wins: 0 });
+  assert.deepEqual(payload.stats, { rank: null, points: 0, base_points: 0, bonus_points: 0, played: 0, wins: 0 });
   world.events = [];
   payload = publicView(world, undefined, id(1001), '2026-09-08');
   assert.equal(payload.season, null);
@@ -185,7 +185,7 @@ test('duplicate display names remain separate identities and use latest chronolo
   world.results.reverse();
   const payload = view(world);
   assert.equal(payload.standings.filter(p => p.display_name === 'Same name').length, 2);
-  assert.deepEqual(view(world, id(1001)).stats, { rank: 3, points: 3, played: 2, wins: 1,
+  assert.deepEqual(view(world, id(1001)).stats, { rank: 3, points: 3, base_points: 3, bonus_points: 0, played: 2, wins: 1,
     points_gain: 0, previous_rank: 1, rank_gain: -2 });
   world.results.find(r => r.event_id === id(302) && r.player_id === id(1)).display_name = 'Latest nickname';
   world.results.reverse();

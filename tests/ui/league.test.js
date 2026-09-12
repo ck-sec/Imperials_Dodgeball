@@ -203,3 +203,49 @@ test('public finalized ties show the confirmed winner rather than a pending deci
   assert.doesNotMatch(html, /admins must confirm/);
   assert.ok(html.indexOf('league-player-name">Team 5') < html.indexOf('league-player-name">Team 1'));
 });
+
+test('season totals include a separately labelled BP amount without adding it again', () => {
+  const html = ui.standings([
+    { rank: 1, display_name: 'Bonus player', points: 3.5, base_points: 3, bonus_points: 0.5, played: 1, wins: 1 },
+    { rank: 2, display_name: 'No bonus', points: 3, bonus_points: 0, played: 1, wins: 1 }
+  ], 'de');
+  assert.match(html, /league-points">3.5<small>Punkte gesamt/);
+  assert.match(html, /BP 0,5<\/span>/);
+  assert.match(html, /BP 0<\/span>/);
+  assert.match(html, /BP sind in der Gesamtpunktzahl enthalten/);
+  assert.doesNotMatch(html, /league-points">4</);
+  assert.match(ui.bonus({ bonus_points: '<img src=x>' }, 'en'), /&lt;img src=x&gt;/);
+  assert.doesNotMatch(ui.bonus({ bonus_points: '<img src=x>' }, 'en'), /<img/);
+});
+
+test('bonus rules explain configurable limits and the disabled state', () => {
+  const config = { placement_points: [3, 2, 1], scoring_mode: 'fixed', bonus_points_max: 2, bonus_points_step: 0.25 };
+  assert.match(ui.rules(config, 'en'), /Up to 2 BP per player and training, in steps of 0.25/);
+  assert.match(ui.rules(config, 'de'), /2 BP pro Spieler und Training, in 0,25er-Schritten/);
+  assert.match(ui.rules({ ...config, bonus_points_max: 0 }, 'en'), /Bonus points are disabled/);
+  assert.match(ui.bonus(null, 'en'), /BP 0<\/span>/);
+});
+
+test('public Thursday events expose a safe matchday link without linking drafts or other weekdays', () => {
+  const event = { ...fixture(), id: '00000000-0000-4000-8000-000000000001' };
+  assert.match(ui.matchdayLink(event, 'de'), /href="\/spieltag\?event=00000000-0000-4000-8000-000000000001"/);
+  assert.match(ui.event(event, 'en'), /Schedule &amp; live scores/);
+  assert.doesNotMatch(ui.event(event, 'en', { hideMatchdayLink: true }), /\/spieltag/);
+  assert.equal(ui.matchdayLink({ ...event, status: 'draft' }), '');
+  assert.equal(ui.matchdayLink({ ...event, session_date: '2026-09-18' }), '');
+  assert.equal(ui.matchdayLink({ ...event, session_date: 'not-a-date' }), '');
+  assert.doesNotMatch(ui.matchdayLink({ ...event, id: '"><script>bad</script>' }), /<script/);
+});
+
+test('the standalone match table reuses confirmed standings without fixtures or season BP', () => {
+  const event = fixture();
+  event.schedule = buildSchedule(5);
+  event.match_standings = matchStandings(5, event.schedule);
+  const before = JSON.stringify(event);
+  const table = ui.matchTable(event, 'en');
+  assert.match(table, /Match standings/);
+  assert.doesNotMatch(table, /class="league-match"|league-bonus/);
+  assert.ok(ui.schedule(event, 'en').includes(table));
+  assert.equal(JSON.stringify(event), before);
+  assert.equal(ui.matchTable(null), '');
+});

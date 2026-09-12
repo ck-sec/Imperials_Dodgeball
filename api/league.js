@@ -4,6 +4,7 @@ const { requireAdmin, requireMember } = require('../lib/auth');
 const { requireJSON } = require('../lib/validation');
 const { assert, uuid, validateAction, publicView, adminView } = require('../lib/league');
 const { readWorld, syncPlayers, applyAction, dbError } = require('../lib/league-db');
+const { scoringIdentity, scoringPermissions, scoringView } = require('../lib/league-scoring-access');
 
 module.exports = async (req, res) => {
   setCors(req, res, 'GET, POST, OPTIONS');
@@ -15,20 +16,29 @@ module.exports = async (req, res) => {
   }
   try {
     if (req.method === 'POST') {
-      if (!requireAdmin(req, res)) return;
+      const matchWrite = req.body && req.body.action === 'save_match';
+      let actor = { is_admin: true, user_id: null };
+      if (matchWrite) {
+        actor = scoringIdentity(req);
+        assert(actor.is_admin || actor.user_id, 'Authentication required', 401);
+      } else if (!requireAdmin(req, res)) return;
       assert(requireJSON(req), 'Content-Type must be application/json');
       const input = validateAction(req.body);
       const sql = getDb();
       if (['save_player', 'link_player', 'generate'].includes(input.action)) await syncPlayers(sql);
       const world = input.action === 'save_season' ? null : await readWorld(sql);
-      const result = await applyAction(sql, input, world);
+      if (matchWrite) {
+        const permissions = scoringPermissions(world, actor);
+        assert(permissions.is_admin || permissions.is_scorekeeper, 'Designated scorekeeper or admin required', 403);
+      }
+      const result = await applyAction(sql, input, world, actor);
       console.log('[AUDIT]', { action: `league_${input.action}`, event_id: result.event_id,
         season_id: result.season_id, player_id: result.player_id });
       return res.status(200).json({ success: true, ...result });
     }
 
     const view = req.query.view || 'public';
-    assert(['admin', 'public', 'me'].includes(view), 'Invalid view');
+    assert(['admin', 'public', 'me', 'scoring'].includes(view), 'Invalid view');
     let userId;
     if (view === 'admin' && !requireAdmin(req, res)) return;
     if (view === 'me') {
@@ -37,9 +47,11 @@ module.exports = async (req, res) => {
       userId = uuid(member.sub, 'Member id');
     }
     const seasonId = req.query.season_id === undefined ? undefined : uuid(req.query.season_id, 'season_id');
+    const eventId = view === 'scoring' && req.query.event_id !== undefined ? uuid(req.query.event_id, 'event_id') : undefined;
     const sql = getDb();
     if (view === 'admin') await syncPlayers(sql);
     const world = await readWorld(sql);
+    if (view === 'scoring') return res.status(200).json(scoringView(world, eventId, scoringIdentity(req)));
     if (userId) {
       assert(world.users.some(u => u.id === userId && u.is_active && u.status === 'approved'),
         'Approved active membership required', 403);

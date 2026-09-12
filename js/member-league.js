@@ -48,6 +48,7 @@ function renderTrainingSummary() {
     <div class="member-summary-line">
       <div><div class="member-summary-name">${escapeHtml(data.season.name)}</div>
         <span class="member-summary-values">${stats && stats.rank !== null ? '#' + escapeHtml(stats.rank) : '—'} · ${escapeHtml(stats ? stats.points : 0)} ${mt('Punkte', 'points')}</span>
+        ${window.LeagueUI.bonus(stats, memberLang())}
       </div>
       <button type="button" class="text-button" data-member-tab="league">${mt('Zur Liga', 'League')}</button>
     </div>
@@ -74,7 +75,7 @@ function renderMemberLeague() {
     </div>
     <div class="league-metrics">
       <div class="league-metric"><strong>${stats && stats.rank !== null ? '#' + escapeHtml(stats.rank) : '—'}</strong><span>${mt('Dein Rang', 'Your rank')}</span></div>
-      <div class="league-metric"><strong>${escapeHtml(stats ? stats.points : 0)}</strong><span>${mt('Deine Punkte', 'Your points')}</span></div>
+      <div class="league-metric"><strong>${escapeHtml(stats ? stats.points : 0)}</strong><span>${mt('Deine Punkte gesamt', 'Your total points')}</span><br>${ui.bonus(stats, lang)}</div>
       <div class="league-metric"><strong>${escapeHtml(stats ? stats.played : 0)}</strong><span>Trainings</span></div>
       <div class="league-metric"><strong>${escapeHtml(stats ? stats.wins : 0)}</strong><span>${mt('Siege', 'Wins')}</span></div>
     </div>
@@ -87,6 +88,7 @@ function renderMemberLeague() {
         <div class="league-player-name">${escapeHtml(entry.title)}</div>
         <p class="league-copy">${escapeHtml(ui.date(entry.session_date, lang))} · ${escapeHtml(entry.team_name)}</p>
         <span class="league-chip league-chip-gold">${mt('Platz', 'Place')} ${escapeHtml(entry.placement)} · +${escapeHtml(entry.points)} ${mt('Punkte', 'points')}</span>
+        ${ui.bonus(entry, lang)}
       </li>`).join('')}</ol>` : `<p class="league-notice">${mt('Noch keine gewerteten Trainings.', 'No scored training yet.')}</p>`}
     </details>
     <details class="member-details"><summary>${mt('Regeln & Saison', 'Rules & season')}</summary>
@@ -152,7 +154,8 @@ function renderMemberEvent(event) {
     ${own ? `<p class="eyebrow">${mt('Dein Team', 'Your team')}</p><h4>${escapeHtml(own.name)}</h4>
       <p class="member-team-names">${own.players.map(player => escapeHtml(player.display_name)).join(' · ')}</p>${fixture}`
       : `<p class="league-copy">${mt('Teams veröffentlicht. Kein Team mit deinem Profil verknüpft.', 'Teams published. No team linked to your profile.')}</p>`}
-    <details class="member-details"><summary>${mt('Alle Teams & Spielplan', 'All teams & schedule')}</summary>${ui.event(event, lang)}${ui.schedule(event, lang)}</details>
+    ${ui.matchdayLink(event, lang)}
+    <details class="member-details"><summary>${mt('Alle Teams & Spielplan', 'All teams & schedule')}</summary>${ui.event(event, lang, { hideMatchdayLink: true })}${ui.schedule(event, lang)}</details>
   </div>`;
 }
 

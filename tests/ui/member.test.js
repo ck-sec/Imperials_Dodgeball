@@ -139,7 +139,8 @@ test('member page is German-first, training-first and versions every local style
   assert.match(html, /data-tab="training" role="tab"[^>]+aria-selected="true"/);
   assert.doesNotMatch(html, /href="\/#training-league"|data-tab="stats"|data-tab="settings"/);
   assert.match(html, /<details[^>]+id="seasonOneArchive"/);
-  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=20260912$/);
+  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=20260912b?$/);
+  for (const asset of ['/league.css', '/js/league-ui.js', '/js/member-league.js']) assert.ok(html.includes(asset + '?v=20260912b'));
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
   assert.ok(html.indexOf('member-recovery-token.js') < html.indexOf('<link'));
   assert.doesNotMatch(source('member-core') + source('member-auth') + source('member-init'), /localStorage|sessionStorage/);
@@ -493,6 +494,30 @@ test('league movement uses the supplied common baseline and marks new entrants',
   assert.match(app.node('trainingLeagueSummary').innerHTML, /New/);
   assert.match(app.node('trainingLeagueSummary').innerHTML, /\+3 Points/);
   assert.equal(app.translated[0].textContent, 'Choose training');
+});
+
+test('member summaries and training history show BP as part of the server total', () => {
+  const app = fixtureApp();
+  app.context.payload = {
+    season, seasons: [season], my_events: [], events: [], standings: [],
+    stats: { rank: 1, points: 3.5, base_points: 3, bonus_points: 0.5, played: 1, wins: 1 },
+    history: [{ title: 'Thursday', session_date: '2026-09-17', team_name: 'Gold', placement: 1, points: 3.5, bonus_points: 0.5 }]
+  };
+  app.run('memberLeagueData = payload; memberCurrentLeagueData = payload; renderMemberLeague(); renderTrainingSummary()');
+  assert.match(app.node('trainingLeagueSummary').innerHTML, /3.5 Punkte[\s\S]*BP 0,5/);
+  assert.match(app.node('memberLeagueContent').innerHTML, /<strong>3.5<\/strong>/);
+  assert.match(app.node('memberLeagueContent').innerHTML, /\+3.5 Punkte[\s\S]*BP 0,5/);
+  app.window.SiteLanguage.set('en');
+  assert.match(app.node('memberLeagueContent').innerHTML, /Your total points/);
+  assert.match(app.node('memberLeagueContent').innerHTML, /BP 0.5/);
+});
+
+test('own Thursday team has one visible matchday link before expandable details', () => {
+  const app = fixtureApp();
+  app.context.event = { ...ownEvent, id: '00000000-0000-4000-8000-000000000001', session_date: '2026-09-17' };
+  const output = app.run('renderMemberEvent(event)');
+  assert.equal((output.match(/href="\/spieltag\?/g) || []).length, 1);
+  assert.ok(output.indexOf('/spieltag?') < output.indexOf('<details'));
 });
 
 test('archive absence stays absent and does not fabricate movement', () => {

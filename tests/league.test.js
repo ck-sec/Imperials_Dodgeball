@@ -59,7 +59,7 @@ test('auto prioritizes largest equal 4/5/6 squads, then distributes every substi
     assert(Math.max(...sizes) - Math.min(...sizes) <= 1);
     assert.deepEqual(result.teams.flatMap(t => t.players.map(p => p.id)).sort(), roster.map(p => p.id).sort());
   }
-  assert.throws(() => balanceTeams(players(7), 'auto'), LeagueError);
+  assert.throws(() => balanceTeams(players(3), 'auto'), LeagueError);
   assert.throws(() => balanceTeams(players(11), 6), LeagueError);
 });
 
@@ -167,7 +167,7 @@ test('small and odd mixed rosters keep demographic counts within one and reprodu
       assert.deepEqual(result, balanceTeams([...roster].reverse(), 'auto'));
     }
   }
-  assert.throws(() => balanceTeams(players(7), 'auto'), /Attendee count/);
+  assert.throws(() => balanceTeams(players(3), 'auto'), /Attendee count/);
   assert.deepEqual(balanceTeams(players(8), 'auto').teams.map(t => t.players.length), [4, 4]);
 });
 
@@ -249,13 +249,13 @@ test('public release filters seasons and drafts; equal ALL-training totals share
   assert.equal(result.standings.length, 12);
   assert(result.standings.every(p => p.points === 3.5 && p.played === 2 && p.wins === 1 && p.rank === 1));
   assert.throws(() => publicView(world, world.seasons[1].id), error => error.status === 404);
-  const forbidden = /"(rating|initial_rating|gender|is_rookie|user_id|player_id|email|version|roster_ids|settings)"/;
+  const forbidden = /"(rating|initial_rating|gender|is_rookie|user_id|player_id|email|roster_ids|settings)"/;
   assert(!forbidden.test(JSON.stringify(result)));
   world.profiles[0].display_name = 'Unreleased draft nickname';
   assert(!JSON.stringify(publicView(world, world.seasons[0].id)).includes('Unreleased draft nickname'));
   for (const event of result.events) {
     for (const team of event.teams) for (const player of team.players) {
-      assert.deepEqual(Object.keys(player), ['display_name']);
+      assert.deepEqual(Object.keys(player), ['display_name', 'points', 'base_points', 'bonus_points']);
     }
   }
   const withPublished = structuredClone(world);
@@ -268,14 +268,14 @@ test('public release filters seasons and drafts; equal ALL-training totals share
 test('personal history contains only personal released placements, never private balancing fields', () => {
   const world = fixture();
   const result = publicView(world, world.seasons[0].id, id(1001));
-  assert.deepEqual(result.stats, { rank: 1, points: 3.5, played: 2, wins: 1,
+  assert.deepEqual(result.stats, { rank: 1, points: 3.5, base_points: 3.5, bonus_points: 0, played: 2, wins: 1,
     points_gain: 0.5, previous_rank: 1, rank_gain: 0 });
   assert.equal(result.history.length, 2);
   assert(!/"(rating|initial_rating|gender|is_rookie|user_id|player_id|email)"/.test(JSON.stringify(result)));
-  assert.deepEqual(publicView(world, world.seasons[0].id, id(999)).stats, { rank: null, points: 0, played: 0, wins: 0,
+  assert.deepEqual(publicView(world, world.seasons[0].id, id(999)).stats, { rank: null, points: 0, base_points: 0, bonus_points: 0, played: 0, wins: 0,
     points_gain: 0, previous_rank: null, rank_gain: null });
   const empty = { ...world, events: [], results: [] };
-  assert.deepEqual(publicView(empty, undefined, id(1)).stats, { rank: null, points: 0, played: 0, wins: 0 });
+  assert.deepEqual(publicView(empty, undefined, id(1)).stats, { rank: null, points: 0, base_points: 0, bonus_points: 0, played: 0, wins: 0 });
   assert.equal(publicView(empty).season, null);
 });
 
@@ -324,8 +324,8 @@ test('admin results preview exposes frozen event points and K despite later seas
 test('migration is additive, idempotent and preserves PL/pgSQL statement bodies', () => {
   const schema = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'league-schema.sql'), 'utf8');
   const statements = migrationStatements(schema);
-  assert.equal(statements.length, 13);
-  assert(statements.every(s => /CREATE (TABLE IF NOT EXISTS|INDEX IF NOT EXISTS|OR REPLACE FUNCTION)|ALTER TABLE league_(seasons|events)/.test(s)));
+  assert.equal(statements.length, 14);
+  assert(statements.every(s => /CREATE (TABLE IF NOT EXISTS|INDEX IF NOT EXISTS|OR REPLACE FUNCTION)|ALTER TABLE (league_(seasons|events)|users)/.test(s)));
   assert(!/UPDATE\s+users|DROP\s|TRUNCATE\s/i.test(schema));
   assert(!/UPDATE\s+league_(events|results)/i.test(schema));
   assert(statements.at(-1).includes("DETAIL = 'LEAGUE_'"));

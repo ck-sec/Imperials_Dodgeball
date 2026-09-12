@@ -10,13 +10,19 @@
     loaded: false, busy: false, conflict: false,
     seasonId: '', sessionId: '', selected: new Set(), attending: new Set(),
     teams: [], dirtyTeams: false, dirtyRoster: false, dirtyResults: false,
+    draftUndo: [], pickedPlayer: '', bonusAwards: {}, dirtyBonus: false, bonusSearch: '',
     size: 'auto', maxTeams: 5, search: '', selectedOnly: false,
     scheduleSettings: { courts: 2, match_minutes: 20, break_minutes: 5, available_minutes: 120 },
     dirtySchedule: false, matchEdits: {},
-    profileId: '', profileSearch: '', newSeason: false, seasonOpen: false,
-    profilesOpen: false, guestOpen: false, attendanceError: ''
+    profileId: '', profileSearch: '', seasonOpen: false,
+    profilesOpen: false, guestOpen: false, attendanceError: '', formEdits: {}
   };
-  const dateOnly = value => String(value || '').slice(0, 10);
+  const dateOnly = value => {
+    const text = String(value || '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const date = new Date(value);
+    return text && Number.isFinite(date.getTime()) ? date.toLocaleDateString('sv-SE', { timeZone: 'Europe/Vienna' }) : '';
+  };
   const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Vienna' });
   const season = () => state.data.seasons.find(s => s.id === state.seasonId);
   const event = () => state.data.events.find(e => e.session_id === state.sessionId);
@@ -24,12 +30,17 @@
   const allMatches = () => event()?.schedule?.rounds.flatMap(round => round.matches) || [];
   const gamesStarted = () => allMatches().some(match => match.score_a != null || match.score_b != null);
   const lineupStarted = () => !!event()?.roster_locked || gamesStarted();
-  const isLocked = () => !!event() && (event().status !== 'draft' || lineupStarted());
+  const cancelled = () => !!session()?.is_cancelled || !!event()?.is_cancelled;
+  const isLocked = () => cancelled() || (!!event() && (event().status !== 'draft' || lineupStarted()));
   const futureTraining = () => dateOnly(session()?.session_date || event()?.session_date) > today();
   const needsRosterReview = () => state.dirtyRoster || !!event()?.roster_stale;
-  const minimumRoster = () => state.size === 'auto' ? 8 : Number(state.size) * 2;
+  const minimumRoster = () => state.size === 'auto' ? 4 : Number(state.size) * 2;
+  const draftSize = () => state.size === 'auto'
+    ? [6, 5, 4].find(size => state.selected.size >= size * 2 && state.selected.size % size === 0) ||
+      [6, 5, 4, 3, 2].find(size => state.selected.size >= size * 2) || 2
+    : Number(state.size);
   const hasChanges = () => state.dirtyRoster || state.dirtyTeams || state.dirtyResults ||
-    state.dirtySchedule || Object.keys(state.matchEdits).length > 0;
+    state.dirtySchedule || state.dirtyBonus || Object.keys(state.matchEdits).length > 0 || Object.keys(state.formEdits).length > 0;
   const selectedAttr = (a, b) => String(a) === String(b) ? ' selected' : '';
   const disabled = condition => condition ? ' disabled' : '';
   const number = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -69,13 +80,20 @@
     const selectedSeason = season();
     if (!selectedSeason) return [];
     return [...all.values()].filter(s => {
-      const existing = state.data.events.find(e => e.session_id === s.id);
-      if (existing) return existing.season_id === selectedSeason.id;
       const date = dateOnly(s.session_date);
-      return date >= dateOnly(selectedSeason.start_date) && date <= dateOnly(selectedSeason.end_date);
-    }).sort((a, b) => dateOnly(b.session_date).localeCompare(dateOnly(a.session_date)) ||
-      String(b.start_time || '').localeCompare(String(a.start_time || '')));
+      const existing = state.data.events.find(e => e.session_id === s.id);
+      return (!existing || existing.season_id === selectedSeason.id) &&
+        date >= dateOnly(selectedSeason.start_date) && date <= dateOnly(selectedSeason.end_date) &&
+        new Date(`${date}T12:00:00Z`).getUTCDay() === 4;
+    }).sort((a, b) => dateOnly(a.session_date).localeCompare(dateOnly(b.session_date)) ||
+      String(a.start_time || '').localeCompare(String(b.start_time || '')));
   }
+
+  const nextTraining = () => sessions().find(s => !s.is_cancelled && dateOnly(s.session_date) >= today());
+  const savedBonus = () => {
+    const awards = event()?.bonus_points || {};
+    return Array.isArray(awards) ? Object.fromEntries(awards.map(a => [a.player_id, a.points])) : awards;
+  };
 
   function setBusy(value, message = '') {
     state.busy = value;
@@ -138,12 +156,17 @@
     return data;
   }
 
-  async function loadData({ preserve = false, seasonId, addPlayerId } = {}) {
+  async function loadData({ preserve = false, addPlayerId } = {}) {
     const previousEvent = event();
     preserve = preserve && hasChanges();
     const data = await request('/api/league?view=admin');
     for (const key of ['seasons', 'players', 'members', 'sessions', 'events']) {
       if (!Array.isArray(data[key])) throw new Error(`League response is missing ${key}. Refresh and try again.`);
+    }
+    const matches = data.seasons.filter(s => s.name === 'Season 2');
+    if (matches.length !== 1) {
+      throw new Error(matches.length ? 'Season 2 is ambiguous: more than one record has this exact name. Resolve the duplicate records before continuing.' :
+        'Season 2 is missing. An administrator must initialize the existing Season 2 calendar before this dashboard can be used. No other season was selected.');
     }
     const nextEvent = data.events.find(e => e.session_id === state.sessionId);
     if (preserve && (previousEvent?.id !== nextEvent?.id || previousEvent?.version !== nextEvent?.version)) {
@@ -153,23 +176,29 @@
     }
     state.data = data;
     state.loaded = true;
-    if (seasonId) state.seasonId = seasonId;
-    if (!season()) {
-      const active = data.seasons.find(s => dateOnly(s.start_date) <= today() && dateOnly(s.end_date) >= today());
-      state.seasonId = (active || data.seasons[0])?.id || '';
-    }
+    state.seasonId = matches[0].id;
     const available = sessions();
     if (!available.some(s => s.id === state.sessionId)) {
-      const upcoming = available.filter(s => !s.is_cancelled && dateOnly(s.session_date) >= today()).reverse();
-      state.sessionId = (upcoming[0] || available[0])?.id || '';
+      if (preserve) throw Object.assign(new Error('The selected Thursday is no longer available in Season 2. Your edits were not applied. Refresh to review the latest calendar.'), { status: 409 });
+      state.sessionId = (nextTraining() || available.filter(s => !s.is_cancelled).at(-1) || available[0])?.id || '';
       preserve = false;
+    }
+    if (preserve) {
+      for (const p of data.players.filter(p => p.user_id)) {
+        const oldId = `member:${p.user_id}`;
+        if (state.selected.delete(oldId)) state.selected.add(p.id);
+        state.teams.forEach(t => { t.player_ids = t.player_ids.map(id => id === oldId ? p.id : id); });
+        state.draftUndo.forEach(snapshot => {
+          snapshot.selected = snapshot.selected.map(id => id === oldId ? p.id : id);
+          snapshot.teams.forEach(t => { t.player_ids = t.player_ids.map(id => id === oldId ? p.id : id); });
+        });
+        if (state.pickedPlayer === oldId) state.pickedPlayer = p.id;
+      }
     }
     await loadRoster(preserve);
     if (addPlayerId && !isLocked()) {
-      state.selected.add(addPlayerId);
-      state.dirtyRoster = true;
+      changeRoster(new Set([...state.selected, addPlayerId]));
     }
-    state.newSeason = !state.seasonId;
   }
 
   async function loadRoster(preserve = false) {
@@ -209,15 +238,23 @@
       state.dirtyTeams = false;
       state.dirtyRoster = false;
       state.dirtyResults = false;
+      state.bonusAwards = { ...savedBonus() };
+      state.dirtyBonus = false;
+      state.draftUndo = [];
+      state.pickedPlayer = '';
       state.search = '';
     }
     const validIds = new Set(players().map(p => p.id));
+    if (preserve && [...state.selected].some(id => !validIds.has(id))) {
+      throw Object.assign(new Error('A selected player profile is no longer available. Refresh and review the latest roster before saving.'), { status: 409 });
+    }
     state.selected = new Set([...state.selected].filter(id => validIds.has(id)));
   }
 
   async function reload(ask = true) {
     if (state.busy) return;
-    if (ask && hasChanges() && !window.confirm('Refresh and discard unsaved roster, team or result edits?')) return;
+    if (ask && hasChanges() && !window.confirm('Refresh and discard all unsaved roster, team, BP, result and form edits?')) return;
+    state.formEdits = {};
     clearNotice();
     setBusy(true, 'Loading seasons, players and training RSVPs…');
     try {
@@ -229,18 +266,30 @@
     } finally { setBusy(false); }
   }
 
-  async function write(actionName, payload, { preserve = false, message = 'League updated.', after, focus, retainMatchEdits } = {}) {
+  async function write(actionName, payload, { preserve = false, message = 'League updated.', after, focus, retainMatchEdits, clearFormKey } = {}) {
     if (state.busy || state.conflict) return false;
     clearNotice();
     setBusy(true, 'Saving… Please wait.');
     let saved = false;
     const priorScores = allMatches().map(match => ({ ...match }));
+    const pendingBonus = !preserve && actionName !== 'save_bonus_points' && state.dirtyBonus ? { ...state.bonusAwards } : null;
+    const priorBonus = { ...savedBonus() };
     try {
       const result = await request('/api/league', { action: actionName, ...payload });
       saved = true;
+      if (clearFormKey) delete state.formEdits[clearFormKey];
       const options = { preserve };
       if (after) Object.assign(options, after(result) || {});
       await loadData(options);
+      if (pendingBonus) {
+        for (const id of state.selected) {
+          if (Number(savedBonus()[id] || 0) !== Number(priorBonus[id] || 0)) {
+            throw new Error('Bonus points changed on the server. Refresh and review the saved awards before applying your remaining edits.');
+          }
+        }
+        state.bonusAwards = Object.fromEntries([...state.selected].map(id => [id, pendingBonus[id] ?? '0']));
+        state.dirtyBonus = [...state.selected].some(id => String(state.bonusAwards[id]) !== String(savedBonus()[id] || 0));
+      }
       if (retainMatchEdits) {
         for (const matchNumber of Object.keys(retainMatchEdits)) {
           const before = priorScores.find(match => String(match.number) === matchNumber);
@@ -259,7 +308,7 @@
       const unconfirmed = !saved && (error.unconfirmed || !error.status);
       showError(saved ? new Error(`Your change was saved, but refreshing failed. Do not submit it again. ${error.message}`) :
         unconfirmed ? new Error(`Could not confirm whether the change was saved. Refresh before trying again. ${error.message}`) : error,
-        saved || unconfirmed || (error.status === 409 && ['generate', 'save_teams', 'publish', 'unpublish', 'results', 'generate_schedule', 'save_match', 'reopen_results'].includes(actionName)));
+        saved || unconfirmed || error.status === 409);
       return false;
     } finally {
       setBusy(false, saved && !state.conflict ? message : '');
@@ -268,20 +317,14 @@
   }
 
   function seasonForm() {
-    const current = state.newSeason ? null : season();
-    const defaults = {
-      name: 'Season 2', start_date: '2026-09-14', end_date: '2027-07-02',
-      placement_points: [3, 2.5, 2, 1, 0.5], scoring_mode: 'relative', points_step: 0.5,
-      k_factor: 24, default_rating: 1000, rookie_rating: 800
-    };
-    const s = current || defaults;
-    return `<details class="al-details" id="al-season-details"${state.seasonOpen || !current ? ' open' : ''}>
-      <summary>${current ? 'Edit season settings' : 'Create a season'}</summary>
+    const s = season();
+    if (!s) return '';
+    return `<details class="al-details" id="al-season-details"${state.seasonOpen ? ' open' : ''}>
+      <summary>Season 2 settings — future drafts</summary>
       <form data-al-form="season">
-        <input type="hidden" name="id" value="${esc(current?.id || '')}">
+        <input type="hidden" name="id" value="${esc(s.id)}">
         <div class="al-grid">
-          <div class="al-field al-wide">${label('al-season-name', 'Season name')}
-            <input id="al-season-name" name="name" value="${esc(s.name)}" required maxlength="100" autocomplete="off" placeholder="Season 2"></div>
+          <input type="hidden" name="name" value="Season 2">
           <div class="al-field">${label('al-season-start', 'Start date')}
             <input type="date" id="al-season-start" name="start_date" value="${esc(dateOnly(s.start_date))}" min="2000-01-01" max="2199-12-31" required></div>
           <div class="al-field">${label('al-season-end', 'End date')}
@@ -299,6 +342,11 @@
           <div class="al-field al-wide">${label('al-season-points', 'Base placement awards, first to last')}
             <input id="al-season-points" name="placement_points" value="${esc(s.placement_points.join(', '))}" required aria-describedby="al-points-help">
             <p class="al-small" id="al-points-help">Default curve: 3, 2.5, 2, 1, 0.5. Custom curves may use any number of descending or equal awards. Every player earns their team’s points, including rotating substitutes. Season points sum EVERY finalized training, not just the best results.</p></div>
+          <div class="al-field">${label('al-season-bonus-max', 'Bonus points (BP) maximum per player / training')}
+            <input id="al-season-bonus-max" name="bonus_points_max" type="number" min="0" max="10000" step="any" value="${number(s.bonus_points_max, 1)}" required></div>
+          <div class="al-field">${label('al-season-bonus-step', 'BP award step')}
+            <select id="al-season-bonus-step" name="bonus_points_step">${[0.1, 0.25, 0.5, 1].map(step => option(step, `${step} BP`, s.bonus_points_step ?? 0.5)).join('')}</select>
+            <p class="al-small">Admin-only awards. Each training keeps its saved BP cap and step.</p></div>
           <div class="al-callout al-wide">
             <h4>Points per player, first place to last</h4>
             <p class="al-small">Preview of these form settings. Existing trainings keep their captured rules.</p>
@@ -312,10 +360,8 @@
           <div class="al-field">${label('al-season-rookie', 'Really-rookie starting rating')}
             <input type="number" id="al-season-rookie" name="rookie_rating" value="${number(s.rookie_rating, 800)}" min="0" max="10000" step="any" required></div>
         </div>
-        ${!current ? '<p class="al-small">Season 2 starts Monday 14 September 2026 and ends Friday 2 July 2027, before Vienna’s summer holidays. Eligible Thursdays run from 17 September to 1 July. These defaults are editable; saving a season does not create training sessions.</p>' : ''}
         <p class="al-callout">Scoring mode, rounding, awards, K-factor and skill ratings are captured when teams are generated. These settings apply to future drafts: regenerate an existing draft to adopt changes. Published and finalized trainings keep their saved rules. Season defaults never reset player profiles or silently re-award completed trainings.</p>
-        <div class="al-actions"><button class="al-button" type="submit">${current ? 'Save season settings' : 'Create season'}</button>
-          ${state.newSeason && season() ? action('cancel-season', 'Cancel new season') : ''}</div>
+        <div class="al-actions"><button class="al-button" type="submit">Save Season 2 settings</button></div>
       </form>
     </details>`;
   }
@@ -324,22 +370,26 @@
     const available = sessions();
     const s = season();
     const selectedSession = session();
-    return `<section class="al-card" id="al-setup">${heading(1, 'Choose season & training')}
+    const next = nextTraining();
+    const renderOption = t => {
+      const e = state.data.events.find(e => e.session_id === t.id);
+      return option(t.id, `${t.id === next?.id ? '★ Next · ' : ''}Thu ${dateOnly(t.session_date)} · ${String(t.start_time || '').slice(0, 5)} · ${t.title || 'Training'}${t.is_cancelled ? ' · Cancelled' : ''}${e ? ` · ${e.status}` : ''}`, state.sessionId);
+    };
+    const upcoming = available.filter(t => dateOnly(t.session_date) >= today());
+    const past = available.filter(t => dateOnly(t.session_date) < today()).reverse();
+    return `<section class="al-card" id="al-setup">${heading(1, 'Season 2 · Thursday training')}
       <div class="al-grid">
-        <div class="al-field">${label('al-season-select', 'Season')}
-          <select id="al-season-select"${disabled(!state.data.seasons.length)}>
-            ${state.data.seasons.length ? state.data.seasons.map(s => option(s.id, s.name, state.seasonId)).join('') : '<option>No seasons yet</option>'}
-          </select></div>
-        <div class="al-field">${label('al-session-select', 'Training session — upcoming or past')}
+        <div class="al-field"><strong>Season 2</strong><span class="al-small">${esc(dateOnly(s?.start_date))} – ${esc(dateOnly(s?.end_date))} · Europe/Vienna</span></div>
+        <div class="al-field">${label('al-session-select', 'Thursday training — Season 2 only')}
           <select id="al-session-select"${disabled(!available.length)}>
-            ${available.length ? available.map(t => {
-              const e = state.data.events.find(e => e.session_id === t.id);
-              return option(t.id, `${dateOnly(t.session_date)} · ${String(t.start_time || '').slice(0, 5)} · ${t.title}${t.is_cancelled ? ' · Cancelled' : ''}${e ? ` · ${e.status}` : ''}`, state.sessionId);
-            }).join('') : '<option>No training sessions in this season</option>'}
+            ${upcoming.length ? `<optgroup label="Upcoming Thursdays">${upcoming.map(renderOption).join('')}</optgroup>` : ''}
+            ${past.length ? `<optgroup label="Past Thursdays — results / corrections">${past.map(renderOption).join('')}</optgroup>` : ''}
+            ${!available.length ? '<option>No Thursday trainings in Season 2</option>' : ''}
           </select></div>
       </div>
-      ${selectedSession ? `<p class="al-small al-form-actions">${esc(selectedSession.location || 'No location specified')} · Members RSVP in the Training area. Select a past finalized training here to correct its results.</p>` : '<p class="al-callout">First create a season, then schedule sessions in the Training tab within its dates. Return here and refresh.</p>'}
-      ${s ? `<div class="al-actions">${action('new-season', '+ Create another season')}</div>` : ''}
+      ${selectedSession ? `<p class="al-small al-form-actions">${esc(selectedSession.location || 'No location specified')} · Members RSVP in the Training area. Past Thursdays remain available for corrections.</p>` : '<p class="al-callout">Schedule a Thursday within the existing Season 2 dates in the Training tab, then refresh.</p>'}
+      ${next ? `<p class="al-callout">Next active Thursday: <strong>${esc(dateOnly(next.session_date))}</strong>${next.id === state.sessionId ? ' · selected' : '. Your selected training has been kept.'}</p>` : ''}
+      ${cancelled() ? '<p class="al-notice" role="status">Cancelled training — read-only. Roster, bonus points, match scores and results cannot be changed here.</p>' : ''}
       ${seasonForm()}
     </section>`;
   }
@@ -364,7 +414,7 @@
     const filtered = list.filter(p => p.display_name.toLocaleLowerCase().includes(state.profileSearch.toLocaleLowerCase()));
     const player = list.find(p => p.id === state.profileId);
     return `<details class="al-details" id="al-profiles-details"${state.profilesOpen ? ' open' : ''}>
-      <summary>Player profiles & private skill</summary>
+      <summary>Player profiles, private skill & Spielleiter</summary>
       <p class="al-muted">Use gender, real beginner experience and private skill together for fair teams. Do not infer gender from a name. Profiles persist across trainings and seasons.</p>
       <div class="al-grid">
         <div class="al-field">${label('al-profile-search', 'Find a player profile')}
@@ -387,7 +437,27 @@
           <p class="al-small">Preserves the guest’s stats and connects future RSVPs. If both profiles played the same training, linking is refused to prevent duplicate points.</p></div>
         <button type="submit" class="al-button al-secondary al-form-actions">Link guest & preserve stats</button>
       </form>` : ''}` : '<p class="al-small al-form-actions">Choose one player above to review or update their profile.</p>'}</div>
+      ${scorekeeperRoles()}
     </details>`;
+  }
+
+  function eligibleScorekeeper(member) {
+    // The admin member list is already filtered by the API; honor explicit flags if supplied.
+    return member.id && (!('status' in member) || member.status === 'approved') &&
+      (!('is_active' in member) || member.is_active === true);
+  }
+
+  function scorekeeperRoles() {
+    const members = state.data.members.filter(eligibleScorekeeper).filter(m =>
+      m.display_name.toLocaleLowerCase().includes(state.profileSearch.toLocaleLowerCase()));
+    return `<section class="al-details">
+      <h4>Permanent Spielleiter role</h4>
+      <p class="al-small">Approved active members only; guests cannot receive this role. A Spielleiter may save match scores for every Thursday training, but cannot edit teams, BP, settings or final results. This role persists until an admin removes it. Use the profile search above to filter.</p>
+      <div class="al-role-list" id="al-role-list">${members.map(m => `<label class="al-check al-role-row" for="al-role-${esc(m.id)}">
+        <input type="checkbox" id="al-role-${esc(m.id)}" data-al-scorekeeper="${esc(m.id)}"${m.league_scorekeeper ? ' checked' : ''}>
+        <span>${esc(m.display_name)} <span class="al-small">· Spielleiter</span></span>
+      </label>`).join('') || '<p class="al-small">No matching approved active members.</p>'}</div>
+    </section>`;
   }
 
   function rosterRows() {
@@ -409,9 +479,9 @@
   function renderRoster() {
     return `<section class="al-card" id="al-roster">${heading(2, 'Confirm everyone playing')}
       <p class="al-muted">Start with member RSVPs, then check or uncheck anyone for last-minute changes. Guests need no account; use their existing profile next time to keep their stats together.</p>
-      ${isLocked() ? `<p class="al-callout">${event().status === 'finalized' ? 'Finalized: the roster and teams are locked. Results can still be corrected below.' : lineupStarted() ? 'Games have started or results were finalized: roster, guest additions to this training and team changes are permanently locked. Score corrections remain available.' : 'Published: the roster is locked. Before any match is scored, use “Edit lineup” in step 5 to hide public teams and return to a draft.'}</p>` : ''}
+      ${isLocked() ? `<p class="al-callout">${cancelled() ? 'Cancelled: this training is read-only.' : event()?.status === 'finalized' ? 'Finalized: the roster and teams are locked. Results can still be corrected below.' : lineupStarted() ? 'Games have started or results were finalized: roster, guest additions to this training and team changes are permanently locked. Score corrections remain available.' : 'Published: the roster is locked. Before any match is scored, use “Edit lineup” in step 5 to hide public teams and return to a draft.'}</p>` : ''}
       ${state.attendanceError ? `<p class="al-notice">${esc(state.attendanceError)}</p>` : ''}
-      ${event()?.roster_stale && !isLocked() ? '<p class="al-notice">Member RSVPs changed after this draft was generated. Review the latest attending labels below, then regenerate before publishing. Your checked guest and manual selections are kept unless you explicitly change them.</p>' : ''}
+      ${event()?.roster_stale && !isLocked() ? '<p class="al-notice">RSVPs changed. Review the attending labels and explicitly save this draft roster before publishing. No guests or manual selections have been changed.</p>' : ''}
       <div class="al-actions">
         ${action('add-rsvp', 'Include all attending members · keep guests', disabled(isLocked() || !state.sessionId || !!state.attendanceError))}
         ${action('rsvp', 'Reset to RSVPs only', disabled(isLocked() || !state.sessionId || !!state.attendanceError))}
@@ -440,11 +510,9 @@
 
   function planText() {
     const n = state.selected.size;
-    if (n < minimumRoster()) return `${n} selected. Select at least ${minimumRoster()} players for two ${state.size === 'auto' ? '4' : state.size}-a-side teams${state.size === 'auto' ? ' (auto can also choose 5 or 6)' : ''}.`;
+    if (n < minimumRoster()) return `${n} selected. At least ${minimumRoster()} players are needed for two ${state.size === 'auto' ? '2' : state.size}-a-side teams. You may save an understrength draft, but not publish it.`;
     if (n > 500) return `${n} selected. A training supports at most 500 players. Reduce this roster before drafting.`;
-    const size = state.size === 'auto'
-      ? [6, 5, 4].find(size => n >= size * 2 && n % size === 0) || [6, 5, 4].find(size => n >= size * 2)
-      : Number(state.size);
+    const size = draftSize();
     const count = Math.min(state.maxTeams, Math.floor(n / size));
     const min = Math.floor(n / count);
     const max = Math.ceil(n / count);
@@ -468,8 +536,8 @@
       const male = list.filter(p => p.gender === 'male').length;
       const rookie = list.filter(p => p.is_rookie).length;
       const avg = list.length ? Math.round(list.reduce((sum, p) => sum + rating(p), 0) / list.length) : 0;
-      const subs = Math.max(0, list.length - Number(event()?.team_size || 6));
-      return `<article class="al-team" aria-labelledby="al-team-heading-${t.number}">
+      const subs = Math.max(0, list.length - draftSize());
+      return `<article class="al-team" data-al-drop-team="${t.number}" aria-labelledby="al-team-heading-${t.number}">
         <h4 id="al-team-heading-${t.number}">${esc(t.name || `Team ${t.number}`)}</h4>
         <p class="al-small">Squad ${t.number}</p>
         ${!isLocked() ? `<div class="al-field">${label(`al-team-name-${t.number}`, 'Public team name')}<input id="al-team-name-${t.number}" data-al-team-name="${t.number}" value="${esc(t.name)}" maxlength="80" required></div>` : ''}
@@ -479,51 +547,63 @@
           <span class="al-chip al-rookie">${rookie} really rookie</span>
         </div>
         ${subs ? `<p class="al-small">${subs} rotating substitute${subs === 1 ? '' : 's'} — all ${list.length} players receive this team’s placement points.</p>` : ''}
-        <ul class="al-team-players">${list.map(p => `<li><span>${esc(p.display_name)}${p.is_rookie ? ' <span class="al-chip al-rookie">Rookie</span>' : ''}</span><span class="al-small">Private ${rating(p)}</span></li>`).join('')}</ul>
+        <ul class="al-team-players">${list.map(p => `<li class="al-draft-player" data-al-drop-player="${esc(p.id)}">
+          ${!isLocked() ? playerHandle(p) : ''}
+          <span class="al-player-info">${esc(p.display_name)}${p.is_rookie ? ' <span class="al-chip al-rookie">Rookie</span>' : ''}<span class="al-small"> · private ${rating(p)}</span></span>
+          ${!isLocked() ? action(`remove-player:${p.id}`, 'Remove', ` aria-label="Remove ${esc(p.display_name)} from this training only"`) : ''}
+        </li>`).join('') || '<li class="al-small">Empty team — add players before publishing.</li>'}</ul>
+        ${!isLocked() ? action(`place-player:${t.number}`, 'Move selected player here', ` data-al-place-team="${t.number}"${disabled(!state.pickedPlayer)}`) : ''}
       </article>`;
     }).join('');
   }
 
   function editTools() {
-    const all = state.teams.flatMap(t => t.player_ids.map(id => ({ id, text: `${teamPlayer(id).display_name} · ${t.name}` })));
+    const assigned = new Set(state.teams.flatMap(t => t.player_ids));
+    const unassigned = [...state.selected].filter(id => !assigned.has(id));
+    const all = [...state.selected].map(id => ({ id, text: `${teamPlayer(id).display_name} · ${state.teams.find(t => t.player_ids.includes(id))?.name || 'Unassigned'}` }));
     return `<div class="al-edit-tools">
-      <h4>Adjust the draft — no dragging needed</h4>
-      <p class="al-small">Swap any two players. Moves must leave enough players on court and keep squad sizes within one player of each other; otherwise use a swap. Roster additions/removals take effect when you regenerate.</p>
+      <h4>Adjust this draft — keep everyone else in place</h4>
+      <p class="al-small" id="al-drag-help">Drag a player’s ↕ handle onto another player to swap, or onto a team to move; hold near the screen edge to scroll. On touch or keyboard, activate a handle, then another handle to swap or “Move selected player here”. Escape cancels selection. The controls below also work without dragging.</p>
+      <p class="al-small">Remove only takes a player out of this training roster, never deletes their account or profile. Changes stay local until Save draft. Undo or discard restores the saved lineup; rebalancing is a separate choice.</p>
+      <p id="al-drag-status" class="al-callout" role="status" aria-live="polite">${state.pickedPlayer ? `${esc(teamPlayer(state.pickedPlayer).display_name)} selected. Choose a different player or destination team.` : 'No player selected for a move or swap.'}</p>
+      ${unassigned.length ? `<div class="al-callout"><h4>Assign ${unassigned.length} selected player${unassigned.length === 1 ? '' : 's'} before saving</h4>
+        <ul class="al-team-players">${unassigned.map(id => `<li>${playerHandle(playerFor(id))}<span>${esc(playerFor(id).display_name)}</span>${action(`remove-player:${id}`, 'Remove')}</li>`).join('')}</ul></div>` : ''}
       <div class="al-grid">
         <div class="al-field">${label('al-move-player', 'Player to move or swap')}
           <select id="al-move-player">${option('', 'Choose a player', '')}${all.map(p => option(p.id, p.text, '')).join('')}</select></div>
         <div class="al-field">${label('al-swap-player', 'Swap with player')}
           <select id="al-swap-player">${option('', 'Choose the other player', '')}${all.map(p => option(p.id, p.text, '')).join('')}</select></div>
       </div>
-      <div class="al-actions al-form-actions">${action('swap', 'Swap these players', disabled(needsRosterReview()))}</div>
+      <div class="al-actions al-form-actions">${action('swap', 'Swap these players')}</div>
       <div class="al-field al-form-actions">${label('al-move-team', 'Or move to team')}
         <select id="al-move-team">${option('', 'Choose destination team', '')}${state.teams.map(t => option(t.number, t.name, '')).join('')}</select></div>
-      <div class="al-actions al-form-actions">${action('move', 'Move player', disabled(needsRosterReview()))}</div>
+      <div class="al-actions al-form-actions">${action('move', 'Move player')}</div>
     </div>`;
   }
 
   function renderDraft() {
     const locked = isLocked();
-    const cancelled = session()?.is_cancelled;
     return `<section class="al-card" id="al-draft">${heading(3, 'Balance & review teams')}
       <div class="al-grid"><div class="al-field">${label('al-team-size', 'Players on court per team')}
         <select id="al-team-size"${disabled(locked)}>
-          ${[['auto', 'Auto · choose 4, 5 or 6'], ['4', '4 on court'], ['5', '5 on court'], ['6', '6 on court']].map(([v, l]) => option(v, l, state.size)).join('')}
+          ${[['auto', 'Auto · choose 2–6'], ...[2, 3, 4, 5, 6].map(n => [String(n), `${n} on court`])].map(([v, l]) => option(v, l, state.size)).join('')}
         </select></div>
-        <div class="al-field">${label('al-max-teams', 'Maximum squads for this training')}
+        <div class="al-field">${label('al-max-teams', 'Maximum squads for next rebalance')}
           <select id="al-max-teams"${disabled(locked)}>${[2, 3, 4, 5].map(count => option(count, `${count} squads maximum`, state.maxTeams)).join('')}</select>
-          <p class="al-small">Maximum five squads for this round robin. Extra players rotate as substitutes, never excluded.</p></div></div>
+          <p class="al-small">Used only when generating or rebalancing, not by Save draft. Maximum five squads; extra players rotate as substitutes.</p></div></div>
       <p class="al-callout" id="al-plan" role="status">${planText()}</p>
       <p class="al-small">A draft includes everyone. Gender and really-rookie distribution are balanced alongside hidden ELO. With the five-squad limit, 30 players at size 6 gives five teams of six; 36 gives five squads of seven or eight.</p>
       <p class="al-small">Team names are chosen when the draft is generated and stay saved until you edit or regenerate them. Refreshing does not redraw names.</p>
-      ${cancelled ? '<p class="al-notice">This training is cancelled. Choose an active training to generate or publish teams.</p>' : ''}
+      ${cancelled() ? '<p class="al-notice">This training is cancelled. Choose an active Thursday to edit.</p>' : ''}
       <div class="al-actions">
-        <button type="button" class="al-button" data-al-action="generate" id="al-generate"${disabled(locked || cancelled || !state.sessionId || state.selected.size < minimumRoster() || state.selected.size > 500)}>${event() ? 'Regenerate balanced draft' : 'Generate balanced draft'}</button>
+        <button type="button" class="al-button al-secondary" data-al-action="generate" id="al-generate"${disabled(locked || !state.sessionId || state.selected.size < minimumRoster() || state.selected.size > 500)}>${event() ? 'Rebalance teams — optional, replaces assignments' : 'Generate balanced draft'}</button>
       </div>
-      <p class="al-dirty" id="al-dirty-roster"${needsRosterReview() ? '' : ' hidden'}>${event()?.roster_stale ? 'RSVPs changed since generation. Review your checked roster and generate again before publishing.' : 'Roster or team size changed. Generate again to apply this selection before publishing.'}</p>
+      <p class="al-dirty" id="al-dirty-roster"${needsRosterReview() ? '' : ' hidden'}>Roster or team size needs review. Assign any new players, then Save draft — no rebalance required.</p>
       ${state.teams.length ? `<div class="al-team-grid" id="al-teams">${teamCards()}</div>
         ${!locked ? `${editTools()}<p class="al-dirty" id="al-dirty-teams"${state.dirtyTeams ? '' : ' hidden'}>Team edits are not saved yet.</p>
-        <div class="al-actions"><button type="button" class="al-button" id="al-save-teams" data-al-action="save-teams"${disabled(!state.dirtyTeams || needsRosterReview())}>Save draft edits</button>${action('discard-teams', 'Discard team edits', disabled(!state.dirtyTeams))}</div>` : ''}` :
+        <div class="al-actions"><button type="button" class="al-button" id="al-save-teams" data-al-action="save-draft"${disabled(!state.dirtyTeams && !needsRosterReview())}>Save draft</button>
+        ${action('undo-draft', 'Undo last draft change', ` id="al-undo-draft"${disabled(!state.draftUndo.length)}`)}
+        ${action('discard-teams', 'Discard draft changes', disabled(!state.dirtyTeams && !state.dirtyRoster))}</div>` : ''}` :
         '<p class="al-empty al-form-actions">No teams yet. Confirm the roster, then generate a private draft. Names stay hidden from the public until you publish.</p>'}
     </section>`;
   }
@@ -620,7 +700,7 @@
   function renderMatches() {
     const e = event();
     if (!e?.schedule) return `<section class="al-card" id="al-matches">${heading(6, 'Fixtures & match scores')}<p class="al-empty">Generate a schedule in step 4 to record scores and calculate placements automatically. Trainings without a schedule can still use manual placements in step 7.</p></section>`;
-    const editable = e.status === 'published' && !futureTraining();
+    const editable = e.status === 'published' && !futureTraining() && !cancelled();
     const completed = allMatches().filter(match => match.score_a != null && match.score_b != null).length;
     return `<section class="al-card" id="al-matches">
       ${heading(6, 'Fixtures & match scores')}
@@ -666,12 +746,63 @@
       <div class="al-status"><span class="al-chip ${status === 'draft' || !e ? 'al-draft' : 'al-live'}">${esc(status)}</span>${e ? `<span class="al-small">Saved version ${number(e.version, 0)}</span>` : ''}</div>
       <p class="al-callout">${text}</p>
       ${eventAwardsSummary()}
+      <p class="al-notice" id="al-publish-warning"${publishWarning() ? '' : ' hidden'}>${esc(publishWarning())}</p>
       <div class="al-actions">
-        ${status === 'published' ? lineupStarted() ? '<a class="al-button al-secondary" href="#al-matches">Record or correct match scores</a>' : action('unpublish', 'Edit lineup — temporarily hide published teams') :
+        ${status === 'published' ? lineupStarted() ? '<a class="al-button al-secondary" href="#al-matches">Record or correct match scores</a>' : action('unpublish', 'Edit lineup — temporarily hide published teams', disabled(cancelled())) :
           status === 'finalized' ? '<a class="al-button al-secondary" href="#al-results">Correct final placements</a>' :
-            `<button type="button" class="al-button" id="al-publish-button" data-al-action="publish"${disabled(!e || state.dirtyTeams || state.dirtySchedule || needsRosterReview() || session()?.is_cancelled)}>Publish teams (public names)</button>`}
+            `<button type="button" class="al-button" id="al-publish-button" data-al-action="publish"${disabled(!e || isLocked() || state.dirtyTeams || state.dirtySchedule || needsRosterReview() || !!publishWarning())}>Publish teams (public names)</button>`}
+        ${e ? `<a class="al-button al-secondary" href="/spieltag?event=${encodeURIComponent(e.id)}" target="_blank" rel="noopener">Live-Spieltag / Ergebnisse <span class="al-sr-only">(opens a new tab; sign in there to enter scores)</span></a>` : ''}
       </div>
       <p class="al-small al-form-actions">Publishing makes all selected player names public, including named guests. Let guests know before publishing. Ratings, gender labels and rookie tags remain admin-only and are never included in the public team view.</p>
+    </section>`;
+  }
+
+  function publishWarning() {
+    if (!event()) return '';
+    if (state.selected.size < 4) return `Cannot publish: ${state.selected.size} players; at least 4 are required. An understrength draft can still be saved.`;
+    if (state.teams.length < 2 || state.teams.length > 5) return 'Cannot publish: use two to five teams.';
+    if (state.teams.flatMap(t => t.player_ids).length !== state.selected.size) return 'Cannot publish: assign every selected player to a team.';
+    const short = state.teams.find(t => t.player_ids.length < draftSize());
+    if (short) return `Cannot publish: ${short.name || `Team ${short.number}`} has ${short.player_ids.length} players; needs ${draftSize()}. Add players, move players or choose a smaller on-court size.`;
+    const sizes = state.teams.map(t => t.player_ids.length);
+    if (Math.max(...sizes) - Math.min(...sizes) > 1) return 'Cannot publish: team sizes may differ by at most one player. Move a player or rebalance.';
+    return '';
+  }
+
+  function bonusSettings() {
+    const e = event();
+    return {
+      max: number(e?.bonus_points_max ?? e?.settings?.bonus_points_max, 1),
+      step: number(e?.bonus_points_step ?? e?.settings?.bonus_points_step, 0.5)
+    };
+  }
+
+  function bonusRows() {
+    const rules = bonusSettings();
+    const locked = cancelled() || event()?.status === 'finalized';
+    return [...state.selected].map(playerFor).filter(p => p.display_name.toLocaleLowerCase().includes(state.bonusSearch.toLocaleLowerCase()))
+      .sort((a, b) => a.display_name.localeCompare(b.display_name)).map(p => `<div class="al-bonus-row">
+        <label for="al-bonus-${esc(p.id)}">${esc(p.display_name)}<span class="al-small">${esc(state.teams.find(t => t.player_ids.includes(p.id))?.name || 'Unassigned')}</span></label>
+        <input id="al-bonus-${esc(p.id)}" data-al-bonus="${esc(p.id)}" type="number" inputmode="decimal" min="0" max="${rules.max}" step="${rules.step}" value="${esc(state.bonusAwards[p.id] ?? 0)}" required${disabled(locked)} aria-label="${esc(p.display_name)} bonus points">
+      </div>`).join('') || '<p class="al-small">No matching roster players.</p>';
+  }
+
+  function renderBonus() {
+    const e = event();
+    const rules = bonusSettings();
+    return `<section class="al-card" id="al-bonus"><h3>Bonus points (BP) · admin only</h3>
+      <p class="al-muted">Individual awards for this training, added to each player’s season total when results are finalized. Spielleiter cannot award BP.</p>
+      ${!e ? '<p class="al-empty">Generate a draft first to award BP.</p>' : `
+        <p class="al-callout">Saved training rules: maximum <strong>${rules.max} BP</strong> per player, in <strong>${rules.step} BP</strong> steps. Later Season 2 setting changes do not alter this training.</p>
+        ${e.status === 'finalized' ? `<p class="al-notice">Finalized BP are read-only. Reopen results before editing; finalize again when corrections are complete.</p>${action('reopen-results', 'Reopen results to correct BP', disabled(cancelled()))}` : ''}
+        <div class="al-field">${label('al-bonus-search', 'Find a player to award BP')}<input type="search" id="al-bonus-search" value="${esc(state.bonusSearch)}" placeholder="Filter this roster"></div>
+        <form data-al-form="bonus">
+          <div class="al-bonus-list" id="al-bonus-list">${bonusRows()}</div>
+          <p class="al-small">0 means no award. Saving replaces the complete BP list, including players hidden by the filter. It never adds the same award twice.</p>
+          <p class="al-dirty" id="al-bonus-dirty"${state.dirtyBonus ? '' : ' hidden'}>Unsaved bonus points — save or discard before finalizing.</p>
+          <div class="al-actions"><button class="al-button" type="submit" id="al-bonus-save"${disabled(cancelled() || e.status === 'finalized' || !state.dirtyBonus)}>Save bonus points</button>
+          ${action('discard-bonus', 'Discard BP edits', ` id="al-bonus-discard"${disabled(!state.dirtyBonus)}`)}</div>
+        </form>`}
     </section>`;
   }
 
@@ -750,10 +881,10 @@
 
   function renderResults() {
     const e = event();
-    const enabled = e && ['published', 'finalized'].includes(e.status);
+    const enabled = e && !cancelled() && ['published', 'finalized'].includes(e.status);
     const scheduled = !!e?.schedule;
     const finished = !scheduled || !!e.match_standings?.complete;
-    const finalizedSchedule = scheduled && e.status === 'finalized';
+    const finalizedSchedule = e?.status === 'finalized';
     const winner = e?.status === 'finalized' ? e.teams.find(team => Number(team.placement) === 1) :
       scheduled && finished ? state.teams.find(team => {
         const choices = allowedPlaces(team.number);
@@ -785,13 +916,40 @@
   }
 
   function render() {
+    stopDrag();
     $('al-app').innerHTML = `<fieldset id="al-workspace"${disabled(state.busy || state.conflict)}>
       <legend class="al-sr-only">Imperials Social League administration</legend>
       <ol class="al-steps" aria-label="League administration steps">
-        ${[['setup', '1 · Season'], ['roster', '2 · Roster'], ['draft', '3 · Teams'], ['schedule', '4 · Schedule'], ['publish', '5 · Publish'], ['matches', '6 · Scores'], ['results', '7 · Finalize']].map(([id, text]) => `<li><a href="#al-${id}">${text}</a></li>`).join('')}
+        ${[['setup', '1 · Thursday'], ['roster', '2 · Roster'], ['draft', '3 · Teams'], ['schedule', '4 · Schedule'], ['publish', '5 · Publish'], ['matches', '6 · Scores'], ['bonus', 'BP'], ['results', '7 · Finalize']].map(([id, text]) => `<li><a href="#al-${id}">${text}</a></li>`).join('')}
       </ol>
-      ${renderSetup()}${renderRoster()}${renderDraft()}${renderSchedule()}${renderPublish()}${renderMatches()}${renderResults()}
+      ${renderSetup()}${renderRoster()}${renderDraft()}${renderSchedule()}${renderPublish()}${renderMatches()}${renderBonus()}${renderResults()}
     </fieldset>`;
+    restoreFormEdits();
+  }
+
+  function restoreFormEdits() {
+    root.querySelectorAll('form[data-al-form]').forEach(form => {
+      const edits = state.formEdits[formKey(form)];
+      if (!edits) return;
+      for (const field of form.elements) {
+        if (!(field.name in edits)) continue;
+        if (field.type === 'checkbox') field.checked = edits[field.name];
+        else field.value = edits[field.name];
+      }
+    });
+    if (state.formEdits['season:']) updateScoringPreview();
+  }
+
+  function formKey(form) {
+    return `${form.dataset.alForm}:${form.dataset.alForm === 'profile' || form.dataset.alForm === 'link' ? state.profileId : ''}`;
+  }
+
+  function rememberFormInput(input) {
+    const form = input.closest('form[data-al-form]');
+    if (!form || !['season', 'profile', 'guest', 'link'].includes(form.dataset.alForm) || !input.name) return;
+    const key = formKey(form);
+    if (!state.formEdits[key]) state.formEdits[key] = {};
+    state.formEdits[key][input.name] = input.type === 'checkbox' ? input.checked : input.value;
   }
 
   function updateRoster() {
@@ -805,11 +963,15 @@
     $('al-dirty-roster').hidden = !needsRosterReview();
     $('al-generate').disabled = isLocked() || session()?.is_cancelled || !state.sessionId || state.selected.size < minimumRoster() || state.selected.size > 500;
     const save = $('al-save-teams');
-    if (save) save.disabled = !state.dirtyTeams || needsRosterReview();
+    if (save) save.disabled = isLocked() || (!state.dirtyTeams && !needsRosterReview());
     const publish = $('al-publish-button');
-    if (publish) publish.disabled = !event() || state.dirtyTeams || state.dirtySchedule || needsRosterReview() || session()?.is_cancelled;
+    if (publish) publish.disabled = !event() || isLocked() || state.dirtyTeams || state.dirtySchedule || needsRosterReview() || !!publishWarning();
+    if ($('al-publish-warning')) {
+      $('al-publish-warning').textContent = publishWarning();
+      $('al-publish-warning').hidden = !publishWarning();
+    }
     if ($('al-schedule-fields')) $('al-schedule-fields').disabled = !event() || isLocked() || state.dirtyTeams || needsRosterReview();
-    root.querySelectorAll('[data-al-action="swap"], [data-al-action="move"]').forEach(b => { b.disabled = needsRosterReview(); });
+    if ($('al-undo-draft')) $('al-undo-draft').disabled = !state.draftUndo.length;
   }
 
   function markTeamDirty() {
@@ -819,76 +981,117 @@
     updateDraftControls();
   }
 
-  async function changeSelection(kind, value) {
-    if (hasChanges() && !window.confirm('Switch selection and discard unsaved roster, team or result edits?')) {
-      $(kind === 'season' ? 'al-season-select' : 'al-session-select').value = kind === 'season' ? state.seasonId : state.sessionId;
+  async function changeSelection(value) {
+    if (!sessions().some(s => s.id === value)) throw new Error('Choose a Thursday within Season 2.');
+    if (hasChanges() && !window.confirm('Switch training and discard all unsaved roster, team, BP, result and form edits?')) {
+      $('al-session-select').value = state.sessionId;
       return;
     }
     clearNotice();
     setBusy(true, 'Loading this training’s roster…');
-    if (kind === 'season') {
-      state.seasonId = value;
-      const available = sessions();
-      state.sessionId = (available.filter(s => !s.is_cancelled && dateOnly(s.session_date) >= today()).reverse()[0] || available[0])?.id || '';
-      state.newSeason = false;
-    } else state.sessionId = value;
+    state.formEdits = {};
+    state.sessionId = value;
     try { await loadRoster(); render(); }
     catch (error) { showError(error); }
     finally { setBusy(false); }
-    $(kind === 'season' ? 'al-season-select' : 'al-session-select')?.focus();
+    $('al-session-select')?.focus();
   }
 
   function validateTeams() {
     const ids = state.teams.flatMap(t => t.player_ids);
     if (new Set(ids).size !== ids.length || ids.length !== state.selected.size || ids.some(id => !state.selected.has(id))) {
-      throw new Error('Each selected player must appear exactly once. Regenerate the draft to apply roster changes.');
+      throw new Error('Assign every selected player to exactly one team before saving. Use “Move selected player here” for unassigned players.');
     }
-    const sizes = state.teams.map(t => t.player_ids.length);
-    if (Math.min(...sizes) < Number(event()?.team_size || 4) || Math.max(...sizes) - Math.min(...sizes) > 1) throw new Error('Keep enough players on court and squad sizes within one player of each other. Swap players instead, or regenerate the draft.');
+    if (state.teams.length < 2 || state.teams.length > 5) throw new Error('Use two to five teams.');
+    if (![2, 3, 4, 5, 6].includes(draftSize())) throw new Error('Choose an on-court size from 2 to 6.');
     if (state.teams.some(t => !t.name.trim())) throw new Error('Give every team a visible public name before saving.');
+  }
+
+  function rememberDraft() {
+    state.draftUndo.push({
+      teams: state.teams.map(t => ({ ...t, player_ids: [...t.player_ids] })),
+      selected: [...state.selected], size: state.size, dirtyTeams: state.dirtyTeams, dirtyRoster: state.dirtyRoster
+    });
+    if (state.draftUndo.length > 30) state.draftUndo.shift();
+  }
+
+  function changeRoster(ids) {
+    rememberDraft();
+    state.selected = new Set(ids);
+    state.teams.forEach(t => { t.player_ids = t.player_ids.filter(id => state.selected.has(id)); });
+    state.dirtyRoster = true;
+    if (event()) state.dirtyTeams = true;
+    if (!state.selected.has(state.pickedPlayer)) state.pickedPlayer = '';
+  }
+
+  function playerHandle(p) {
+    return `<button type="button" class="al-player-handle" data-al-action="pick-player:${esc(p.id)}" data-al-handle="${esc(p.id)}" aria-pressed="${state.pickedPlayer === p.id}" aria-describedby="al-drag-help" aria-label="Select or drag ${esc(p.display_name)} to move or swap">↕</button>`;
+  }
+
+  function updatePickedPlayer() {
+    root.querySelectorAll('[data-al-handle]').forEach(handle => {
+      handle.setAttribute('aria-pressed', String(handle.dataset.alHandle === state.pickedPlayer));
+    });
+    root.querySelectorAll('[data-al-place-team]').forEach(button => { button.disabled = !state.pickedPlayer; });
+    if ($('al-drag-status')) $('al-drag-status').textContent = state.pickedPlayer
+      ? `${teamPlayer(state.pickedPlayer).display_name} selected. Choose another player to swap, or a team destination to move. Escape cancels.`
+      : 'No player selected for a move or swap.';
+  }
+
+  function editLineup(playerId, { secondId, teamNumber } = {}) {
+    if (state.busy || state.conflict || isLocked() || !event()) return;
+    if (!state.selected.has(playerId)) throw new Error('Choose a player in this training roster.');
+    const source = state.teams.find(t => t.player_ids.includes(playerId));
+    const destination = secondId ? state.teams.find(t => t.player_ids.includes(secondId)) :
+      state.teams.find(t => String(t.number) === String(teamNumber));
+    if (!destination) throw new Error('Choose an assigned player to swap with, or a destination team.');
+    if (source === destination) throw new Error('Choose a different team or a player on another team.');
+    if (secondId && !source) throw new Error('Move an unassigned player to a team first. Use a team destination, not a swap.');
+    rememberDraft();
+    if (secondId) {
+      source.player_ids[source.player_ids.indexOf(playerId)] = secondId;
+      destination.player_ids[destination.player_ids.indexOf(secondId)] = playerId;
+    } else {
+      if (source) source.player_ids = source.player_ids.filter(id => id !== playerId);
+      destination.player_ids.push(playerId);
+    }
+    state.dirtyTeams = true;
+    state.pickedPlayer = '';
+    render();
+    $('al-save-teams')?.focus();
+    $('al-progress').textContent = secondId ? 'Players swapped locally. Save draft when ready.' : 'Player moved locally. Save draft when ready.';
   }
 
   function adjustTeams(swap) {
     const playerId = $('al-move-player').value;
-    const source = state.teams.find(t => t.player_ids.includes(playerId));
-    if (!source) throw new Error('Choose the player you want to move or swap.');
     const secondId = $('al-swap-player').value;
-    const destination = swap ? state.teams.find(t => t.player_ids.includes(secondId)) :
-      state.teams.find(t => String(t.number) === $('al-move-team').value);
-    if (!destination) throw new Error(swap ? 'Choose a second player to swap with.' : 'Choose a destination team.');
-    if (source === destination) throw new Error('Choose players or a destination on different teams.');
-    if (swap) {
-      source.player_ids[source.player_ids.indexOf(playerId)] = secondId;
-      destination.player_ids[destination.player_ids.indexOf(secondId)] = playerId;
-    } else {
-      const sizes = state.teams.map(t => t.player_ids.length + (t === source ? -1 : t === destination ? 1 : 0));
-      if (Math.min(...sizes) < Number(event()?.team_size || 4) || Math.max(...sizes) - Math.min(...sizes) > 1) throw new Error('That move would leave too few players on court or unbalance squad sizes. Swap two players instead.');
-      source.player_ids = source.player_ids.filter(id => id !== playerId);
-      destination.player_ids.push(playerId);
-    }
-    state.dirtyTeams = true;
-    render();
-    $('al-save-teams').focus();
-    $('al-progress').textContent = swap ? 'Players swapped locally. Save draft edits when ready.' : 'Player moved locally. Save draft edits when ready.';
+    if (swap && !secondId) throw new Error('Choose the second player to swap with.');
+    editLineup(playerId, swap ? { secondId } : { teamNumber: $('al-move-team').value });
   }
 
-  async function generate() {
-    if (!season() || !state.sessionId || isLocked()) throw new Error('Choose a season and an editable training first.');
-    if (state.selected.size < minimumRoster() || state.selected.size > 500) throw new Error(`Select ${minimumRoster()}–500 players for this team size.`);
-    if (!Number.isInteger(state.maxTeams) || state.maxTeams < 2 || state.maxTeams > 5) throw new Error('Choose a maximum of two to five squads.');
-    if (event() && !window.confirm(`Regenerate this draft for the selected roster? Team names will be redrawn, including any manually edited names. Existing assignments and pending team edits will be replaced.${event().schedule || state.dirtySchedule ? ' The saved schedule and pending timing edits will be cleared; generate the schedule again after changing teams.' : ''} Everyone selected will be included.`)) return;
+  async function prepareProfiles() {
     const uncreated = players().filter(p => p.uncreated && state.selected.has(p.id));
     for (const p of uncreated) {
       const oldId = p.id;
       const ok = await write('save_player', {
         user_id: p.user_id, gender: p.gender, is_rookie: p.is_rookie, initial_rating: p.initial_rating
       }, { preserve: true, message: `League profile ready for ${p.display_name}.` });
-      if (!ok) return;
+      if (!ok) return false;
       const created = state.data.players.find(profile => profile.user_id === p.user_id);
       if (!created) throw new Error('A member league profile was not returned. Refresh before generating teams.');
       state.selected.delete(oldId);
       state.selected.add(created.id);
+      state.teams.forEach(t => { t.player_ids = t.player_ids.map(id => id === oldId ? created.id : id); });
     }
+    return true;
+  }
+
+  async function generate() {
+    if (!season() || !state.sessionId || isLocked()) throw new Error('Choose an editable Season 2 Thursday first.');
+    if (state.selected.size < minimumRoster() || state.selected.size > 500) throw new Error(`Select ${minimumRoster()}–500 players for this team size.`);
+    if (!Number.isInteger(state.maxTeams) || state.maxTeams < 2 || state.maxTeams > 5) throw new Error('Choose a maximum of two to five squads.');
+    if (event() && !window.confirm(`Rebalance this draft? Team names and all assignments will be replaced. To keep other players in place, cancel and use Save draft instead.${event().schedule || state.dirtySchedule ? ' The saved schedule and timing edits will be cleared.' : ''}`)) return;
+    if (!await prepareProfiles()) return;
     await write('generate', {
       season_id: state.seasonId, session_id: state.sessionId, team_size: state.size === 'auto' ? 'auto' : Number(state.size),
       ...(event() ? { version: event().version } : {}),
@@ -900,6 +1103,25 @@
     if (name === 'reload') { await reload(); return; }
     if (state.busy || state.conflict || !state.loaded) return;
     clearNotice();
+    if (/^(pick-player:|place-player:|remove-player:)/.test(name)) {
+      if (isLocked() || !event()) return;
+      const id = name.slice(name.indexOf(':') + 1);
+      if (name.startsWith('remove-player:')) {
+        if (!state.selected.has(id)) return;
+        changeRoster(new Set([...state.selected].filter(playerId => playerId !== id)));
+        render();
+        $('al-undo-draft')?.focus();
+        $('al-progress').textContent = `${playerFor(id).display_name} removed from this draft only. Account/profile unchanged. Undo or Save draft.`;
+      } else if (name.startsWith('place-player:')) {
+        editLineup(state.pickedPlayer, { teamNumber: id });
+      } else if (state.pickedPlayer && state.pickedPlayer !== id) {
+        editLineup(state.pickedPlayer, { secondId: id });
+      } else {
+        state.pickedPlayer = state.pickedPlayer === id ? '' : id;
+        updatePickedPlayer();
+      }
+      return;
+    }
     if (name.startsWith('discard-match:')) {
       const matchNumber = name.slice('discard-match:'.length);
       delete state.matchEdits[matchNumber];
@@ -908,22 +1130,17 @@
       return;
     }
     switch (name) {
-      case 'new-season':
-        state.newSeason = true; state.seasonOpen = true; render(); $('al-season-name').focus(); break;
-      case 'cancel-season':
-        state.newSeason = false; state.seasonOpen = false; render(); break;
       case 'add-rsvp':
         if (isLocked() || state.attendanceError) return;
-        state.attending.forEach(id => state.selected.add(id));
-        state.dirtyRoster = true; updateRoster(); break;
+        changeRoster(new Set([...state.selected, ...state.attending])); render(); break;
       case 'rsvp':
         if (isLocked() || state.attendanceError) return;
         if (state.selected.size && !window.confirm('Replace the current selection with attending member RSVPs? Manually selected guests or other members will be unchecked.')) return;
-        state.selected = new Set(state.attending); state.dirtyRoster = true; updateRoster(); break;
+        changeRoster(state.attending); render(); break;
       case 'clear-roster':
         if (isLocked()) return;
-        if (state.selected.size && !window.confirm('Uncheck everyone in this local roster? Existing saved teams are unchanged until you regenerate.')) return;
-        state.selected.clear(); state.dirtyRoster = true; updateRoster(); break;
+        if (state.selected.size && !window.confirm('Remove everyone from this local draft roster? No account or profile is deleted. The saved lineup stays unchanged until Save draft.')) return;
+        changeRoster(new Set()); render(); break;
       case 'retry-rsvp':
         setBusy(true, 'Refreshing RSVPs and saved league data…');
         try { await loadData({ preserve: true }); render(); }
@@ -937,27 +1154,40 @@
           break_minutes: event().schedule.break_minutes, available_minutes: event().schedule.available_minutes
         } : { courts: 2, match_minutes: 20, break_minutes: 5, available_minutes: 120 };
         state.dirtySchedule = false; render(); break;
-      case 'swap': if (!isLocked() && !needsRosterReview()) adjustTeams(true); break;
-      case 'move': if (!isLocked() && !needsRosterReview()) adjustTeams(false); break;
+      case 'swap': if (!isLocked()) adjustTeams(true); break;
+      case 'move': if (!isLocked()) adjustTeams(false); break;
+      case 'undo-draft': {
+        if (isLocked()) return;
+        const prior = state.draftUndo.pop();
+        if (!prior) return;
+        Object.assign(state, { ...prior, selected: new Set(prior.selected), pickedPlayer: '' });
+        render(); $('al-save-teams')?.focus(); break;
+      }
       case 'discard-teams':
-        if (!window.confirm('Discard unsaved team names, swaps and moves? Your roster selection will be kept.')) return;
+        if (isLocked() || !event()) return;
+        if (!window.confirm('Discard all local draft changes, including roster removals/additions, names, swaps and moves? Restore the saved roster and teams without changing accounts or profiles.')) return;
         state.teams = event().teams.map(t => ({ number: t.number, name: t.name, placement: t.placement, player_ids: t.players.map(p => p.id) }));
-        state.dirtyTeams = false; render(); break;
-      case 'save-teams':
-        if (isLocked() || needsRosterReview()) return;
+        state.selected = new Set(state.teams.flatMap(t => t.player_ids));
+        state.size = String(event().team_size);
+        state.dirtyTeams = false; state.dirtyRoster = false; state.draftUndo = []; state.pickedPlayer = ''; render(); break;
+      case 'save-draft':
+        if (isLocked() || !event()) return;
         validateTeams();
+        if (state.dirtySchedule) throw new Error('Generate or discard your unsaved timing edits before saving a lineup change.');
         if (event().schedule && !window.confirm('Save these lineup changes? This can clear the match schedule. Generate the schedule again before republishing.')) return;
-        await write('save_teams', { event_id: event().id, version: event().version, teams: state.teams.map(t => ({ number: t.number, name: t.name.trim(), player_ids: t.player_ids })) },
-          { message: 'Draft edits saved. Publish when ready.' });
+        if (!await prepareProfiles()) return;
+        await write('save_draft', { event_id: event().id, version: event().version, team_size: draftSize(), teams: state.teams.map(t => ({ number: t.number, name: t.name.trim(), player_ids: t.player_ids })) },
+          { message: 'Draft saved without rebalancing. Check the roster warning before publishing.' });
         break;
       case 'publish':
         if (!event() || isLocked() || needsRosterReview() || state.dirtyTeams || state.dirtySchedule) return;
         validateTeams();
+        if (publishWarning()) throw new Error(publishWarning());
         if (!window.confirm(`Publish ${state.teams.length} teams and ${state.selected.size} player names publicly, including named guests? Let guests know their names will be public. Ratings, gender and rookie tags remain admin-only.`)) return;
         await write('publish', { event_id: event().id, version: event().version }, { message: 'Teams are now public.' });
         break;
       case 'unpublish':
-        if (event()?.status !== 'published') return;
+        if (event()?.status !== 'published' || cancelled()) return;
         if (lineupStarted()) throw new Error('The lineup cannot be reopened after a match score or finalized results. Correct scores instead; players and teams remain locked.');
         if (Object.keys(state.matchEdits).length) throw new Error('Save or discard your unsaved match score edits before reopening the lineup.');
         if (state.dirtyResults && !window.confirm('Discard unsaved final placements and reopen the lineup?')) return;
@@ -965,12 +1195,15 @@
         await write('unpublish', { event_id: event().id, version: event().version }, { message: 'Lineup is now a private draft. Republish after editing.', focus: 'al-generate' });
         break;
       case 'reopen-results':
-        if (event()?.status !== 'finalized' || !event().schedule) return;
+        if (event()?.status !== 'finalized' || cancelled()) return;
         if (!window.confirm('Reopen this training’s results? Its previous season awards and rating adjustments will be temporarily removed. Match scores are retained and the roster stays locked. Correct scores or exact ties, then finalize again to restore updated awards.')) return;
         await write('reopen_results', { event_id: event().id, version: event().version }, {
           message: 'Results reopened. Previous awards removed temporarily; correct scores and finalize again.', focus: 'al-matches-heading'
         });
         break;
+      case 'discard-bonus':
+        state.bonusAwards = { ...savedBonus() };
+        state.dirtyBonus = false; render(); $('al-bonus-search')?.focus(); break;
     }
   }
 
@@ -979,14 +1212,14 @@
     clearNotice();
     const data = new FormData(form);
     const type = form.dataset.alForm;
+    const clearFormKey = formKey(form);
+    if (cancelled() && ['schedule', 'match', 'results', 'bonus'].includes(type)) throw new Error('Cancelled training — read-only. Choose an active Thursday.');
     if (type === 'season') {
       const points = String(data.get('placement_points')).split(',').map(s => s.trim());
       if (points.some(p => !p || !Number.isFinite(Number(p)) || Number(p) < 0)) throw new Error('Enter placement points as non-negative numbers separated by commas, for example 3, 2.5, 2, 1, 0.5.');
       if (points.length > 100 || points.some(p => Number(p) > 10000 || Math.round(Number(p) * 1e6) / 1e6 !== Number(p))) throw new Error('Use at most 100 placement awards, each between 0 and 10,000 with at most six decimal places.');
       if (points.some((p, i) => i > 0 && Number(p) > Number(points[i - 1]))) throw new Error('Placement points must stay the same or decrease from first place down.');
       if (String(data.get('start_date')) > String(data.get('end_date'))) throw new Error('The season end date must be on or after its start date.');
-      const name = String(data.get('name')).trim();
-      if (!name) throw new Error('Enter a season name.');
       const scoringMode = data.get('scoring_mode');
       const pointsStep = Number(data.get('points_step'));
       if (!['relative', 'fixed'].includes(scoringMode) || ![0.1, 0.25, 0.5, 1].includes(pointsStep)) throw new Error('Choose a valid scoring mode and rounding step.');
@@ -994,21 +1227,41 @@
         throw new Error(`Relative base awards must be multiples of ${pointsStep}. Edit the awards or choose a finer rounding step.`);
       }
       const id = String(data.get('id') || '');
-      const knownIds = new Set(state.data.seasons.map(s => s.id));
+      if (!season() || id !== season().id) throw new Error('Only the existing Season 2 settings can be edited here.');
+      const bonusMax = Number(data.get('bonus_points_max'));
+      const bonusStep = Number(data.get('bonus_points_step'));
+      if (![0.1, 0.25, 0.5, 1].includes(bonusStep) || !Number.isFinite(bonusMax) || bonusMax < 0 || bonusMax > 10000 ||
+        Math.abs(bonusMax / bonusStep - Math.round(bonusMax / bonusStep)) > 1e-8) {
+        throw new Error('The BP maximum must be 0–10,000 and a multiple of the selected BP step.');
+      }
       await write('save_season', {
-        ...(id ? { id } : {}), name, start_date: data.get('start_date'), end_date: data.get('end_date'),
+        id, name: 'Season 2', start_date: data.get('start_date'), end_date: data.get('end_date'),
         placement_points: points.map(Number), scoring_mode: scoringMode, points_step: pointsStep,
+        bonus_points_max: bonusMax, bonus_points_step: bonusStep,
         k_factor: Number(data.get('k_factor')),
         default_rating: Number(data.get('default_rating')), rookie_rating: Number(data.get('rookie_rating'))
       }, {
-        preserve: !!id, message: id ? 'Season settings saved.' : 'Season created. Choose its training session.',
-        after: result => ({ seasonId: result.season?.id || result.season_id || id }),
+        preserve: true, message: 'Season 2 settings saved. Existing training snapshots are unchanged.',
+        clearFormKey,
         focus: 'al-session-select'
       });
-      if (!id && !state.conflict) {
-        const added = state.data.seasons.find(s => !knownIds.has(s.id));
-        if (added && state.seasonId !== added.id) await changeSelection('season', added.id);
+    } else if (type === 'bonus') {
+      if (!event() || !['draft', 'published'].includes(event().status)) throw new Error('Reopen finalized results before changing bonus points.');
+      if (state.dirtyTeams || state.dirtyRoster || state.dirtySchedule || state.dirtyResults || Object.keys(state.matchEdits).length) {
+        throw new Error('Save or discard your draft, timing and result edits first. Your BP edits are kept.');
       }
+      const rules = bonusSettings();
+      const awards = [...state.selected].map(id => {
+        const raw = String(state.bonusAwards[id] ?? 0).trim();
+        const points = Number(raw);
+        if (!raw || !Number.isFinite(points) || points < 0 || points > rules.max ||
+          Math.abs(points / rules.step - Math.round(points / rules.step)) > 1e-8) {
+          throw new Error(`${playerFor(id).display_name}: enter 0–${rules.max} BP in ${rules.step} steps.`);
+        }
+        return { player_id: id, points };
+      });
+      await write('save_bonus_points', { event_id: event().id, version: event().version, awards },
+        { message: 'Bonus points saved for this training. Finalize results to update season totals.', focus: 'al-bonus-search' });
     } else if (type === 'schedule') {
       if (!event() || isLocked() || state.dirtyTeams || needsRosterReview()) throw new Error('Save a private draft with its final roster before generating the schedule.');
       const settings = Object.fromEntries(['courts', 'match_minutes', 'break_minutes', 'available_minutes'].map(key => [key, Number(data.get(key))]));
@@ -1056,12 +1309,14 @@
         gender: data.get('gender'), is_rookie: data.has('is_rookie'), initial_rating: Number(data.get('initial_rating'))
       }, {
         preserve: true, message: type === 'guest' ? 'Guest profile saved for this and future trainings.' : 'Player profile saved.',
+        clearFormKey,
         after: result => ({ addPlayerId: type === 'guest' && state.sessionId && !isLocked() ? result.player?.id || result.player_id : undefined })
       });
       if (!state.conflict && type === 'guest') {
         const added = state.data.players.find(p => !oldIds.has(p.id) && !p.user_id && p.display_name === name);
         if (added && state.sessionId && !isLocked()) {
-          state.selected.add(added.id); state.dirtyRoster = true; state.guestOpen = false; render();
+          if (!state.selected.has(added.id)) changeRoster(new Set([...state.selected, added.id]));
+          state.guestOpen = false; render();
         }
       }
     } else if (type === 'link') {
@@ -1070,8 +1325,10 @@
       const member = state.data.members.find(m => m.id === data.get('user_id'));
       if (!member) throw new Error('Choose a member account to link.');
       if (!window.confirm(`Link guest “${p.display_name}” to member “${member.display_name}”? Their persistent league stats will be connected to that account.`)) return;
-      await write('link_player', { player_id: data.get('player_id'), user_id: data.get('user_id') }, { message: 'Guest linked to member account; stats preserved.' });
+      await write('link_player', { player_id: data.get('player_id'), user_id: data.get('user_id') }, { clearFormKey, message: 'Guest linked to member account; stats preserved.' });
     } else if (type === 'results') {
+      if (event()?.status !== 'published') throw new Error('Publish this training, or reopen finalized results, before finalizing.');
+      if (state.dirtyBonus) throw new Error('Save or discard bonus point edits before finalizing results.');
       if (event()?.schedule) {
         if (event().status === 'finalized') throw new Error('Reopen results before correcting a finalized scheduled training.');
         if (!event().match_standings?.complete) throw new Error('Finish and save every match before finalizing results.');
@@ -1090,8 +1347,97 @@
     }
   }
 
+  let drag = null;
+  let dragFrame = null;
+  let suppressPointerClickUntil = 0;
+
+  function updateDragTarget() {
+    if (!drag) return;
+    const hit = document.elementFromPoint(drag.clientX, drag.clientY);
+    const target = hit?.closest('[data-al-drop-player], [data-al-drop-team]');
+    drag.target?.classList.remove('al-drop-target');
+    drag.target = target && root.contains(target) ? target : null;
+    drag.target?.classList.add('al-drop-target');
+  }
+
+  function scrollDuringDrag() {
+    dragFrame = null;
+    if (!drag?.moved) return;
+    const edge = 64;
+    const delta = drag.clientY < edge ? -14 : drag.clientY > window.innerHeight - edge ? 14 : 0;
+    if (delta) {
+      window.scrollBy({ top: delta, behavior: 'instant' });
+      updateDragTarget();
+    }
+    dragFrame = window.requestAnimationFrame(scrollDuringDrag);
+  }
+
+  function stopDrag() {
+    const current = drag;
+    drag = null;
+    if (dragFrame !== null) window.cancelAnimationFrame(dragFrame);
+    dragFrame = null;
+    if (!current) return;
+    current.handle.classList.remove('al-dragging');
+    current.target?.classList.remove('al-drop-target');
+    if (current.handle.hasPointerCapture?.(current.pointerId)) current.handle.releasePointerCapture(current.pointerId);
+    updatePickedPlayer();
+  }
+
+  root.addEventListener('pointerdown', e => {
+    const handle = e.target.closest('[data-al-handle]');
+    if (!handle || !root.contains(handle) || e.button !== 0 || e.isPrimary === false ||
+      state.busy || state.conflict || isLocked() || !event()) return;
+    drag = { handle, playerId: handle.dataset.alHandle, pointerId: e.pointerId, x: e.clientX, y: e.clientY, clientX: e.clientX, clientY: e.clientY, moved: false, target: null };
+    handle.setPointerCapture?.(e.pointerId);
+  });
+  root.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+    drag.moved = true;
+    drag.clientX = e.clientX;
+    drag.clientY = e.clientY;
+    e.preventDefault();
+    drag.handle.classList.add('al-dragging');
+    updateDragTarget();
+    if (dragFrame === null && window.requestAnimationFrame) dragFrame = window.requestAnimationFrame(scrollDuringDrag);
+    if ($('al-drag-status')) $('al-drag-status').textContent = `Dragging ${teamPlayer(drag.playerId).display_name}. Drop on a player to swap or a team to move; release outside to cancel.`;
+  });
+  root.addEventListener('pointerup', e => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const current = drag;
+    stopDrag();
+    if (!current.moved) return;
+    suppressPointerClickUntil = Date.now() + 600;
+    e.preventDefault();
+    if (!current.target) return;
+    try {
+      const secondId = current.target.dataset.alDropPlayer;
+      if (secondId === current.playerId) return;
+      editLineup(current.playerId, secondId ? { secondId } : { teamNumber: current.target.dataset.alDropTeam });
+    } catch (error) { showError(error); }
+  });
+  const cancelDrag = e => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    suppressPointerClickUntil = Date.now() + 600;
+    stopDrag();
+  };
+  root.addEventListener('pointercancel', cancelDrag);
+  root.addEventListener('lostpointercapture', cancelDrag);
+  root.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || (!drag && !state.pickedPlayer)) return;
+    e.preventDefault();
+    suppressPointerClickUntil = Date.now() + 600;
+    stopDrag();
+    state.pickedPlayer = '';
+    updatePickedPlayer();
+  });
   root.addEventListener('click', e => {
     const button = e.target.closest('[data-al-action]');
+    if (e.detail > 0 && Date.now() < suppressPointerClickUntil && button?.dataset.alAction.startsWith('pick-player:')) {
+      e.preventDefault();
+      return;
+    }
     if (button && root.contains(button)) handleAction(button.dataset.alAction).catch(error => showError(error));
   });
   $('al-refresh').addEventListener('click', () => reload());
@@ -1104,6 +1450,7 @@
   root.addEventListener('input', e => {
     const input = e.target;
     if (state.busy || state.conflict) return;
+    rememberFormInput(input);
     if (input.id === 'al-season-points') updateScoringPreview();
     if (input.dataset.alSchedule) {
       state.scheduleSettings[input.dataset.alSchedule] = Number(input.value);
@@ -1111,7 +1458,15 @@
       updateSchedulePreview();
       updateDraftControls();
     }
-    if (input.dataset.alMatch && event()?.status === 'published' && !futureTraining()) {
+    if (input.dataset.alBonus && !cancelled() && ['draft', 'published'].includes(event()?.status)) {
+      state.bonusAwards[input.dataset.alBonus] = input.value;
+      state.dirtyBonus = [...state.selected].some(id => String(state.bonusAwards[id] ?? 0) !== String(savedBonus()[id] || 0));
+      $('al-bonus-dirty').hidden = !state.dirtyBonus;
+      $('al-bonus-save').disabled = !state.dirtyBonus;
+      $('al-bonus-discard').disabled = !state.dirtyBonus;
+    }
+    if (input.id === 'al-bonus-search') { state.bonusSearch = input.value; $('al-bonus-list').innerHTML = bonusRows(); }
+    if (input.dataset.alMatch && event()?.status === 'published' && !futureTraining() && !cancelled()) {
       const match = allMatches().find(item => String(item.number) === input.dataset.alMatch);
       if (match) {
         const values = state.matchEdits[input.dataset.alMatch] || {
@@ -1130,10 +1485,14 @@
       state.profileSearch = input.value;
       const matching = players().filter(p => p.display_name.toLocaleLowerCase().includes(input.value.toLocaleLowerCase()));
       $('al-profile-select').innerHTML = option('', 'Choose a player', '') + matching.map(p => option(p.id, `${p.display_name}${p.user_id ? '' : ' (guest)'}`, state.profileId)).join('');
+      const holder = document.createElement('div');
+      holder.innerHTML = scorekeeperRoles();
+      $('al-role-list').replaceChildren(...holder.querySelector('#al-role-list').childNodes);
     }
     if (input.dataset.alTeamName && !isLocked()) {
       const team = state.teams.find(t => String(t.number) === input.dataset.alTeamName);
       if (team) {
+        rememberDraft();
         team.name = input.value;
         $(`al-team-heading-${team.number}`).textContent = team.name || `Team ${team.number}`;
         markTeamDirty();
@@ -1143,28 +1502,48 @@
   root.addEventListener('change', e => {
     if (state.busy || state.conflict) return;
     const input = e.target;
+    rememberFormInput(input);
     if (input.id === 'al-season-scoring' || input.id === 'al-season-step') updateScoringPreview();
-    else if (input.id === 'al-season-select') changeSelection('season', input.value).catch(error => showError(error));
-    else if (input.id === 'al-session-select') changeSelection('session', input.value).catch(error => showError(error));
+    else if (input.id === 'al-session-select') changeSelection(input.value).catch(error => showError(error));
     else if (input.dataset.alPlayer && !isLocked()) {
-      if (input.checked) state.selected.add(input.dataset.alPlayer);
-      else state.selected.delete(input.dataset.alPlayer);
-      state.dirtyRoster = true;
-      updateDraftControls();
-      if (state.selectedOnly && !input.checked) updateRoster();
+      const ids = new Set(state.selected);
+      if (input.checked) ids.add(input.dataset.alPlayer);
+      else ids.delete(input.dataset.alPlayer);
+      changeRoster(ids);
+      render();
+      $(input.id)?.focus();
     } else if (input.id === 'al-selected-only') { state.selectedOnly = input.checked; updateRoster(); }
-    else if (input.id === 'al-team-size' && !isLocked()) { state.size = input.value; state.dirtyRoster = true; updateDraftControls(); }
-    else if (input.id === 'al-max-teams' && !isLocked()) { state.maxTeams = Number(input.value); state.dirtyRoster = true; updateDraftControls(); }
+    else if (input.id === 'al-team-size' && !isLocked()) {
+      rememberDraft(); state.size = input.value; state.dirtyRoster = true; render(); $('al-team-size')?.focus();
+    }
+    else if (input.id === 'al-max-teams' && !isLocked()) { state.maxTeams = Number(input.value); updateDraftControls(); }
+    else if (input.dataset.alScorekeeper) {
+      const member = state.data.members.find(m => m.id === input.dataset.alScorekeeper && eligibleScorekeeper(m));
+      if (!member) { input.checked = false; return; }
+      const enabled = input.checked;
+      if (!window.confirm(`${enabled ? 'Grant' : 'Remove'} the permanent Spielleiter role ${enabled ? 'for' : 'from'} ${member.display_name}? This permits only match-score entry for Thursday trainings.`)) {
+        input.checked = !!member.league_scorekeeper;
+        return;
+      }
+      write('set_scorekeeper', { user_id: member.id, enabled }, { preserve: true, message: 'Spielleiter role updated.' })
+        .then(saved => { if (!saved) input.checked = !!member.league_scorekeeper; }).catch(error => {
+          input.checked = !!member.league_scorekeeper; showError(error);
+        });
+    }
     else if (input.id === 'al-profile-select') {
       state.profileId = input.value; state.profilesOpen = true;
       const holder = document.createElement('div');
       holder.innerHTML = profileEditor();
       $('al-profile-editor').replaceChildren(...holder.querySelector('#al-profile-editor').childNodes);
+      restoreFormEdits();
     } else if (input.id === 'al-guest-rookie') {
       const field = $('al-guest-rating');
       const regular = number(season()?.default_rating, 1000);
       const rookie = number(season()?.rookie_rating, 800);
-      if ([regular, rookie].includes(Number(field.value))) field.value = input.checked ? rookie : regular;
+      if ([regular, rookie].includes(Number(field.value))) {
+        field.value = input.checked ? rookie : regular;
+        rememberFormInput(field);
+      }
     } else if (input.dataset.alPlacement) {
       state.dirtyResults = true;
       const team = state.teams.find(t => String(t.number) === input.dataset.alPlacement);

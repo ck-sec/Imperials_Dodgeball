@@ -81,9 +81,9 @@
 
   <style>body{background:#0C1B3A;color:#F4F7FF}#navbar{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;padding:.75rem 2rem;background:rgba(12,27,58,.95);backdrop-filter:blur(12px);border-bottom:1px solid rgba(53,103,192,.15);transition:transform .3s ease}.nav-logo{display:flex;align-items:center;gap:.5rem;text-decoration:none;color:#F4F7FF}.nav-logo span{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:.04em;text-transform:uppercase}.nav-links{display:flex;list-style:none;gap:1.5rem;margin-left:auto;align-items:center}.nav-links a{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(244,247,255,.7);text-decoration:none;transition:color .2s}.nav-cta{background:linear-gradient(135deg,#D4961A,#F0B830);color:#0C1B3A!important;padding:6px 16px;border-radius:4px;font-weight:700!important}.nav-toggle{display:none}#hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:6rem 2rem 4rem}.hero-content{position:relative;z-index:2;text-align:center;max-width:700px}.hero-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(4rem,12vw,9rem);letter-spacing:.04em;line-height:.95;color:#F4F7FF}.hero-title span{background:linear-gradient(135deg,#D4961A,#F0B830);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.hero-sub{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:1.1rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(244,247,255,.7);margin-top:1rem}.btn-primary{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;padding:14px 32px;border-radius:6px;background:linear-gradient(135deg,#D4961A,#F0B830);color:#0C1B3A;text-decoration:none;border:none;cursor:pointer}.btn-secondary{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;padding:14px 32px;border-radius:6px;background:transparent;color:#F0B830;border:1px solid rgba(240,184,48,.4);text-decoration:none;cursor:pointer}.reveal{opacity:0;transform:translateY(30px);transition:opacity .8s ease,transform .8s ease}.revealVisible{opacity:1;transform:translateY(0)}#progress-bar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,#D4961A,#F0B830);z-index:10001;transition:width .15s ease-out}@media(max-width:768px){.nav-links{display:none}.nav-toggle{display:flex}}</style>
   <link rel="stylesheet" href="/site.css?v=20260912" />
-  <link rel="stylesheet" href="/league.css?v=20260912" />
+  <link rel="stylesheet" href="/league.css?v=20260912b" />
   <link rel="stylesheet" href="/club-content.css?v=20260912" />
-  <link rel="stylesheet" href="/public-ui.css?v=20260912" />
+  <link rel="stylesheet" href="/public-ui.css?v=20260912b" />
 </head>
 <body>
   <a href="#main" class="public-skip" data-en="Skip to content">Zum Inhalt springen</a>
@@ -99,19 +99,18 @@
     </a>
     <ul class="nav-links">
       <li><a href="#about" data-en="About">Über uns</a></li>
-      <li><a href="#how" data-en="How to play">So geht's</a></li>
       <li><a href="#league" data-en="Training">Angebot</a></li>
       <li><a href="/jugendtraining-wien" data-en="Youth">Jugend</a></li>
       <li><a href="#faq">FAQ</a></li>
-      <li><a href="#rankings" data-en="Standings">Rangliste</a></li>
-      <li><a href="/member" data-en="Members">Mitglieder</a></li>
-      <li><a href="#cta" class="nav-cta" data-en="Join us">Mitmachen</a></li>
+      <li><a href="#training-league" data-en="Social League">Social League</a></li>
+      <li><a href="/member" data-en="Login">Login</a></li>
+      <li><a href="#cta" class="nav-cta" data-en="Contact us">Kontaktiere uns</a></li>
     </ul>
     <div class="site-language" role="group" aria-label="Sprache / Language">
       <button type="button" data-site-language="de" aria-pressed="true" lang="de">DE</button>
       <button type="button" data-site-language="en" aria-pressed="false" lang="en">EN</button>
     </div>
-    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" id="navToggleBtn">
+    <button class="nav-toggle" aria-label="Menü öffnen oder schließen" data-en-aria-label="Open or close menu" aria-expanded="false" id="navToggleBtn">
       <span></span><span></span><span></span>
     </button>
     <a href="https://www.askoe.at" target="_blank" rel="noopener" class="nav-asko" aria-label="ASKÖ">
@@ -147,13 +146,11 @@
         Vienna<br/><span>Imperials</span>
       </h1>
 
-      <div class="hero-divider reveal reveal-delay-2"></div>
-
       <p class="hero-sub reveal reveal-delay-3" data-en="Dodgeball Vienna — Vienna's first foam dodgeball club">Dodgeball Wien — Wiens erster Foam-Dodgeball-Verein</p>
 
       <div class="hero-ctas reveal reveal-delay-4">
-        <a href="#cta" class="btn-primary" data-en="Join us">Jetzt mitmachen</a>
-        <a href="#how" class="btn-secondary" data-en="How to play">So funktioniert's</a>
+        <a href="#cta" class="btn-primary" data-en="Contact us">Kontaktiere uns</a>
+        <a href="#league" class="btn-secondary" data-en="Find your training">Training finden</a>
       </div>
     </div>
 
@@ -199,22 +196,7 @@
           </p>
         </div>
 
-        <div class="about-stat-row reveal reveal-delay-3">
-          <div>
-            <div class="about-stat-num">100+</div>
-            <div class="about-stat-label" data-en="Active players">Aktive Spieler</div>
-          </div>
-          <div class="about-stat-divider"></div>
-          <div>
-            <div class="about-stat-num">1+</div>
-            <div class="about-stat-label" data-en="Seasons">Saisons</div>
-          </div>
-          <div class="about-stat-divider"></div>
-          <div>
-            <div class="about-stat-num">1.</div>
-            <div class="about-stat-label" data-en="In Austria">In Österreich</div>
-          </div>
-        </div>
+        <a class="public-text-link" href="#how" data-en="New to dodgeball? Here's how it works →">Neu beim Dodgeball? So geht's &rarr;</a>
       </div>
     </div>
   </section>
@@ -239,7 +221,7 @@
             <div class="how-icon" aria-hidden="true">&#127952;</div>
             <h3 class="how-card-title">Komm vorbei &amp; spiel mit</h3>
             <p class="how-card-text">
-              Einfach bei einer Session vorbeikommen — keine Vorkenntnisse nötig. Wir teilen dich in ein ausgeglichenes Team ein und du bist in Minuten auf dem Feld.
+              Such dir einen Trainingstermin und melde dich an. Keine Vorkenntnisse nötig — wir erklären dir die Regeln und teilen dich in ein Team ein.
             </p>
           </div>
           <div class="how-card reveal reveal-delay-2">
@@ -267,7 +249,7 @@
             <div class="how-icon" aria-hidden="true">&#127952;</div>
             <h3 class="how-card-title">Show Up &amp; Team Up</h3>
             <p class="how-card-text">
-              Drop into any session — no prior experience needed. We'll sort you into balanced teams and get you on the court in minutes.
+              Pick a training session and register. No experience needed — we'll explain the rules and find you a team.
             </p>
           </div>
           <div class="how-card">
@@ -300,10 +282,10 @@
           <div class="gold-line reveal reveal-delay-1"></div>
           <h2 class="section-title reveal reveal-delay-1" data-en="Dodgeball in Vienna">Dodgeball in Wien</h2>
         </div>
-        <a href="#cta" class="btn-red reveal reveal-delay-2" data-en="Join us!">Jetzt mitmachen!</a>
+        <a href="/member#training" class="btn-secondary reveal reveal-delay-2" data-en="Dates &amp; registration">Termine &amp; Anmeldung</a>
       </div>
 
-      <p class="section-body" style="margin-bottom:1.5rem;" data-en="14 September 2026–2 July 2027 inclusive. No training during Vienna school holidays or Austrian public holidays.">14.09.2026–02.07.2027. Ausgenommen: Wiener Schulferien und gesetzliche Feiertage.</p>
+      <p class="section-body public-season-note" data-en="14 September 2026–2 July 2027 inclusive. No training during Vienna school holidays or Austrian public holidays.">14.09.2026–02.07.2027. Ausgenommen: Wiener Schulferien und gesetzliche Feiertage.</p>
       <div class="league-cards">
         <!-- Card 1 -->
         <div class="league-card reveal reveal-delay-1">
@@ -341,22 +323,6 @@
         <!-- Card 3 -->
         <div class="league-card reveal reveal-delay-3">
           <div class="league-card-img-wrap">
-            <img src="imperials-action-3.webp" srcset="imperials-action-3-400.webp 400w, imperials-action-3.webp 800w" sizes="(max-width: 960px) 100vw, 50vw" alt="Vienna Imperials team members at championship event" class="league-card-img img-pos-mid" loading="lazy" width="800" height="533" />
-          </div>
-          <span class="league-card-tag tag-blue" data-en="Competition">Wettkampf</span>
-          <div class="league-card-body">
-            <h3 class="league-card-title" data-en="Tournaments &amp; team spirit">Turniere &amp; Teamgeist</h3>
-            <div class="league-card-meta">
-              <span data-en="Compete together as a club.">Gemeinsam als Verein antreten.</span><br/>
-              <span data-en="Ask us about upcoming competitions and participation.">Frag uns nach kommenden Wettbewerben und der Teilnahme.</span><br/>
-              <a href="mailto:imperialsdodgeball@gmail.com" data-en="Contact the club">Verein kontaktieren</a>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 4 -->
-        <div class="league-card reveal reveal-delay-4">
-          <div class="league-card-img-wrap">
             <img src="imperials-action-4.webp" srcset="imperials-action-4-700.webp 700w, imperials-action-4.webp 1400w" sizes="(max-width: 960px) 100vw, 50vw" alt="Vienna Imperials players ready with dodgeballs" class="league-card-img img-pos-top" loading="lazy" width="1400" height="933" />
           </div>
           <span class="league-card-tag tag-gold" data-en="Adults">Erwachsene</span>
@@ -371,6 +337,7 @@
           </div>
         </div>
       </div>
+      <p class="public-offer-note"><span data-en="Want to compete with the club?">Lust auf Turniere mit dem Verein?</span> <a href="#cta" data-en="Contact us">Kontaktiere uns</a>.</p>
       <aside class="club-callout club-youth-callout" aria-labelledby="youth-callout-heading">
         <div class="club-copy">
           <p class="club-eyebrow" data-en="Youth · Ages 12–18">Jugend &middot; 12&ndash;18 Jahre</p>
@@ -384,85 +351,8 @@
     </div>
   </section>
 
-  <!-- ══ WHY JOIN ══ -->
-  <section id="why">
-    <div class="why-bg"></div>
-    <div style="max-width:1100px; margin:0 auto; position:relative; z-index:1;">
-      <div style="text-align:center;">
-        <p class="section-label reveal" data-en="The community">Die Community</p>
-        <div class="gold-line reveal reveal-delay-1" style="margin:0 auto 1.5rem;"></div>
-        <h2 class="section-title reveal reveal-delay-1" data-en="Why dodgeball in Vienna?">Warum Dodgeball in Wien?</h2>
-      </div>
-
-      <div class="lang-content" data-section="why" data-lang="de">
-        <div class="why-grid">
-          <div class="why-item reveal reveal-delay-1">
-            <div class="why-icon" aria-hidden="true">&#127939;</div>
-            <div>
-              <h3 class="why-title">Alle Levels willkommen</h3>
-              <p class="why-text">Noch nie gespielt? Perfekt. Wir stellen die Teams so zusammen, dass jedes Spiel fair und spaßig bleibt — keine Erfahrung nötig, nur Begeisterung.</p>
-            </div>
-          </div>
-          <div class="why-item reveal reveal-delay-2">
-            <div class="why-icon" aria-hidden="true">&#129309;</div>
-            <div>
-              <h3 class="why-title">Echte Gemeinschaft</h3>
-              <p class="why-text">Die Imperials sind mehr als eine Liga — sie sind eine Crew. Social Events, Getränke nach dem Spiel und Freundschaften weit über das Feld hinaus.</p>
-            </div>
-          </div>
-          <div class="why-item reveal reveal-delay-3">
-            <div class="why-icon" aria-hidden="true">&#127775;</div>
-            <div>
-              <h3 class="why-title">Sicher &amp; Energiegeladen</h3>
-              <p class="why-text">Wir spielen mit weichen Schaumstoffbällen statt harten Gummibällen. Fairplay und Rücksicht gehören dazu — wie bei jedem Sport sind Verletzungen trotzdem möglich.</p>
-            </div>
-          </div>
-          <div class="why-item reveal reveal-delay-4">
-            <div class="why-icon" aria-hidden="true">&#127942;</div>
-            <div>
-              <h3 class="why-title">Kämpfe um den Sieg</h3>
-              <p class="why-text">Sammle mit deinem Team Punkte in der Social League und verfolge eure Fortschritte in der Saison-Rangliste.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="lang-content" data-section="why" data-lang="en" style="display:none;">
-        <div class="why-grid">
-          <div class="why-item">
-            <div class="why-icon" aria-hidden="true">&#127939;</div>
-            <div>
-              <h3 class="why-title">All Skill Levels Welcome</h3>
-              <p class="why-text">Never played before? Perfect. We match teams to keep every game competitive and fun — no experience required, just enthusiasm.</p>
-            </div>
-          </div>
-          <div class="why-item">
-            <div class="why-icon" aria-hidden="true">&#129309;</div>
-            <div>
-              <h3 class="why-title">Real Community</h3>
-              <p class="why-text">The Imperials are more than a league — it's a crew. Social events, post-game drinks, and friendships that go way beyond the court.</p>
-            </div>
-          </div>
-          <div class="why-item">
-            <div class="why-icon" aria-hidden="true">&#127775;</div>
-            <div>
-              <h3 class="why-title">Safe &amp; High-Energy</h3>
-              <p class="why-text">We use soft foam balls rather than hard rubber balls. Fair play and consideration matter — as in any sport, injuries are still possible.</p>
-            </div>
-          </div>
-          <div class="why-item">
-            <div class="why-icon" aria-hidden="true">&#127942;</div>
-            <div>
-              <h3 class="why-title">Compete to Win</h3>
-              <p class="why-text">Earn points with your team in the Social League and follow your progress in the season standings.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ══ FAQ ══ -->
-  <section id="faq" style="background:linear-gradient(180deg,#0F2150 0%,#0C1B3A 100%);padding:7rem 2rem;">
+  <section id="faq">
     <div style="max-width:800px;margin:0 auto;position:relative;z-index:1;">
       <div style="text-align:center;margin-bottom:3rem;">
         <p class="section-label reveal">FAQ</p>
@@ -492,6 +382,8 @@
           <p class="faq-answer">Dodgeball ist die internationale, moderne Variante von Völkerball. Wir spielen nach den offiziellen Regeln der World Dodgeball Federation — mit weichen Schaumstoffbällen, ohne Gefängnisfeld, und mit Fangregeln, die ausgeschiedene Spieler zurückbringen. Schneller, strategischer und sicherer als klassischer Völkerball. <a href="/dodgeball-wien#was-ist-dodgeball" style="color:var(--gold-lt);text-decoration:underline;">Völkerball vs. Dodgeball &rarr;</a></p>
         </details>
 
+        <details class="public-faq-more">
+          <summary>Mehr zu Spielregeln, Liga &amp; Mitgliedschaft</summary>
         <h3 class="faq-category">Rund um den Einstieg</h3>
         <details class="faq-item">
           <summary class="faq-question">Was genau ist die Social League?</summary>
@@ -549,6 +441,7 @@
           <summary class="faq-question">Wo finde ich das aktuelle Ranking?</summary>
           <p class="faq-answer">Alle Ergebnisse und die aktuelle <a href="#rankings" style="color:var(--gold-lt);">Rangliste</a> werden regelmäßig auf unserer Website aktualisiert. Als Mitglied kannst du deine Statistiken auch im <a href="/member" style="color:var(--gold-lt);">Mitgliederbereich</a> einsehen.</p>
         </details>
+        </details>
       </div>
       <div id="faqEn" lang="en" data-public-language="en" class="faq-list reveal" hidden>
         <details class="faq-item">
@@ -573,6 +466,8 @@
           <p class="faq-answer">Dodgeball is the modern, international version of the German Völkerball. We play by official World Dodgeball Federation rules — with soft foam balls, no jail zone, and catch rules that bring eliminated players back. Faster, more strategic, and safer than traditional Völkerball.</p>
         </details>
 
+        <details class="public-faq-more">
+          <summary>More about rules, the league &amp; membership</summary>
         <h3 class="faq-category">Getting Started</h3>
         <details class="faq-item">
           <summary class="faq-question">What exactly is the Social League?</summary>
@@ -630,6 +525,7 @@
           <summary class="faq-question">Where can I find the current rankings?</summary>
           <p class="faq-answer">All results and the current <a href="#rankings" style="color:var(--gold-lt);">leaderboard</a> are updated regularly on our website. Members can also view their stats in the <a href="/member" style="color:var(--gold-lt);">member area</a>.</p>
         </details>
+        </details>
       </div>
     </div>
   </section>
@@ -644,8 +540,9 @@
           <p class="league-kicker">Vienna Imperials</p>
           <h2 class="league-heading">Imperials <span>Social League</span></h2>
           <p class="league-copy" data-league-intro>Dein Team. Deine Punkte. Eure Saison.</p>
-          <div class="league-toolbar">
+          <div class="league-toolbar public-league-actions">
             <a class="league-btn league-btn-primary" href="/member#training" data-en="Register for training">Zum Training anmelden</a>
+            <a class="league-btn public-hof-link" href="#hall-of-fame" data-league-hof>Hall of Fame <span>· Season 1</span></a>
           </div>
           <div data-league-content><p class="league-notice" role="status">Liga wird geladen...</p></div>
           <noscript><p class="league-notice">Bitte JavaScript aktivieren, um Teams und Ergebnisse zu sehen. Enable JavaScript to see teams and results.</p></noscript>
@@ -673,24 +570,24 @@
           <div class="signup-form-grid">
             <div class="signup-field">
               <label for="joinName" class="signup-label">Name *</label>
-              <input type="text" id="joinName" name="name" class="signup-input" placeholder="Your name / Dein Name" required autocomplete="name" />
+              <input type="text" id="joinName" name="name" class="signup-input" placeholder="Dein Name" data-en-placeholder="Your name" required autocomplete="name" />
             </div>
             <div class="signup-field">
-              <label for="joinEmail" class="signup-label">Email *</label>
+              <label for="joinEmail" class="signup-label" data-en="Email *">E-Mail *</label>
               <input type="email" id="joinEmail" name="email" class="signup-input" placeholder="your@email.com" required autocomplete="email" />
             </div>
             <div class="signup-field">
-              <label for="joinLevel" class="signup-label">Erfahrungslevel / Experience</label>
+              <label for="joinLevel" class="signup-label" data-en="Experience (optional)">Erfahrung (optional)</label>
               <select id="joinLevel" name="level" class="signup-input">
-                <option value="">Select / Auswählen</option>
-                <option value="Anfänger">Anfänger / Beginner</option>
-                <option value="Fortgeschritten">Fortgeschritten / Intermediate</option>
-                <option value="Profi">Profi / Advanced</option>
+                <option value="" data-en="Select">Auswählen</option>
+                <option value="Anfänger" data-en="Beginner">Anfänger</option>
+                <option value="Fortgeschritten" data-en="Intermediate">Fortgeschritten</option>
+                <option value="Profi" data-en="Advanced">Profi</option>
               </select>
             </div>
             <div class="signup-field">
-              <label for="joinSource" class="signup-label">Wie hast du von uns gehört? / How did you find us?</label>
-              <input type="text" id="joinSource" name="source" class="signup-input" placeholder="Instagram, Friend, Google…" autocomplete="off" />
+              <label for="joinSource" class="signup-label" data-en="How did you find us? (optional)">Wie hast du uns gefunden? (optional)</label>
+              <input type="text" id="joinSource" name="source" class="signup-input" placeholder="Instagram, Freunde, Google…" data-en-placeholder="Instagram, friends, Google…" autocomplete="off" />
             </div>
           </div>
           <button type="submit" class="btn-primary signup-submit" id="joinSubmitBtn" data-en="Send enquiry">Anfrage senden</button>
@@ -738,8 +635,8 @@
         <li><a href="/dodgeball-wien">Dodgeball Wien</a></li>
         <li><a href="/jugendtraining-wien" data-en="Youth training">Jugendtraining</a></li>
         <li><a href="#partners" data-en="Become a partner">Partner werden</a></li>
-        <li><a href="#cta" data-en="Contact">Kontakt</a></li>
-        <li><a href="/member" data-en="Members">Mitglieder</a></li>
+        <li><a href="#cta" data-en="Contact us">Kontaktiere uns</a></li>
+        <li><a href="/member" data-en="Login">Login</a></li>
       </ul>
       <div class="footer-social">
         <!-- Instagram -->
@@ -768,13 +665,13 @@
 
   <!-- ══ SCRIPTS ══ -->
   <script src="/js/site-language.js?v=20260912" defer></script>
-  <script src="/js/site-lang.js?v=20260912" defer></script>
+  <script src="/js/site-lang.js?v=20260912b" defer></script>
   <script src="/js/site-utils.js?v=20260912" defer></script>
   <script src="/js/site-ui.js?v=20260912" defer></script>
   <script src="/js/site-forms.js?v=20260912" defer></script>
   <script src="/js/league-scoring.js?v=20260912" defer></script>
-  <script src="/js/league-ui.js?v=20260912" defer></script>
+  <script src="/js/league-ui.js?v=20260912b" defer></script>
   <script src="/js/league-archive.js?v=20260912" defer></script>
-  <script src="/js/site-league.js?v=20260912" defer></script>
+  <script src="/js/site-league.js?v=20260912b" defer></script>
 </body>
 </html>

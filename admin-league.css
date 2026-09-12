@@ -91,6 +91,25 @@
 .al-match-stats dt { color: #b9c6dd; }
 .al-match-stats dd { margin: 0; font-weight: 700; }
 .al-dirty { color: #ffe1a0; font-weight: 600; font-size: .9rem; }
+.al-player-handle {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px;
+  width: 44px; height: 48px; border: 1px solid #637391; border-radius: 8px;
+  background: #142a50; color: #f6c969; font: inherit; font-size: 1.4rem;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.al-player-handle[aria-pressed="true"] { background: #f6c969; color: #0c1b3a; outline: 2px solid #f6c969; }
+.al-player-handle.al-dragging { cursor: grabbing; opacity: .65; }
+#tab-league .al-drop-target { outline: 3px solid #f6c969; outline-offset: 2px; background: #203e54; }
+#tab-league .al-draft-player { flex-wrap: nowrap; align-items: center; gap: .5rem; }
+#tab-league .al-draft-player > .al-player-info { flex: 1 1 0; min-width: 0; }
+#tab-league [data-al-action^="remove-player:"] { min-height: 44px; padding: .5rem; flex: 0 0 auto; font-size: .8rem; }
+#tab-league [data-al-place-team] { width: 100%; margin-top: .75rem; font-size: .8rem; }
+.al-role-list, .al-bonus-list { max-height: 440px; overflow-y: auto; overscroll-behavior: contain; margin: .8rem 0; padding: .3rem; }
+.al-role-row { border-top: 1px solid #3a4e71; }
+.al-bonus-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: .8rem; align-items: center; border-top: 1px solid #3a4e71; padding: .65rem 0; }
+.al-bonus-row label { min-width: 0; overflow-wrap: anywhere; }
+.al-bonus-row label .al-small { display: block; }
+.al-bonus-row input { text-align: center; }
 .al-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (min-width: 640px) {
   .al-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

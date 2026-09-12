@@ -7,9 +7,18 @@
   let data = null;
   let archive = null;
   let seasons = [];
+  const routes = {
+    '': 'teams',
+    '#training-league': 'teams',
+    '#training-league-schedule': 'schedule',
+    '#training-league-standings': 'standings',
+    '#rankings': 'teams',
+    '#season-1': 'standings',
+    '#hall-of-fame': 'honours'
+  };
   let selectedSeason = ['#season-1', '#hall-of-fame'].includes(location.hash) ? 'season-1' : '';
-  let deepLinkPending = selectedSeason === 'season-1';
-  let activePanel = selectedSeason === 'season-1' ? (location.hash === '#hall-of-fame' ? 'honours' : 'standings') : 'teams';
+  let deepLinkPending = Boolean(location.hash && routes[location.hash]);
+  let activePanel = routes[location.hash] || 'teams';
   let selectedEvent = '';
   let search = '';
   let gender = 'all';
@@ -49,7 +58,14 @@
     content.querySelector('[data-league-schedule]').innerHTML = ui.schedule(event, lang);
   }
 
-  function selectPanel(panel, updateHash = false) {
+  function updateHash() {
+    const hash = selectedSeason === 'season-1'
+      ? (activePanel === 'honours' ? '#hall-of-fame' : '#season-1')
+      : (activePanel === 'teams' ? '#training-league' : '#training-league-' + activePanel);
+    if (location.hash !== hash) history.pushState(null, '', hash);
+  }
+
+  function selectPanel(panel, navigate = false) {
     activePanel = panel;
     content.querySelectorAll('[data-league-tab]').forEach(button => {
       const active = button.dataset.leagueTab === panel;
@@ -61,19 +77,20 @@
     });
     const trainingControl = content.querySelector('[data-league-training-control]');
     if (trainingControl) trainingControl.hidden = panel === 'standings';
-    if (updateHash) history.replaceState(null, '', selectedSeason === 'season-1'
-      ? (panel === 'honours' ? '#hall-of-fame' : '#season-1') : '#training-league');
+    if (navigate) updateHash();
+    const honours = root.querySelector('[data-league-hof]');
+    if (honours) honours.setAttribute('aria-current', selectedSeason === 'season-1' && panel === 'honours' ? 'location' : 'false');
   }
 
   function tabs(panels) {
     return `<div class="league-tabs" role="tablist" aria-label="Imperials Social League">${panels.map(([key, label]) =>
-      `<button class="league-btn" role="tab" id="leagueTab-${key}" aria-controls="leaguePanel-${key}" data-league-tab="${key}">${ui.escape(label)}</button>`
+      `      <button class="league-btn" type="button" role="tab" id="leagueTab-${key}" aria-controls="leaguePanel-${key}" data-league-tab="${key}">${ui.escape(label)}</button>`
     ).join('')}</div>`;
   }
 
   function standingsPanel(isArchive) {
     const t = ui.text[lang];
-    return `<div class="league-block" role="tabpanel" id="leaguePanel-standings" aria-labelledby="leagueTab-standings" data-league-panel="standings">
+    return `<div class="league-block" role="tabpanel" tabindex="0" id="leaguePanel-standings" aria-labelledby="leagueTab-standings" data-league-panel="standings">
       ${!isArchive && data.comparison_event ? `<p class="league-comparison">${ui.escape(lang === 'de' ? 'Veränderung durch das letzte gewertete Training:' : 'Movement from the latest scored training:')} ${ui.escape(ui.date(data.comparison_event.session_date, lang))} · ${ui.escape(data.comparison_event.title)}</p>` : ''}
       <div class="league-toolbar">
         <label class="league-field">${ui.escape(t.search)}<input class="league-input" type="search" data-league-search placeholder="${ui.escape(t.searchHint)}" value="${ui.escape(search)}"></label>
@@ -93,7 +110,7 @@
     return `<p class="league-copy">Season 1 &middot; ${lang === 'de' ? 'Abgeschlossen' : 'Completed'} &middot; ${archive.players.length} ${ui.escape(t.members)}</p>
       ${tabs([['standings', t.standings], ['honours', 'Hall of Fame']])}
       ${standingsPanel(true)}
-      <div class="league-block" role="tabpanel" id="leaguePanel-honours" aria-labelledby="leagueTab-honours" data-league-panel="honours">
+      <div class="league-block" role="tabpanel" tabindex="0" id="leaguePanel-honours" aria-labelledby="leagueTab-honours" data-league-panel="honours">
         <h3>Hall of Fame &middot; Season 1</h3>
         <p class="league-copy">${lang === 'de' ? 'Die Top 3 der Herren und Damen. Gleiche Punkte teilen sich den Platz.' : 'Honouring our top three men and women. Equal points share a place.'}</p>
         <div class="league-hof-grid">${window.LeagueArchive.hallOfFame(archive.players).map(group => `
@@ -124,23 +141,31 @@
       ${events.length ? `<label class="league-field league-block" data-league-training-control>${ui.escape(t.training)}<select class="league-input" data-league-event-select>${events.map(event =>
           `<option value="${ui.escape(event.id)}"${event.id === selectedEvent ? ' selected' : ''}>${ui.escape(ui.date(event.session_date, lang))} - ${ui.escape(event.title)}</option>`
         ).join('')}</select></label>` : ''}
-      <div class="league-block" role="tabpanel" id="leaguePanel-teams" aria-labelledby="leagueTab-teams" data-league-panel="teams">
+      <div class="league-block" role="tabpanel" tabindex="0" id="leaguePanel-teams" aria-labelledby="leagueTab-teams" data-league-panel="teams">
         <div class="league-block" data-league-event></div>
       </div>
-      <div class="league-block" role="tabpanel" id="leaguePanel-schedule" aria-labelledby="leagueTab-schedule" data-league-panel="schedule">
+      <div class="league-block" role="tabpanel" tabindex="0" id="leaguePanel-schedule" aria-labelledby="leagueTab-schedule" data-league-panel="schedule">
         <div data-league-schedule></div>
       </div>
       ${standingsPanel(false)}`;
   }
 
   function render() {
+    const focused = document.activeElement;
+    const focusAttribute = focused && content.contains(focused)
+      ? ['data-league-season', 'data-league-refresh', 'data-league-search', 'data-league-gender', 'data-league-event-select', 'data-league-tab']
+        .find(attribute => focused.hasAttribute(attribute)) : null;
+    const focusSelector = focusAttribute === 'data-league-tab'
+      ? `[data-league-tab="${focused.dataset.leagueTab}"]`
+      : (focusAttribute ? '[' + focusAttribute + ']' : null);
     const t = ui.text[lang];
     const archived = selectedSeason === 'season-1';
     root.lang = lang;
     root.querySelector('[data-league-intro]').textContent = lang === 'de'
       ? 'Dein Team. Deine Punkte. Eure Saison.'
       : 'Your team. Your points. One season together.';
-    const options = seasons.length ? ui.seasonOptions(seasons, selectedSeason)
+    const currentSeasons = seasons.filter(season => season.id !== 'season-1');
+    const options = currentSeasons.length ? ui.seasonOptions(currentSeasons, selectedSeason)
       : `<option value=""${archived ? '' : ' selected'}>Season 2</option>`;
     const busy = archived ? archiveLoading : loading;
     const failed = archived ? archiveError : loadError;
@@ -149,17 +174,19 @@
     else if (failed) body = `<p class="league-notice league-error" role="alert">${ui.escape(t.error)}</p>`;
     else if (archived) body = renderArchive();
     else body = data && data.season ? renderCurrent() : `<p class="league-notice">${ui.escape(t.empty)}</p>`;
-    content.innerHTML = `<div class="league-toolbar">
+    content.innerHTML = `<div class="league-toolbar league-season-toolbar">
       <label class="league-field">${ui.escape(t.season)}<select class="league-input" data-league-season>${options}<option value="season-1"${archived ? ' selected' : ''}>Season 1</option></select></label>
       <button class="league-btn" data-league-refresh${busy ? ' disabled' : ''}>${ui.escape(t.refresh)}</button>
     </div><div data-league-body${busy ? ' aria-busy="true"' : ''}>${body}</div>`;
-    if (busy || failed || (!archived && (!data || !data.season))) return;
-    if (!archived) renderEvent();
-    renderStandings();
     selectPanel(activePanel);
-    if (deepLinkPending && archived) {
+    if (focusSelector) content.querySelector(focusSelector)?.focus({ preventScroll: true });
+    if (!busy && !failed && (archived || (data && data.season))) {
+      if (!archived) renderEvent();
+      renderStandings();
+    }
+    if (deepLinkPending) {
       deepLinkPending = false;
-      document.getElementById('training-league').scrollIntoView({ block: 'start' });
+      if (location.hash) document.getElementById('training-league').scrollIntoView({ block: 'start' });
     }
   }
 
@@ -207,6 +234,13 @@
   }
 
   root.addEventListener('click', event => {
+    if (event.target.closest('[data-league-hof]')) {
+      event.preventDefault();
+      selectedSeason = 'season-1';
+      activePanel = 'honours';
+      updateHash();
+      render();
+    }
     if (event.target.closest('[data-league-refresh]')) {
       if (selectedSeason === 'season-1') loadArchive();
       else load(selectedSeason);
@@ -232,7 +266,7 @@
       search = '';
       gender = 'all';
       activePanel = selectedSeason === 'season-1' ? 'standings' : 'teams';
-      selectPanel(activePanel, true);
+      updateHash();
       if (selectedSeason === 'season-1') render();
       else load(selectedSeason);
     }
@@ -243,16 +277,12 @@
     if (event.target.matches('[data-league-search]')) { search = event.target.value; visible = 25; renderStandings(); }
   });
   window.addEventListener('hashchange', () => {
-    if (['#season-1', '#hall-of-fame'].includes(location.hash)) {
-      selectedSeason = 'season-1';
-      activePanel = location.hash === '#hall-of-fame' ? 'honours' : 'standings';
-      render();
-      document.getElementById('training-league').scrollIntoView({ block: 'start' });
-    } else if (location.hash === '#training-league' && selectedSeason === 'season-1') {
-      selectedSeason = data && data.season ? data.season.id : '';
-      activePanel = 'teams';
-      render();
-    }
+    if (!routes[location.hash]) return;
+    selectedSeason = ['#season-1', '#hall-of-fame'].includes(location.hash)
+      ? 'season-1' : (data && data.season ? data.season.id : '');
+    activePanel = routes[location.hash];
+    render();
+    document.getElementById('training-league').scrollIntoView({ block: 'start' });
   });
   document.addEventListener('site-language-change', event => {
     lang = event.detail.lang;

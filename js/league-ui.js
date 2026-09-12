@@ -8,7 +8,10 @@ window.LeagueUI = (function() {
       error: 'Die Trainingsliga konnte nicht geladen werden. Bitte versuche es erneut.',
       standings: 'Saison-Rangliste', search: 'Spieler suchen', searchHint: 'Name eingeben',
       noResults: 'Keine Spieler gefunden.', noScores: 'Noch keine Ergebnisse. Punkte erscheinen nach der ersten gewerteten Einheit.',
-      points: 'Punkte', played: 'Trainings', wins: 'Siege', more: 'Mehr anzeigen',
+      points: 'Punkte', totalPoints: 'Punkte gesamt', played: 'Trainings', wins: 'Siege', more: 'Mehr anzeigen',
+      bonus: 'Bonuspunkte', bonusIncluded: 'BP sind in der Gesamtpunktzahl enthalten.',
+      bonusOff: 'Bonuspunkte sind f\u00fcr diese Saison deaktiviert.',
+      matchday: 'Spielplan & Live-Ergebnisse',
       movementCompared: 'Durch das letzte gewertete Training',
       newRank: 'Neu', rankUnchanged: 'Rang unver\u00e4ndert',
       rankUp: 'Pl\u00e4tze gestiegen', rankUpOne: 'Platz gestiegen',
@@ -36,7 +39,10 @@ window.LeagueUI = (function() {
       error: 'The training league could not be loaded. Please try again.',
       standings: 'Season standings', search: 'Find a player', searchHint: 'Search by name',
       noResults: 'No players found.', noScores: 'No results yet. Points appear after the first scored training.',
-      points: 'Points', played: 'Trainings', wins: 'Wins', more: 'Show more',
+      points: 'Points', totalPoints: 'Total points', played: 'Trainings', wins: 'Wins', more: 'Show more',
+      bonus: 'Bonus points', bonusIncluded: 'BP are included in the total points.',
+      bonusOff: 'Bonus points are disabled for this season.',
+      matchday: 'Schedule & live scores',
       movementCompared: 'From the last scored training',
       newRank: 'New', rankUnchanged: 'Rank unchanged',
       rankUp: 'places up', rankUpOne: 'place up',
@@ -76,6 +82,8 @@ window.LeagueUI = (function() {
     const awards = season.placement_points;
     const relative = season.scoring_mode !== 'fixed';
     const step = season.points_step === undefined ? 0.5 : season.points_step;
+    const bonusMax = season.bonus_points_max === undefined ? 1 : season.bonus_points_max;
+    const bonusStep = season.bonus_points_step === undefined ? 0.5 : season.bonus_points_step;
     const format = value => value.toLocaleString(lang === 'de' ? 'de-AT' : 'en-GB');
     const scale = relative
       ? `<p class="league-copy">${lang === 'de'
@@ -90,7 +98,19 @@ window.LeagueUI = (function() {
     return `<p class="league-copy">${escape(t.total)}</p>
       <details><summary class="league-btn">${escape(t.rules)}</summary>
         ${scale}
+        <p class="league-copy">${bonusMax === 0 ? escape(t.bonusOff) : escape(lang === 'de'
+          ? `Zus\u00e4tzlich bis zu ${format(bonusMax)} BP pro Spieler und Training, in ${format(bonusStep)}er-Schritten. ${t.bonusIncluded}`
+          : `Up to ${format(bonusMax)} BP per player and training, in steps of ${format(bonusStep)}. ${t.bonusIncluded}`)}</p>
       </details>`;
+  }
+
+  function bonus(entry, lang = 'en') {
+    const t = text[lang] || text.en;
+    const value = entry && entry.bonus_points !== undefined ? entry.bonus_points : 0;
+    const formatted = typeof value === 'number'
+      ? value.toLocaleString(lang === 'de' ? 'de-AT' : 'en-GB', { maximumFractionDigits: 6 })
+      : value;
+    return `<span class="league-bonus" aria-label="${escape(t.bonus + ': ' + formatted + '. ' + t.bonusIncluded)}">BP ${escape(formatted)}</span>`;
   }
 
   function movement(entry, lang = 'en') {
@@ -124,7 +144,7 @@ window.LeagueUI = (function() {
       <span class="league-rank">#${escape(p.rank)}</span>
       <div><div class="league-player-name">${escape(p.display_name)}</div>
         <div class="league-player-meta">${escape(p.played)} ${escape(t.played)}${p.wins === undefined ? '' : ' &middot; ' + escape(p.wins) + ' ' + escape(t.wins)}</div>${movement(p, lang)}</div>
-      <div class="league-points">${escape(p.points)}<small>${escape(t.points)}</small></div>
+      <div class="league-points">${escape(p.points)}<small>${escape(t.totalPoints)}</small>${bonus(p, lang)}</div>
       ${p.legacy ? `<details class="league-standing-details"><summary>Details</summary><div class="league-player-meta">
         ${escape(p.legacy.tier)} &middot; Streak: ${escape(p.legacy.streak)} &middot; BP: ${escape(p.legacy.bp)}
         &middot; ${lang === 'de' ? 'Letzter Gewinn' : 'Last gain'}: ${escape(p.legacy.gain)}
@@ -133,12 +153,20 @@ window.LeagueUI = (function() {
     </li>`).join('')}</ol>`;
   }
 
-  function event(eventData, lang) {
+  function matchdayLink(eventData, lang = 'en') {
+    if (!eventData || !eventData.id || !['published', 'finalized'].includes(eventData.status)
+      || new Date(String(eventData.session_date).slice(0, 10) + 'T12:00:00Z').getUTCDay() !== 4) return '';
+    const href = '/spieltag?event=' + encodeURIComponent(eventData.id);
+    return `<a class="league-btn league-matchday-link" href="${escape(href)}">${escape((text[lang] || text.en).matchday)}</a>`;
+  }
+
+  function event(eventData, lang, options = {}) {
     const t = text[lang];
     const final = eventData.status === 'finalized';
     return `<div class="league-event-title">${escape(eventData.title)}</div>
       <p class="league-copy">${escape(date(eventData.session_date, lang))}${eventData.start_time ? ' &middot; ' + escape(eventData.start_time.slice(0, 5)) : ''}${eventData.location ? ' &middot; ' + escape(eventData.location) : ''}</p>
       <span class="league-chip league-chip-gold">${escape(final ? t.finalized : t.published)}</span>
+      ${options.hideMatchdayLink ? '' : matchdayLink(eventData, lang)}
       <p class="league-copy">${escape(t.rotated)} ${escape(eventData.team_size)}v${escape(eventData.team_size)}.</p>
       <div class="league-team-grid">${eventData.teams.map(team => {
         const extras = Math.max(0, team.players.length - eventData.team_size);
@@ -149,6 +177,31 @@ window.LeagueUI = (function() {
           <ul>${team.players.map(p => `<li>${escape(p.display_name)}</li>`).join('')}</ul>
         </article>`;
       }).join('')}</div>`;
+  }
+
+  function matchTable(eventData, lang = 'en') {
+    const t = text[lang] || text.en;
+    if (!eventData || !eventData.match_standings) return '';
+    const table = eventData.match_standings;
+    const names = new Map(eventData.teams.map(team => [team.number, team.name]));
+    const finalized = eventData.status === 'finalized';
+    const finalPlaces = new Map(eventData.teams.map(team => [team.number, team.placement]));
+    const tableRows = [...table.standings];
+    if (finalized) tableRows.sort((a, b) => finalPlaces.get(a.team_number) - finalPlaces.get(b.team_number));
+    const winner = finalized ? eventData.teams.find(team => team.placement === 1) : null;
+    return `<div class="league-block"><h3>${escape(t.matchTable)}</h3>
+      <p class="league-copy">${escape(t.matchRules)}</p>
+      ${!finalized ? `<p class="league-copy">${escape(t.provisional)}</p>` : ''}
+      ${winner ? `<p class="league-copy"><strong>${escape(t.winner)}: ${escape(winner.name)}</strong></p>` : ''}
+      ${table.has_ties ? `<p class="league-notice">${escape(finalized ? t.resolved : t.unresolved)}</p>` : ''}
+      <ol class="league-standings">${tableRows.map(team => `<li class="league-standing">
+        <span class="league-rank">#${finalized ? finalPlaces.get(team.team_number) : team.rank}</span>
+        <div><div class="league-player-name">${escape(names.get(team.team_number))}</div>
+          <div class="league-player-meta">${team.played} ${lang === 'de' ? 'Spiele' : 'played'} &middot; W ${team.won} / D ${team.drawn} / L ${team.lost}<br>
+          ${lang === 'de' ? 'Differenz' : 'Difference'} ${team.score_difference > 0 ? '+' : ''}${team.score_difference} &middot; ${team.score_for} : ${team.score_against}</div></div>
+        <div class="league-points">${team.table_points}<small>${escape(t.matchPoints)}</small></div>
+      </li>`).join('')}</ol>
+    </div>`;
   }
 
   function schedule(eventData, lang) {
@@ -165,12 +218,6 @@ window.LeagueUI = (function() {
     }
     const firstPending = schedule.rounds.findIndex(round => round.matches.some(match => match.score_a === null));
     const buffer = schedule.available_minutes - schedule.duration_minutes;
-    const table = eventData.match_standings;
-    const finalized = eventData.status === 'finalized';
-    const finalPlaces = new Map(eventData.teams.map(team => [team.number, team.placement]));
-    const tableRows = table ? [...table.standings] : [];
-    if (finalized) tableRows.sort((a, b) => finalPlaces.get(a.team_number) - finalPlaces.get(b.team_number));
-    const winner = finalized ? eventData.teams.find(team => team.placement === 1) : null;
     return `<div class="league-event-title">${escape(eventData.title)}</div>
       <p class="league-copy">${schedule.duration_minutes} min &middot; ${schedule.match_minutes} min ${lang === 'de' ? 'Spielzeit' : 'games'} &middot; ${schedule.break_minutes} min ${lang === 'de' ? 'Wechselpause' : 'changeovers'}</p>
       <p class="league-copy">${buffer === 0 ? escape(t.noBuffer) : buffer + ' min ' + (lang === 'de' ? 'Zeitreserve' : 'buffer')}</p>
@@ -184,20 +231,8 @@ window.LeagueUI = (function() {
         </div>`).join('')}
         ${round.bye_teams.length ? `<p class="league-copy">${escape(t.bye)}: ${round.bye_teams.map(team => escape(names.get(team))).join(', ')}</p>` : ''}
       </details>`).join('')}</div>
-      ${table ? `<div class="league-block"><h3>${escape(t.matchTable)}</h3>
-        <p class="league-copy">${escape(t.matchRules)}</p>
-        ${!finalized ? `<p class="league-copy">${escape(t.provisional)}</p>` : ''}
-        ${winner ? `<p class="league-copy"><strong>${escape(t.winner)}: ${escape(winner.name)}</strong></p>` : ''}
-        ${table.has_ties ? `<p class="league-notice">${escape(finalized ? t.resolved : t.unresolved)}</p>` : ''}
-        <ol class="league-standings">${tableRows.map(team => `<li class="league-standing">
-          <span class="league-rank">#${finalized ? finalPlaces.get(team.team_number) : team.rank}</span>
-          <div><div class="league-player-name">${escape(names.get(team.team_number))}</div>
-            <div class="league-player-meta">${team.played} ${lang === 'de' ? 'Spiele' : 'played'} &middot; W ${team.won} / D ${team.drawn} / L ${team.lost}<br>
-            ${lang === 'de' ? 'Differenz' : 'Difference'} ${team.score_difference > 0 ? '+' : ''}${team.score_difference} &middot; ${team.score_for} : ${team.score_against}</div></div>
-          <div class="league-points">${team.table_points}<small>${escape(t.matchPoints)}</small></div>
-        </li>`).join('')}</ol>
-      </div>` : ''}`;
+      ${matchTable(eventData, lang)}`;
   }
 
-  return { escape, text, date, seasonOptions, rules, standings, movement, event, schedule };
+  return { escape, text, date, seasonOptions, rules, bonus, standings, movement, matchdayLink, event, matchTable, schedule };
 })();

@@ -16,7 +16,9 @@ function harness(world = emptyWorld(), options = {}) {
       text, values,
       then(resolve, reject) {
         if (options.readError) return Promise.reject(options.readError).then(resolve, reject);
-        return Promise.resolve([{ world }]).then(resolve, reject);
+        return Promise.resolve(text.includes('SELECT id, display_name, ranking_player_name FROM users')
+          ? world.users.map(u => ({ id: u.id, display_name: u.display_name, ranking_player_name: u.ranking_player_name || null }))
+          : [{ world }]).then(resolve, reject);
       },
     };
   };
@@ -33,6 +35,10 @@ function harness(world = emptyWorld(), options = {}) {
       if (name === '../lib/db') return { getDb: () => { calls.db++; return sql; } };
       if (name === '../lib/league-db') return db;
       if (name === '../lib/league') return league;
+      if (name === '../lib/league-scoring-access') return {
+        ...require('../lib/league-scoring-access'),
+        scoringIdentity: req => ({ is_admin: req.testRole === 'admin', user_id: req.testRole === 'member' ? userId : null }),
+      };
       if (name === '../lib/validation') return require('../lib/validation');
       if (name === '../lib/cors') return { setCors() {} };
       if (name === '../lib/auth') return {
@@ -95,7 +101,7 @@ test('me validates approved active membership from database even with a valid me
   world.users[0].is_active = true;
   const allowed = await app.request({ query: { view: 'me' }, testRole: 'member' });
   assert.equal(allowed.statusCode, 200);
-  assert.deepEqual(allowed.body.stats, { rank: null, points: 0, played: 0, wins: 0 });
+  assert.deepEqual(allowed.body.stats, { rank: null, points: 0, base_points: 0, bonus_points: 0, played: 0, wins: 0 });
   assert.deepEqual(allowed.body.my_events, []);
   assert.equal(allowed.body.comparison_event, null);
 });
@@ -163,7 +169,7 @@ test('admin exposes member-to-player mapping, while unpublished guests stay out 
   const app = harness(world);
   const admin = await app.request({ query: { view: 'admin' }, testRole: 'admin' });
   assert.equal(admin.statusCode, 200);
-  assert.deepEqual(admin.body.members, [{ id: userId, display_name: 'Account Member' }]);
+  assert.deepEqual(admin.body.members, [{ id: userId, display_name: 'Account Member', league_scorekeeper: false }]);
   assert.equal(admin.body.players[0].id, playerId);
   assert.equal(admin.body.players[0].user_id, userId);
   const pub = await app.request();
@@ -214,7 +220,7 @@ test('authenticated me exposes safe cross-season fixtures and the same movement 
   assert.deepEqual(member.standings, pub.standings);
   assert.deepEqual(member.comparison_event, pub.comparison_event);
   assert.equal(member.comparison_event.id, id(301));
-  assert.deepEqual(member.stats, { rank: 1, points: 3, played: 1, wins: 1,
+  assert.deepEqual(member.stats, { rank: 1, points: 3, base_points: 3, bonus_points: 0, played: 1, wins: 1,
     points_gain: 3, previous_rank: null, rank_gain: null });
   assert.deepEqual(member.my_events.map(e => [e.id, e.my_team_number]), [[id(302), 2], [id(303), 2]]);
   assert.equal(member.my_events[0].end_time, '19:20:00');
@@ -226,4 +232,83 @@ test('authenticated me exposes safe cross-season fixtures and the same movement 
     assert(!JSON.stringify(payload).includes(id(50)));
   }
   assert.equal(app.calls.transactions.length, 0, 'GET must not mutate shared state to track visitor movement');
+});
+
+function scoringFixture() {
+  const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const world = emptyWorld();
+  world.users = [{ id: userId, display_name: 'Designated Member', status: 'approved', is_active: true, league_scorekeeper: true }];
+  world.profiles = Array.from({ length: 4 }, (_, i) => ({
+    id: id(10 + i), user_id: i ? null : userId, display_name: `Participant ${i}`,
+    gender: 'unspecified', is_rookie: false, initial_rating: 1000, rating: 1000, merged_into: null,
+  }));
+  world.seasons = [{ id: id(100), name: 'Season', start_date: '2026-01-01', end_date: '2026-12-31', ...league.DEFAULTS }];
+  world.sessions = [{ id: id(200), title: 'Thursday', session_date: '2026-01-01', start_time: '19:00:00', is_cancelled: false }];
+  world.events = [{ id: id(300), season_id: id(100), session_id: id(200), session_date: '2026-01-01',
+    version: 1, status: 'published', settings: { ...league.DEFAULTS },
+    ...league.balanceTeams(world.profiles, 2), schedule: league.buildSchedule(2), bonus_points: [],
+    roster_ids: world.profiles.map(p => p.id), rsvp_user_ids: [], roster_source: 'manual' }];
+  return world;
+}
+
+test('mobile scoring endpoint is anonymous-safe with exact permissions and rechecks member role for writes', async () => {
+  const world = scoringFixture(), event = world.events[0], app = harness(world);
+  const anonymous = await app.request({ query: { view: 'scoring' } });
+  assert.equal(anonymous.statusCode, 200);
+  assert.deepEqual(anonymous.body.permissions, { is_admin: false, is_scorekeeper: false, can_score: false });
+  assert.equal(anonymous.body.event.version, 1);
+  assert.doesNotMatch(JSON.stringify(anonymous.body), /"(player_id|user_id|gender|rating|initial_rating|is_rookie)"/);
+  const scorer = await app.request({ query: { view: 'scoring', event_id: event.id }, testRole: 'member' });
+  assert.deepEqual(scorer.body.permissions, { is_admin: false, is_scorekeeper: true, can_score: true });
+  assert.equal((await app.request({ query: { view: 'scoring', event_id: 'bad-id' } })).statusCode, 400);
+  const body = { action: 'save_match', event_id: event.id, version: 1, match_number: 1, score_a: 1, score_b: 0 };
+  assert.equal((await app.request({ method: 'POST', body })).statusCode, 401);
+  const saved = await app.request({ method: 'POST', body, testRole: 'member' });
+  assert.equal(saved.statusCode, 200);
+  assert.equal(saved.body.event_id, event.id);
+  assert.equal(saved.body.success, true);
+  assert(app.calls.transactions.at(-1).some(q => q.text.includes('league_scorekeeper = true')));
+  world.users[0].league_scorekeeper = false;
+  assert.equal((await app.request({ method: 'POST', body, testRole: 'member' })).statusCode, 403);
+  assert.equal((await app.request({ method: 'POST', body, testRole: 'admin' })).statusCode, 200);
+  assert.equal((await app.request({ query: { view: 'scoring' }, testRole: 'member' })).body.permissions.is_scorekeeper, false);
+});
+
+test('scorekeeper HTTP permissions never widen admin actions and transactional revocation returns forbidden', async () => {
+  const world = scoringFixture(), event = world.events[0], app = harness(world);
+  for (const action of ['save_draft', 'save_teams', 'save_bonus_points', 'set_bonus', 'set_scorekeeper', 'save_season', 'publish', 'results', 'generate']) {
+    assert.equal((await app.request({ method: 'POST', testRole: 'member', body: { action } })).statusCode, 403);
+  }
+  assert.equal(app.calls.db, 0, 'Admin-only writes fail before accessing the database');
+  const raced = harness(world, { writeError: { code: 'P0001', detail: 'LEAGUE_403', message: 'Designated scorekeeper or admin required' } });
+  const response = await raced.request({ method: 'POST', testRole: 'member', body: {
+    action: 'save_match', event_id: event.id, version: 1, match_number: 1, score_a: 3, score_b: 0,
+  } });
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.body.code, 'FORBIDDEN');
+  world.users[0].status = 'pending';
+  assert.equal((await app.request({ method: 'POST', testRole: 'admin', body: {
+    action: 'set_scorekeeper', user_id: userId, enabled: true,
+  } })).statusCode, 404);
+});
+
+test('bonus frontend contract replaces awards through save_bonus_points and exposes an admin map', async () => {
+  const world = scoringFixture(), event = world.events[0], app = harness(world);
+  const body = { action: 'save_bonus_points', event_id: event.id, version: event.version,
+    awards: [{ player_id: world.profiles[0].id, points: 0.5 }] };
+  const saved = await app.request({ method: 'POST', testRole: 'admin', body });
+  assert.equal(saved.statusCode, 200);
+  const update = app.calls.transactions.at(-1).find(q => q.text.includes('SET bonus_points'));
+  assert.deepEqual(JSON.parse(update.values[0]), body.awards);
+  event.bonus_points = body.awards;
+  const admin = await app.request({ query: { view: 'admin' }, testRole: 'admin' });
+  assert.equal(admin.statusCode, 200);
+  assert.deepEqual(admin.body.events[0].bonus_points, { [world.profiles[0].id]: 0.5 });
+  assert.equal((await app.request({ method: 'POST', testRole: 'member', body })).statusCode, 403);
+  assert.equal((await app.request({ method: 'POST', testRole: 'admin', body: { ...body, awards: [] } })).statusCode, 200);
+  const cleared = app.calls.transactions.at(-1).find(q => q.text.includes('SET bonus_points'));
+  assert.deepEqual(JSON.parse(cleared.values[0]), []);
+  assert.equal((await app.request({ method: 'POST', testRole: 'admin', body: {
+    ...body, awards: undefined, bonus_points: body.awards,
+  } })).statusCode, 400, 'Canonical action requires the exact awards field');
 });

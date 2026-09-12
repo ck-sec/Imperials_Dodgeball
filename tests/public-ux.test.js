@@ -13,6 +13,7 @@ function element(dataset = {}) {
   return {
     dataset, attrs: {}, hidden: false, textContent: '', innerHTML: '',
     setAttribute(key, value) { this.attrs[key] = value; },
+    getAttribute(key) { return this.attrs[key] ?? null; },
     style: { removeProperty() {} },
     classList: {
       add(...names) { names.forEach(name => classes.add(name)); },
@@ -30,12 +31,18 @@ function languagePage(saved, failStorage = false) {
   const blocks = [element({ lang: 'de' }), element({ lang: 'en' })];
   const copy = element({ en: 'English content' });
   copy.textContent = 'Deutscher Inhalt';
+  const input = element();
+  input.attrs = { placeholder: 'Dein Name', 'data-en-placeholder': 'Your name' };
+  const menu = element();
+  menu.attrs = { 'aria-label': 'Menü öffnen oder schließen', 'data-en-aria-label': 'Open or close menu' };
   const warnings = [];
   const document = {
     readyState: 'complete', documentElement: {},
     querySelectorAll(selector) {
       if (selector === '[data-site-language]') return toggles;
       if (selector === '[data-en]') return [copy];
+      if (selector === '[data-en-placeholder]') return [input];
+      if (selector === '[data-en-aria-label]') return [menu];
       return blocks;
     },
     addEventListener(name, fn) { (events[name] ||= []).push(fn); },
@@ -52,7 +59,7 @@ function languagePage(saved, failStorage = false) {
     CustomEvent: function (type, options) { return { type, ...options }; }
   });
   for (const file of ['js/site-language.js', 'js/site-lang.js']) vm.runInContext(read(file), context);
-  return { window, document, toggles, blocks, copy, storage, warnings, windowEvents, context };
+  return { window, document, toggles, blocks, copy, input, menu, storage, warnings, windowEvents, context };
 }
 
 test('one shared DE/EN control replaces independent homepage toggles', () => {
@@ -70,13 +77,14 @@ test('public scripts comply with self-only CSP without executable inline handler
     for (const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
       if (/type="application\/ld\+json"/.test(script[1])) JSON.parse(script[2]);
       else {
-        assert.match(script[1], /src="\/js\/[^"]+\?v=20260912"/, file);
+        assert.match(script[1], /src="\/js\/[^"]+\?v=20260912b?"/, file);
         assert.equal(script[2].trim(), '', file);
       }
     }
     assert.doesNotMatch(html, /(?:href|src)="https:\/\/(?:fonts\.googleapis\.com|fonts\.gstatic\.com|cdn\.tailwindcss\.com)/);
     assert.match(html, /(?:href="\/fonts\/fonts\.css"|src:url\(\/fonts\/)/, file);
-    assert.match(html, /public-ui\.css\?v=20260912/);
+    assert.match(html, /public-ui\.css\?v=20260912b"/);
+    assert.match(html, /site-lang\.js\?v=20260912b"/);
   }
   assert.doesNotMatch(read('dodgeball-wien.html'), /<iframe\b|site-cookies\.js/);
   assert.doesNotMatch(read('index.html'), /cookieBanner|site-cookies\.js/);
@@ -124,11 +132,56 @@ test('blocked storage keeps an in-memory preference and initialization is idempo
   assert.equal(page.window.SiteLanguage, api);
 });
 
+test('translated placeholders and accessible labels restore their German originals', () => {
+  const page = languagePage('en');
+  assert.equal(page.input.attrs.placeholder, 'Your name');
+  assert.equal(page.menu.attrs['aria-label'], 'Open or close menu');
+  page.window.SiteLanguage.set('de');
+  assert.equal(page.input.attrs.placeholder, 'Dein Name');
+  assert.equal(page.menu.attrs['aria-label'], 'Menü öffnen oder schließen');
+});
+
+test('public navigation says Login and Contact us without rewriting membership prose', () => {
+  for (const file of publicPages) {
+    const html = read(file);
+    assert.match(html, /href="\/member" data-en="Login">Login<\/a>/, file);
+    const links = [...html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)].map(match => match[0]).join('\n');
+    assert.doesNotMatch(links, />(?:Mitglieder?|(?:Jetzt )?[Mm]itmachen[^<]*)<\/a>/, file);
+    assert.doesNotMatch(links, /data-en="(?:Join us|Members)[^"]*"/, file);
+  }
+  assert.match(read('index.html'), /Wie kann ich mitmachen\?/);
+  assert.match(read('index.html'), /Mitgliedschaft &amp; Kosten/);
+  for (const file of ['index.html', 'dodgeball-wien.html']) {
+    assert.match(read(file), /data-en="Contact us">Kontaktiere uns<\/a>/);
+  }
+});
+
+test('homepage keeps focused offers, progressive FAQ detail and one permanent Hall of Fame entry', () => {
+  const home = read('index.html');
+  assert.equal((home.match(/class="league-card reveal/g) || []).length, 3);
+  assert.doesNotMatch(home, /id="why"|about-stat-row/);
+  assert.equal((home.match(/class="public-faq-more"/g) || []).length, 2);
+  assert.equal((home.match(/id="publicLeague"/g) || []).length, 1);
+  assert.match(home, /href="#hall-of-fame" data-league-hof/);
+  assert.ok(home.indexOf('data-league-hof') < home.indexOf('data-league-content'));
+  assert.match(home, /league-ui\.js\?v=20260912b"/);
+  assert.match(home, /site-league\.js\?v=20260912b"/);
+});
+
 test('offer cards have a narrow-screen single-column override after existing site CSS', () => {
   const css = read('public-ui.css');
   assert.match(css, /@media \(max-width: 600px\) \{\s*\.league-cards \{ grid-template-columns: minmax\(0, 1fr\); \}/);
   assert.ok(read('index.html').indexOf('/public-ui.css') > read('index.html').indexOf('/site.css'));
   assert.match(css, /\.site-language button \{[\s\S]*?min-height: 44px/);
+});
+
+test('public header reserves group gaps instead of shrinking the logo into navigation', () => {
+  const css = read('public-ui.css');
+  assert.match(css, /#navbar \{ gap: 1rem; \}/);
+  assert.match(css, /#navbar > \* \{ flex-shrink: 0; \}/);
+  assert.match(css, /#navbar \.nav-asko img \{ width: 64px; height: auto; \}/);
+  assert.match(css, /@media \(max-width: 1280px\) \{[\s\S]*?#navbar \.nav-logo span \{ display: none; \}/);
+  assert.match(css, /@media \(max-width: 900px\) \{[\s\S]*?#navbar \.nav-toggle \{ display: flex;/);
 });
 
 test('public offers use factual prices without expired 2026 promotions', () => {
@@ -196,7 +249,7 @@ function leaguePage() {
     addEventListener() {}
   };
   const context = vm.createContext({
-    window, console, location: { hash: '' }, history: { replaceState() {} },
+    window, console, location: { hash: '' }, history: { pushState() {} },
     document: {
       getElementById: id => id === 'publicLeague' ? league : { scrollIntoView() {} },
       addEventListener(name, fn) { documentEvents[name] = fn; }

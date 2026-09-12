@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#09172f">
+  <meta name="description" content="Spielplan, Live-Ergebnisse und Saison-Rangliste der Vienna Imperials Trainingsliga.">
+  <title>Spieltag — Vienna Imperials</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/fonts/fonts.css?v=20260912b">
+  <link rel="stylesheet" href="/league.css?v=20260912b">
+  <link rel="stylesheet" href="/matchday.css?v=20260912b">
+  <script src="/js/site-language.js?v=20260912b" defer></script>
+  <script src="/js/site-utils.js?v=20260912b" defer></script>
+  <script src="/js/league-scoring.js?v=20260912b" defer></script>
+  <script src="/js/league-ui.js?v=20260912b" defer></script>
+  <script src="/js/matchday.js?v=20260912b" defer></script>
+</head>
+<body class="matchday-page league" id="matchdayPage">
+  <a class="matchday-skip" href="#main" data-de="Zum Spieltag" data-en="Skip to matchday">Zum Spieltag</a>
+  <header class="matchday-header">
+    <a class="matchday-brand" href="/" aria-label="Vienna Imperials — Home"><span aria-hidden="true">VI</span> VIENNA IMPERIALS</a>
+    <div class="league-lang" role="group" aria-label="Sprache / Language">
+      <button class="league-btn" type="button" data-site-language="de" aria-pressed="true" lang="de">DE</button>
+      <button class="league-btn" type="button" data-site-language="en" aria-pressed="false" lang="en">EN</button>
+    </div>
+  </header>
+  <main class="matchday-main" id="main">
+    <div class="matchday-intro">
+      <p class="league-kicker" data-de="Donnerstag · Trainingsliga" data-en="Thursday · Training league">Donnerstag · Trainingsliga</p>
+      <h1 class="league-heading" data-de="Spieltag" data-en="Matchday">Spieltag</h1>
+      <p class="league-copy" data-de="Alle Spiele. Alle Ergebnisse. Für alle sichtbar." data-en="Every match. Every result. Open to everyone.">Alle Spiele. Alle Ergebnisse. Für alle sichtbar.</p>
+    </div>
+    <div class="matchday-toolbar">
+      <label class="league-field" for="matchdaySelect">
+        <span data-de="Spieltag auswählen" data-en="Choose matchday">Spieltag auswählen</span>
+        <select class="league-input" id="matchdaySelect" disabled><option data-de="Wird geladen …" data-en="Loading …">Wird geladen …</option></select>
+      </label>
+      <div class="matchday-actions">
+        <button class="league-btn" type="button" id="matchdayRefresh" data-de="Aktualisieren" data-en="Refresh">Aktualisieren</button>
+        <button class="league-btn" type="button" id="matchdayShare" disabled data-de="Link teilen" data-en="Share link">Link teilen</button>
+      </div>
+    </div>
+    <p class="matchday-sync" id="matchdaySync" role="status" aria-live="polite"></p>
+    <div class="league-notice league-error" id="matchdayError" role="alert" hidden></div>
+    <label class="league-field matchday-share" id="matchdayShareField" hidden>
+      <span data-de="Link kopieren" data-en="Copy link">Link kopieren</span>
+      <input class="league-input" id="matchdayShareUrl" type="url" readonly>
+    </label>
+    <details class="matchday-auth" id="matchdayAuth">
+      <summary id="matchdayAuthSummary" data-de="Ergebnisse eintragen · Anmelden" data-en="Enter scores · Sign in">Ergebnisse eintragen · Anmelden</summary>
+      <p class="league-copy" data-de="Admins und freigeschaltete Spielleiter können Ergebnisse eintragen und korrigieren." data-en="Admins and designated scorekeepers can enter and correct scores.">Admins und freigeschaltete Spielleiter können Ergebnisse eintragen und korrigieren.</p>
+      <p id="matchdayAuthMessage" class="league-copy" role="status" aria-live="polite"></p>
+      <form id="matchdayLogin" class="matchday-login">
+        <label class="league-field">
+          <span data-de="Anmeldung als" data-en="Sign in as">Anmeldung als</span>
+          <select class="league-input" id="matchdayLoginMode">
+            <option value="member" data-de="Mitglied / Spielleiter" data-en="Member / scorekeeper">Mitglied / Spielleiter</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <label class="league-field" id="matchdayEmailField">
+          <span data-de="E-Mail" data-en="Email">E-Mail</span>
+          <input class="league-input" id="matchdayEmail" type="email" autocomplete="username" inputmode="email" maxlength="254" required>
+        </label>
+        <label class="league-field">
+          <span data-de="Passwort" data-en="Password">Passwort</span>
+          <input class="league-input" id="matchdayPassword" type="password" autocomplete="current-password" required>
+        </label>
+        <label class="matchday-remember" id="matchdayRememberField">
+          <input id="matchdayRemember" type="checkbox">
+          <span data-de="Angemeldet bleiben (nur auf eigenem Gerät)" data-en="Stay signed in (personal devices only)">Angemeldet bleiben (nur auf eigenem Gerät)</span>
+        </label>
+        <button class="league-btn league-btn-primary" type="submit" id="matchdayLoginButton" data-de="Anmelden" data-en="Sign in">Anmelden</button>
+        <a class="matchday-member-link" href="/member" data-de="Passwort vergessen? Zum Login" data-en="Forgot password? Open login">Passwort vergessen? Zum Login</a>
+      </form>
+      <div class="matchday-actions">
+        <button class="league-btn" type="button" id="matchdayLogout" hidden data-de="Abmelden" data-en="Sign out">Abmelden</button>
+        <a class="league-btn" id="matchdayAdmin" href="/admin" hidden data-de="Im Adminbereich abschließen" data-en="Finalize in admin area">Im Adminbereich abschließen</a>
+      </div>
+    </details>
+    <section class="matchday-event" id="matchdayEvent" aria-labelledby="matchdayTitle" hidden>
+      <div class="matchday-event-heading">
+        <h2 id="matchdayTitle"></h2>
+        <span class="league-chip league-chip-gold" id="matchdayStatus"></span>
+      </div>
+      <p class="league-copy" id="matchdayMeta"></p>
+      <p class="league-copy" id="matchdayReadOnly"></p>
+      <nav class="matchday-jumps" aria-label="Spieltag / Matchday">
+        <a class="league-btn" href="#matchdayFixtures" data-de="Spiele" data-en="Matches">Spiele</a>
+        <a class="league-btn" href="#matchdayTable" data-de="Tagestabelle" data-en="Match table">Tagestabelle</a>
+        <a class="league-btn" href="#matchdaySeason" data-de="Saison" data-en="Season">Saison</a>
+      </nav>
+      <section id="matchdayFixtures" aria-labelledby="matchdayFixturesTitle">
+        <h2 id="matchdayFixturesTitle" data-de="Spielplan & Ergebnisse" data-en="Fixtures & scores">Spielplan &amp; Ergebnisse</h2>
+        <p class="league-notice" id="matchdayScheduleNotice" hidden></p>
+        <div id="matchdayMatches"></div>
+      </section>
+      <section id="matchdayTable" aria-label="Spieltagstabelle / Match standings"></section>
+    </section>
+    <p class="league-notice" id="matchdayEmpty" hidden></p>
+    <section class="matchday-season" id="matchdaySeason" aria-labelledby="matchdaySeasonTitle">
+      <h2 id="matchdaySeasonTitle" data-de="Saison-Rangliste" data-en="Season standings">Saison-Rangliste</h2>
+      <p class="league-copy" id="matchdaySeasonName"></p>
+      <label class="league-field matchday-search" for="matchdaySearch">
+        <span data-de="Spieler suchen" data-en="Find a player">Spieler suchen</span>
+        <input class="league-input" id="matchdaySearch" type="search" autocomplete="off" maxlength="100">
+      </label>
+      <div id="matchdayStandings"></div>
+      <div id="matchdayRules"></div>
+    </section>
+    <noscript><p class="league-notice">Bitte JavaScript aktivieren, um Spielplan und Ergebnisse zu sehen. Please enable JavaScript to view fixtures and results.</p></noscript>
+  </main>
+  <footer class="matchday-footer">
+    <a href="/" data-de="Zur Clubseite" data-en="Club website">Zur Clubseite</a>
+    <a href="/member" data-de="Login" data-en="Login">Login</a>
+  </footer>
+</body>
+</html>
