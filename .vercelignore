@@ -6,3 +6,15 @@ temp screen.png
 temporary screenshots/
 REVIEW-*.md
 *.mjs
+.env*
+.tmp/
+.vscode/
+Agentic-SEO-Skill/
+tests/
+tools/
+scripts/
+workflows/
+*.md
+credentials.json
+token.json
+ss.png

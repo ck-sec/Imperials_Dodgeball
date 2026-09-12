@@ -1,0 +1,115 @@
+{
+  "id": "season-2",
+  "timezone": "Europe/Vienna",
+  "start_date": "2026-09-14",
+  "end_date": "2027-07-02",
+  "season": {
+    "name": "Season 2",
+    "placement_points": [3, 2.5, 2, 1, 0.5],
+    "scoring_mode": "relative",
+    "points_step": 0.5,
+    "default_rating": 1000,
+    "rookie_rating": 800,
+    "k_factor": 24
+  },
+  "notes": [
+    "User-confirmed inclusive dates and weekly slots; exclude Vienna school holidays and Austrian public holidays for every slot.",
+    "Times are local Europe/Vienna wall-clock times, not UTC instants. recurring_day uses Sunday=0.",
+    "Official Vienna school-free days Allerseelen and Hl. Leopold are also excluded; neither is an Austrian nationwide public holiday.",
+    "Vienna lists Semesterferien from 30 January; the federal ministry lists 1 February. These differ only by a weekend and exclude the same training slots.",
+    "School-autonomous closures and school-specific exceptions are unknown and are NOT guessed. In particular, 7 January and 7 and 28 May remain scheduled unless separately confirmed.",
+    "No capacity was confirmed: new sessions have max_capacity=null. Existing descriptions, capacities, cancellations and season settings are never overwritten."
+  ],
+  "sources": {
+    "vienna": {
+      "title": "Bildungsdirektion Wien: Schuljahr 2026/2027",
+      "url": "https://www.bildung-wien.gv.at/schulen/Schulferien-und-schulfreie-Tage/Schuljahr-2026-2027.html",
+      "verified_on": "2026-09-12",
+      "scope": "Exact Vienna holiday ranges, dated public holidays, Allerseelen, Hl. Leopold, school-year end and school-autonomous-day caveat."
+    },
+    "education": {
+      "title": "Bundesministerium für Bildung: Schulferien 2026/2027",
+      "url": "https://www.bmb.gv.at/Themen/schule/schulpraxis/termine/ferientermine_26_27.html",
+      "verified_on": "2026-09-12",
+      "scope": "Independent official confirmation of school holiday dates; school-specific exceptions are possible."
+    },
+    "public_holiday_law": {
+      "title": "RIS: Arbeitsruhegesetz, § 7 Abs. 2",
+      "url": "https://www.ris.bka.gv.at/NormDokument.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10008541&Paragraf=7",
+      "verified_on": "2026-09-12",
+      "scope": "Exhaustive Austrian statutory public holiday names; fixed calendar dates and Easter/Pentecost Mondays. Movable dates are confirmed by the official Vienna calendar."
+    },
+    "vienna_school_law": {
+      "title": "RIS: Wiener Schulgesetz, § 56 Abs. 4, 5 and 7",
+      "url": "https://www.ris.bka.gv.at/NormDokument.wxe?Abfrage=LrW&Gesetzesnummer=20000197&Paragraf=56",
+      "verified_on": "2026-09-12",
+      "scope": "Allerseelen and 15 November are statutory school-free days. Additional bridge days and 7 January require separate declarations; no school-specific dates are inferred."
+    },
+    "autonomous_days": {
+      "title": "Bundesministerium für Bildung: Herbstferien",
+      "url": "https://www.bmb.gv.at/Themen/schule/schulpraxis/termine/hf.html",
+      "verified_on": "2026-09-12",
+      "scope": "Allerseelen remains school-free; Easter/Pentecost Tuesdays are normally school days; school-specific autonomous days and opt-outs cannot be inferred."
+    }
+  },
+  "slots": [
+    {
+      "id": "monday-basic",
+      "recurring_day": 1,
+      "title": "Basic Skill Training",
+      "location": "O-MS Max Winter Platz 12",
+      "start_time": "19:00",
+      "end_time": "21:00"
+    },
+    {
+      "id": "thursday-social",
+      "recurring_day": 4,
+      "title": "Imperials Social League",
+      "location": "Volksschule in der Krieau",
+      "start_time": "18:00",
+      "end_time": "21:00"
+    },
+    {
+      "id": "friday-youth",
+      "recurring_day": 5,
+      "title": "Jugendtraining (12-18 Jahre)",
+      "location": "Am Kaisermuehlendamm 2",
+      "start_time": "17:00",
+      "end_time": "19:00"
+    },
+    {
+      "id": "friday-adults",
+      "recurring_day": 5,
+      "title": "Erwachsenentraining",
+      "location": "Am Kaisermuehlendamm 2",
+      "start_time": "19:00",
+      "end_time": "21:00"
+    }
+  ],
+  "school_holidays": [
+    { "name": "Herbstferien", "start_date": "2026-10-27", "end_date": "2026-10-31", "sources": ["vienna", "education"] },
+    { "name": "Weihnachtsferien", "start_date": "2026-12-24", "end_date": "2027-01-06", "sources": ["vienna", "education"] },
+    { "name": "Semesterferien Wien", "start_date": "2027-01-30", "end_date": "2027-02-06", "sources": ["vienna", "education"] },
+    { "name": "Osterferien", "start_date": "2027-03-20", "end_date": "2027-03-29", "sources": ["vienna", "education"] },
+    { "name": "Pfingstferien", "start_date": "2027-05-15", "end_date": "2027-05-17", "sources": ["vienna", "education"] },
+    { "name": "Sommerferien Wien", "start_date": "2027-07-03", "end_date": "2027-09-05", "sources": ["vienna", "education"] }
+  ],
+  "public_holidays": [
+    { "date": "2026-10-26", "name": "Nationalfeiertag", "sources": ["vienna", "public_holiday_law"] },
+    { "date": "2026-11-01", "name": "Allerheiligen", "sources": ["vienna", "public_holiday_law"] },
+    { "date": "2026-12-08", "name": "Mariä Empfängnis", "sources": ["vienna", "public_holiday_law"] },
+    { "date": "2026-12-25", "name": "Weihnachten", "sources": ["public_holiday_law"] },
+    { "date": "2026-12-26", "name": "Stephanstag", "sources": ["public_holiday_law"] },
+    { "date": "2027-01-01", "name": "Neujahr", "sources": ["public_holiday_law"] },
+    { "date": "2027-01-06", "name": "Heilige Drei Könige", "sources": ["public_holiday_law"] },
+    { "date": "2027-03-29", "name": "Ostermontag", "sources": ["vienna", "education", "public_holiday_law"] },
+    { "date": "2027-05-01", "name": "Staatsfeiertag", "sources": ["vienna", "public_holiday_law"] },
+    { "date": "2027-05-06", "name": "Christi Himmelfahrt", "sources": ["vienna", "public_holiday_law"] },
+    { "date": "2027-05-17", "name": "Pfingstmontag", "sources": ["vienna", "education", "public_holiday_law"] },
+    { "date": "2027-05-27", "name": "Fronleichnam", "sources": ["vienna", "public_holiday_law"] }
+  ],
+  "school_free_days": [
+    { "date": "2026-11-02", "name": "Allerseelen", "sources": ["vienna", "vienna_school_law", "autonomous_days"] },
+    { "date": "2026-11-15", "name": "Hl. Leopold", "sources": ["vienna", "vienna_school_law"] }
+  ]
+}

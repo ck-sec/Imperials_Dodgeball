@@ -1,252 +1,252 @@
-/* ═══════════════════════════════════════
-   LOGIN
-═══════════════════════════════════════ */
-async function handleLogin(e) {
-  e.preventDefault();
-  clearAllErrors('login');
+let sessionExpiredShown = false;
 
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value;
-  const remember = document.getElementById('rememberMe').checked;
-  let hasError = false;
+function authError(id, data = {}) {
+  const errors = {
+    VALIDATION_ERROR: ['Bitte prüfe deine Eingaben.', 'Please check your details.'],
+    INVALID_CONTENT_TYPE: ['Bitte lade die Seite neu und versuche es erneut.', 'Please reload the page and try again.'],
+    WEAK_PASSWORD: ['8–128 Zeichen, mit Buchstabe und Zahl.', 'Use 8–128 characters, including a letter and a number.'],
+    INVALID_RESET_TOKEN: ['Dieser Link ist ungültig oder abgelaufen. Fordere einen neuen an.', 'This link is invalid or expired. Request a new one.'],
+    SERVICE_UNAVAILABLE: ['Der Dienst ist gerade nicht erreichbar. Bitte später erneut versuchen.', 'The service is temporarily unavailable. Please try again later.'],
+    PENDING_APPROVAL: ['Dein Konto wartet auf Freischaltung.', 'Your account is awaiting approval.'],
+    FORBIDDEN: ['Dein Konto ist nicht freigeschaltet. Bitte kontaktiere den Club.', 'Your account is not approved. Please contact the club.']
+  };
+  const text = errors[data.code] || ['Anfrage fehlgeschlagen. Bitte erneut versuchen.', 'The request failed. Please try again.'];
+  fieldError(id, text[0], text[1]);
+}
 
-  if (!email) { showFieldError('loginEmailError', 'Email is required'); hasError = true; }
-  else if (!EMAIL_RE.test(email)) { showFieldError('loginEmailError', 'Please enter a valid email address'); hasError = true; }
-  if (!password) { showFieldError('loginPasswordError', 'Password is required'); hasError = true; }
+function rateLimit(buttonId, errorId, data) {
+  const seconds = Math.min(86400, Math.max(1, Math.ceil(Number(data.retry_after) || 60)));
+  const button = byId(buttonId);
+  button.dataset.retryUntil = String(Date.now() + seconds * 1000);
+  fieldError(errorId, `Bitte in ${seconds} Sekunden erneut versuchen.`, `Please try again in ${seconds} seconds.`);
+  setBusy(buttonId, true);
+  setTimeout(() => {
+    if (Number(button.dataset.retryUntil) <= Date.now()) {
+      delete button.dataset.retryUntil;
+      setBusy(buttonId, false);
+    }
+  }, seconds * 1000);
+}
 
-  if (hasError) return;
+function finishAuthRequest(buttonId) {
+  setBusy(buttonId, Number(byId(buttonId).dataset.retryUntil || 0) > Date.now());
+}
 
-  const btn = document.getElementById('loginBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="auth-spinner"></span>';
+function checkEmail(inputId, errorId) {
+  const email = byId(inputId).value.trim();
+  if (!EMAIL_RE.test(email) || email.length > 254) {
+    fieldError(errorId, 'Bitte gib eine gültige E-Mail-Adresse ein.', 'Please enter a valid email address.', inputId);
+    return false;
+  }
+  return true;
+}
 
+function checkNewPassword(prefix) {
+  const password = byId(prefix + 'Password').value;
+  const confirm = byId(prefix + 'Confirm').value;
+  let valid = true;
+  if (!validPassword(password)) {
+    fieldError(prefix + 'PasswordError', '8–128 Zeichen, mit Buchstabe und Zahl.', 'Use 8–128 characters, including a letter and a number.', prefix + 'Password');
+    valid = false;
+  }
+  if (!confirm || password !== confirm) {
+    fieldError(prefix + 'ConfirmError', 'Die Passwörter stimmen nicht überein.', 'The passwords do not match.', prefix + 'Confirm');
+    valid = false;
+  }
+  return valid;
+}
+
+async function submitSignIn(event, reauth = false) {
+  event.preventDefault();
+  const prefix = reauth ? 'reAuth' : 'login';
+  const formId = prefix + 'Form';
+  const buttonId = prefix + 'Btn';
+  if (byId(buttonId).disabled) return;
+  clearErrors(formId);
+  const email = byId(prefix + 'Email').value.trim();
+  const password = byId(prefix + 'Password').value;
+  let valid = true;
+  if (!EMAIL_RE.test(email)) {
+    fieldError(reauth ? 'reAuthError' : 'loginEmailError', 'Bitte gib eine gültige E-Mail-Adresse ein.', 'Please enter a valid email address.', prefix + 'Email');
+    valid = false;
+  }
+  if (!password) {
+    fieldError(reauth ? 'reAuthError' : 'loginPasswordError', 'Bitte gib dein Passwort ein.', 'Please enter your password.', prefix + 'Password');
+    valid = false;
+  }
+  if (!valid) { focusInvalid(formId); return; }
+  setBusy(buttonId, true);
+  const view = currentView;
   try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password, remember_me: remember }),
+    const response = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ email, password, remember_me: reauth || byId('rememberMe').checked })
     });
-
-    const data = await res.json();
-
-    if (res.status === 429) {
-      const banner = document.getElementById('loginBanner');
-      document.getElementById('loginBannerText').textContent = data.error;
-      banner.classList.add('show');
-      btn.disabled = true;
-      btn.textContent = 'LOG IN';
-      if (data.retry_after) {
-        let remaining = data.retry_after;
-        const interval = setInterval(() => {
-          remaining--;
-          btn.textContent = `WAIT ${remaining}s`;
-          if (remaining <= 0) {
-            clearInterval(interval);
-            btn.disabled = false;
-            btn.textContent = 'LOG IN';
-          }
-        }, 1000);
-      }
+    const data = await response.json();
+    if (currentView !== view) return;
+    if (response.status === 429) { rateLimit(buttonId, prefix + 'Error', data); return; }
+    if (!response.ok) {
+      if (data.code === 'PENDING_APPROVAL') { showView('pending'); return; }
+      if (response.status === 401) {
+        fieldError(prefix + 'Error', 'E-Mail oder Passwort ist nicht korrekt.', 'The email or password is incorrect.');
+      } else authError(prefix + 'Error', data);
       return;
     }
+    if (!data.user) throw new Error('Missing sign-in user');
+    clearMemberState();
+    currentUser = data.user;
+    sessionExpiredShown = false;
+    byId(prefix + 'Password').value = '';
+    enterDashboard();
+  } catch (error) {
+    console.error('Member sign-in failed:', error);
+    fieldError(prefix + 'Error', 'Anmeldung nicht erreichbar. Bitte erneut versuchen.', 'Sign-in is unavailable. Please try again.');
+  } finally { finishAuthRequest(buttonId); }
+}
 
-    if (!res.ok) {
-      if (data.code === 'PENDING_APPROVAL') {
-        showView('pending');
-        return;
-      }
-      document.getElementById('loginCard').classList.add('shake');
-      setTimeout(() => document.getElementById('loginCard').classList.remove('shake'), 400);
-      showFieldError('loginError', data.error || 'Invalid email or password');
-      btn.disabled = false;
-      btn.textContent = 'LOG IN';
+function handleLogin(event) { return submitSignIn(event); }
+function handleReAuth(event) { return submitSignIn(event, true); }
+
+async function handleRegister(event) {
+  event.preventDefault();
+  if (byId('registerBtn').disabled) return;
+  clearErrors('registerForm');
+  const name = byId('regName').value.trim();
+  let valid = checkEmail('regEmail', 'regEmailError');
+  if (name.length < 2 || name.length > 50) {
+    fieldError('regNameError', 'Bitte verwende 2–50 Zeichen.', 'Please use 2–50 characters.', 'regName');
+    valid = false;
+  }
+  if (!checkNewPassword('reg')) valid = false;
+  if (!valid) { focusInvalid('registerForm'); return; }
+  setBusy('registerBtn', true);
+  try {
+    const response = await fetch('/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ display_name: name, email: byId('regEmail').value.trim(), password: byId('regPassword').value })
+    });
+    const data = await response.json();
+    if (currentView !== 'register') return;
+    if (response.status === 429) { rateLimit('registerBtn', 'registerError', data); return; }
+    if (response.status === 409) {
+      fieldError('regEmailError', 'Diese E-Mail ist bereits registriert. Melde dich an oder setze dein Passwort zurück.', 'This email is already registered. Sign in or reset your password.', 'regEmail');
       return;
     }
-
+    if (!response.ok) { authError('registerError', data); return; }
+    byId('regPassword').value = '';
+    byId('regConfirm').value = '';
+    if (data.pending === true) { showView('pending'); return; }
+    if (!data.user) throw new Error('Missing registration state');
+    clearMemberState();
     currentUser = data.user;
     sessionExpiredShown = false;
     enterDashboard();
-  } catch (err) {
-    const banner = document.getElementById('loginBanner');
-    document.getElementById('loginBannerText').textContent = 'Something went wrong. Please try again later.';
-    banner.classList.add('show');
-    btn.disabled = false;
-    btn.textContent = 'LOG IN';
-  }
+  } catch (error) {
+    console.error('Member registration failed:', error);
+    fieldError('registerError', 'Registrierung nicht erreichbar. Bitte erneut versuchen.', 'Registration is unavailable. Please try again.');
+  } finally { finishAuthRequest('registerBtn'); }
 }
-
-/* ═══════════════════════════════════════
-   REGISTER
-═══════════════════════════════════════ */
-async function handleRegister(e) {
-  e.preventDefault();
-  clearAllErrors('reg');
-
-  const name = document.getElementById('regName').value.trim();
-  const email = document.getElementById('regEmail').value.trim();
-  const password = document.getElementById('regPassword').value;
-  const confirm = document.getElementById('regConfirm').value;
-  let hasError = false;
-
-  if (!name) { showFieldError('regNameError', 'Display name is required'); hasError = true; }
-  else if (name.length < 2) { showFieldError('regNameError', 'Display name must be at least 2 characters'); hasError = true; }
-  if (!email) { showFieldError('regEmailError', 'Email is required'); hasError = true; }
-  else if (!EMAIL_RE.test(email)) { showFieldError('regEmailError', 'Please enter a valid email address'); hasError = true; }
-  if (!password) { showFieldError('regPasswordError', 'Password is required'); hasError = true; }
-  else if (password.length < 8) { showFieldError('regPasswordError', 'Password must be at least 8 characters'); hasError = true; }
-  if (!confirm) { showFieldError('regConfirmError', 'Please confirm your password'); hasError = true; }
-  else if (password !== confirm) { showFieldError('regConfirmError', 'Passwords do not match'); hasError = true; }
-
-  if (hasError) return;
-
-  const btn = document.getElementById('registerBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="auth-spinner"></span>';
-
-  try {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password, display_name: name }),
-    });
-
-    const data = await res.json();
-
-    if (res.status === 409) {
-      showFieldError('regEmailError', 'An account with this email already exists');
-      btn.disabled = false;
-      btn.textContent = 'CREATE ACCOUNT';
-      return;
-    }
-
-    if (res.status === 429) {
-      const banner = document.getElementById('registerBanner');
-      document.getElementById('registerBannerText').textContent = data.error;
-      banner.classList.add('show');
-      btn.disabled = false;
-      btn.textContent = 'CREATE ACCOUNT';
-      return;
-    }
-
-    if (!res.ok) {
-      const banner = document.getElementById('registerBanner');
-      document.getElementById('registerBannerText').textContent = data.error || 'Registration failed. Please try again.';
-      banner.classList.add('show');
-      btn.disabled = false;
-      btn.textContent = 'CREATE ACCOUNT';
-      return;
-    }
-
-    if (data.pending === true) {
-      showView('pending');
-      return;
-    }
-
-    currentUser = data.user;
-
-    // Show success state
-    document.getElementById('registerCard').style.display = 'none';
-    document.getElementById('registerSuccess').style.display = '';
-    setTimeout(() => enterDashboard(), 1500);
-  } catch (err) {
-    const banner = document.getElementById('registerBanner');
-    document.getElementById('registerBannerText').textContent = 'Something went wrong. Please try again later.';
-    banner.classList.add('show');
-    btn.disabled = false;
-    btn.textContent = 'CREATE ACCOUNT';
-  }
-}
-
-/* ═══════════════════════════════════════
-   SESSION EXPIRED
-═══════════════════════════════════════ */
-let sessionExpiredShown = false;
 
 function showSessionExpired() {
   if (sessionExpiredShown) return;
   sessionExpiredShown = true;
-  const emailField = document.getElementById('reAuthEmail');
-  if (currentUser && currentUser.email) {
-    emailField.value = currentUser.email;
-    emailField.readOnly = true;
-    emailField.style.opacity = '0.6';
-  } else {
-    emailField.value = '';
-    emailField.readOnly = false;
-    emailField.style.opacity = '';
-  }
-  document.getElementById('sessionOverlay').classList.add('open');
-  const focusTarget = emailField.readOnly ? 'reAuthPassword' : 'reAuthEmail';
-  setTimeout(() => document.getElementById(focusTarget).focus(), 60);
+  byId('reAuthEmail').value = currentUser ? currentUser.email : '';
+  byId('reAuthEmail').readOnly = !!currentUser;
+  byId('reAuthPassword').value = '';
+  clearErrors('reAuthForm');
+  byId('sessionOverlay').showModal();
+  byId(currentUser ? 'reAuthPassword' : 'reAuthEmail').focus();
 }
 
-async function handleReAuth(e) {
-  e.preventDefault();
-  clearFieldError('reAuthError');
-  const email = document.getElementById('reAuthEmail').value;
-  const password = document.getElementById('reAuthPassword').value;
-  if (!password) { showFieldError('reAuthError', 'Password is required'); return; }
-
-  const btn = document.getElementById('reAuthBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="auth-spinner"></span>';
-
+async function handleLogout() {
+  const inDialog = byId('sessionOverlay').open;
+  const buttonId = inDialog ? 'fullLogoutLink' : 'navLogoutBtn';
+  if (byId(buttonId).disabled) return;
+  setBusy(buttonId, true);
   try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password, remember_me: true }),
-    });
-    const data = await res.json();
+    const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    if (!response.ok) throw new Error('Logout rejected');
+    clearMemberState();
+    sessionExpiredShown = false;
+    window.MemberRecovery.clear();
+    showView('login');
+    setMessage('loginMessage', 'Du bist abgemeldet.', 'You are signed out.');
+  } catch (error) {
+    console.error('Member logout failed:', error);
+    setMessage(inDialog ? 'reAuthError' : 'accountMessage',
+      'Abmelden fehlgeschlagen. Bitte erneut versuchen; deine Sitzung ist noch aktiv.',
+      'Sign-out failed. Please try again; your session is still active.', true);
+  } finally { setBusy(buttonId, false); }
+}
 
-    if (!res.ok) {
-      showFieldError('reAuthError', data.error || 'Invalid credentials');
-      btn.disabled = false;
-      btn.textContent = 'LOG BACK IN';
+async function handleRecovery(event) {
+  event.preventDefault();
+  if (byId('recoveryBtn').disabled) return;
+  clearErrors('recoveryForm');
+  if (!checkEmail('recoveryEmail', 'recoveryEmailError')) { focusInvalid('recoveryForm'); return; }
+  setBusy('recoveryBtn', true);
+  try {
+    const response = await fetch('/api/auth/password-reset', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'request', email: byId('recoveryEmail').value.trim() })
+    });
+    const data = await response.json();
+    if (response.status === 429 || data.code === 'RATE_LIMITED') { rateLimit('recoveryBtn', 'recoveryError', data); return; }
+    if (!response.ok) { authError('recoveryError', data); return; }
+    byId('recoveryForm').hidden = true;
+    setMessage('recoveryMessage',
+      'Falls ein berechtigtes Konto existiert, erhältst du eine E-Mail mit dem Link. Prüfe auch deinen Spam-Ordner.',
+      'If an eligible account exists, you’ll receive an email with a reset link. Check your spam folder too.');
+    byId('recoveryMessage').focus();
+  } catch (error) {
+    console.error('Password recovery request failed:', error);
+    fieldError('recoveryError', 'Der Dienst ist nicht erreichbar. Bitte erneut versuchen.', 'The service is unavailable. Please try again.');
+  } finally { finishAuthRequest('recoveryBtn'); }
+}
+
+function invalidateReset() {
+  window.MemberRecovery.clear();
+  setBusy('resetBtn', false);
+  byId('resetPassword').value = '';
+  byId('resetConfirm').value = '';
+  byId('resetForm').hidden = true;
+  authError('resetError', { code: 'INVALID_RESET_TOKEN' });
+}
+
+async function handleResetPassword(event) {
+  event.preventDefault();
+  if (byId('resetBtn').disabled) return;
+  clearErrors('resetForm');
+  byId('resetError').hidden = true;
+  const token = window.MemberRecovery.getToken();
+  if (!token) { invalidateReset(); return; }
+  if (!checkNewPassword('reset')) { focusInvalid('resetForm'); return; }
+  const revision = window.MemberRecovery.getRevision();
+  setBusy('resetBtn', true);
+  try {
+    const response = await fetch('/api/auth/password-reset', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reset', token, password: byId('resetPassword').value })
+    });
+    const data = await response.json();
+    if (revision !== window.MemberRecovery.getRevision()) return;
+    if (response.status === 429 || data.code === 'RATE_LIMITED') { rateLimit('resetBtn', 'resetError', data); return; }
+    if (!response.ok) {
+      if (data.code === 'INVALID_RESET_TOKEN') invalidateReset();
+      else authError('resetError', data);
       return;
     }
-
-    currentUser = data.user;
+    setBusy('resetBtn', false);
+    window.MemberRecovery.clear();
+    clearMemberState();
     sessionExpiredShown = false;
-    document.getElementById('sessionOverlay').classList.remove('open');
-    document.getElementById('reAuthPassword').value = '';
-    btn.disabled = false;
-    btn.textContent = 'LOG BACK IN';
-
-    // Re-fetch dashboard data
-    enterDashboard();
-  } catch {
-    showFieldError('reAuthError', 'Something went wrong');
-    btn.disabled = false;
-    btn.textContent = 'LOG BACK IN';
+    showView('login');
+    setMessage('loginMessage', 'Passwort gespeichert. Bitte melde dich neu an.', 'Password saved. Please sign in again.');
+  } catch (error) {
+    if (revision !== window.MemberRecovery.getRevision()) return;
+    console.error('Password reset failed:', error);
+    fieldError('resetError', 'Der Dienst ist nicht erreichbar. Bitte erneut versuchen.', 'The service is unavailable. Please try again.');
+  } finally {
+    if (revision === window.MemberRecovery.getRevision()) finishAuthRequest('resetBtn');
   }
-}
-
-function handleFullLogout() {
-  document.getElementById('sessionOverlay').classList.remove('open');
-  sessionExpiredShown = false;
-  currentUser = null;
-  showView('login');
-}
-
-/* ═══════════════════════════════════════
-   LOGOUT
-═══════════════════════════════════════ */
-async function handleLogout() {
-  try {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-  } catch { /* ignore */ }
-  // Clear all client-side state
-  currentUser = null;
-  sessionExpiredShown = false;
-  trainingLoaded = false;
-  trainingSessions = [];
-  Object.keys(attendeeCache).forEach(k => delete attendeeCache[k]);
-  // Clear auth cookies client-side in case server request failed
-  document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-  document.cookie = 'refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-  showView('login');
 }

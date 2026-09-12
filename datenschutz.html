@@ -10,9 +10,7 @@
   <title>Datenschutz — Vienna Imperials</title>
   <meta name="description" content="Datenschutzerklärung der Vienna Imperials — DSGVO-konforme Informationen zu Datenerhebung und Ihren Rechten. Privacy policy for Vienna Imperials dodgeball club." />
   <link rel="canonical" href="https://www.imperialsdodgeball.com/datenschutz.html" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
@@ -327,12 +325,19 @@
       .nav-back { font-size: 0.75rem; }
     }
   </style>
+  <link rel="stylesheet" href="/public-ui.css?v=20260912" />
+  <script src="/js/site-language.js?v=20260912" defer></script>
+  <script src="/js/site-lang.js?v=20260912" defer></script>
 </head>
 <body>
 
   <nav class="nav">
     <a href="/" class="nav-logo">Vienna <span>Imperials</span></a>
     <a href="/" class="nav-back">&#8592; Zurück / Back to Main Site</a>
+    <div class="site-language" role="group" aria-label="Sprache / Language">
+      <button type="button" data-site-language="de" aria-pressed="true" lang="de">DE</button>
+      <button type="button" data-site-language="en" aria-pressed="false" lang="en">EN</button>
+    </div>
   </nav>
 
   <div class="container">
@@ -342,7 +347,7 @@
     <p class="page-subtitle">Gemäß DSGVO / EU 2016/679 &nbsp;·&nbsp; Pursuant to GDPR / EU 2016/679</p>
     <div class="gold-bar"></div>
 
-    <p class="last-updated">Stand / Last Updated: 21. März / 21 March 2026</p>
+    <p class="last-updated">Stand / Last Updated: 12. September / 12 September 2026</p>
 
     <!-- 1. Verantwortlicher -->
     <div class="section">
@@ -478,6 +483,20 @@
       </div>
     </div>
 
+    <div class="section">
+      <h2 class="section-title">Imperials Social League</h2>
+      <div class="lang-de">
+        <p class="lang-tag de">Deutsch</p>
+        <p>Für die Imperials Social League werden Spielernamen, Teamzuordnungen, Platzierungen und Saisonpunkte gespeichert. Auch Gäste können durch Admins aufgenommen und später mit einem Mitgliederkonto verknüpft werden. Erst nach Freigabe durch die Admins sind Teams und Spielernamen öffentlich; bestätigte Ergebnisse erscheinen in der Saison-Rangliste. Entwürfe sind nicht öffentlich.</p>
+        <p>Zur ausgewogenen Teameinteilung verwalten Admins eine interne Spielstärke, eine optionale Geschlechtsangabe und eine Anfänger-Markierung. Diese Angaben sind weder auf der öffentlichen Website noch in den Statistiken anderer Mitglieder sichtbar. Saisonergebnisse bleiben als Historie gespeichert. Bei Fragen, Berichtigungs- oder Löschwünschen kontaktiere bitte den Verein über die oben angegebenen Kontaktdaten.</p>
+      </div>
+      <div class="lang-en">
+        <p class="lang-tag en">English</p>
+        <p>The Imperials Social League stores player names, team assignments, placements and season points. Admins can also add guests and later link them to a member account. Teams and player names become public only after admin publication; confirmed results appear in the season standings. Drafts are not public.</p>
+        <p>For balanced teams, admins manage an internal skill rating, an optional gender entry and a beginner tag. These fields are not shown on the public website or in other members' statistics. Season results are retained as history. For questions, corrections or deletion requests, contact the club using the details above.</p>
+      </div>
+    </div>
+
     <!-- 3. Drittanbieter -->
     <div class="section">
       <p class="section-label">Art. 13 Abs. 1 lit. e DSGVO</p>
@@ -503,13 +522,13 @@
         </thead>
         <tbody>
           <tr>
-            <td>Google Fonts</td>
+            <td>Lokale Schriftarten / Local fonts</td>
             <td>
               Schriftarten (Bebas Neue, Barlow Condensed, Inter).<br>
               <span style="font-size:0.8rem;color:rgba(244,247,255,0.55);">Web fonts for typography.</span>
             </td>
-            <td>Google LLC<br><span style="font-size:0.8rem;color:rgba(244,247,255,0.55);">fonts.googleapis.com</span></td>
-            <td><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a></td>
+            <td>Vienna Imperials</td>
+            <td>Vom eigenen Webserver geladen. / Loaded from our own web server.</td>
           </tr>
           <tr>
             <td>Vercel</td>
@@ -544,11 +563,10 @@
       <div class="highlight-box" style="margin-top:1.5rem;">
         <p>
           <strong style="color:#D4961A;">Hinweis / Note:</strong>
-          Beim Aufruf von Google Fonts wird Ihre IP-Adresse an Server von Google übermittelt. Nähere Informationen entnehmen Sie der
-          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Google</a>.
-          Wenn Sie Schriftarten ablehnen, werden diese nicht geladen und es wird eine System-Schriftart verwendet. &nbsp;
-          When Google Fonts loads, your IP address is transmitted to Google's servers. See Google's privacy policy for details.
-          If you decline fonts, they will not load and a system font will be used instead.
+          Schriftarten und Stylesheets werden lokal bereitgestellt; dafür ist keine Verbindung zu Google Fonts oder einem externen CSS-CDN nötig.
+          Karten und Social-Media-Profile werden nur verlinkt. Erst beim Öffnen eines externen Links wird dessen Website aufgerufen. &nbsp;
+          Fonts and stylesheets are self-hosted, without Google Fonts or an external CSS CDN.
+          Maps and social profiles are links only; their websites are contacted when you open a link.
         </p>
       </div>
     </div>
@@ -561,16 +579,13 @@
       <div class="lang-de">
         <p class="lang-tag de">Deutsch</p>
         <p>
-          Diese Website verwendet keine herkömmlichen Tracking-Cookies. Es wird ausschließlich der lokale Browserspeicher (<code style="background:rgba(53,103,192,0.2);padding:1px 5px;border-radius:3px;font-size:0.85em;">localStorage</code>)
-          für folgende Zwecke eingesetzt:
+          Diese Website verwendet keine Tracking-Cookies. Für die Anmeldung werden notwendige Authentifizierungs-Cookies genutzt; deine Sprachwahl wird im lokalen Browserspeicher gespeichert.
         </p>
       </div>
       <div class="lang-en">
         <p class="lang-tag en">English</p>
         <p>
-          This website does not use traditional tracking cookies. Only the browser's local storage
-          (<code style="background:rgba(53,103,192,0.2);padding:1px 5px;border-radius:3px;font-size:0.85em;">localStorage</code>)
-          is used for the following purposes:
+          This website does not use tracking cookies. Necessary authentication cookies support sign-in; your language preference is stored locally in your browser.
         </p>
       </div>
 
@@ -585,11 +600,11 @@
         </thead>
         <tbody>
           <tr>
-            <td><code style="font-size:0.82em;">vi_cookie_consent</code></td>
+            <td><code style="font-size:0.82em;">vi_site_language</code></td>
             <td>localStorage<br><span style="font-size:0.8rem;color:rgba(244,247,255,0.55);">First-party</span></td>
             <td>
-              Speichert die Cookie-Einwilligung des Nutzers.<br>
-              <span style="font-size:0.8rem;color:rgba(244,247,255,0.55);">Stores the user's cookie consent choice.</span>
+              Speichert die gewählte Sprache (Deutsch oder Englisch).<br>
+              <span style="font-size:0.8rem;color:rgba(244,247,255,0.55);">Stores your chosen language (German or English).</span>
             </td>
             <td>
               Dauerhaft bis zur Löschung.<br>
@@ -721,7 +736,7 @@
           12 Monate nach Eingang / 12 months after receipt
         </li>
         <li>
-          <strong>Rankings-Daten / Rankings data:</strong>
+          <strong>Rankings-Daten und Ligaergebnisse / Rankings data and league results:</strong>
           Aktuelle Saison, danach Archivierung oder Löschung /
           Current season, then archived or deleted
         </li>
@@ -781,8 +796,8 @@
             <td>Art. 6 Abs. 1 lit. f — Berechtigtes Interesse / Legitimate interest</td>
           </tr>
           <tr>
-            <td>Google Fonts</td>
-            <td>Art. 6 Abs. 1 lit. a — Einwilligung / Consent (Cookie-Banner)</td>
+            <td>Sprachpräferenz / Language preference</td>
+            <td>Art. 6 Abs. 1 lit. f — Benutzerfreundliche Darstellung / Usable presentation</td>
           </tr>
           <tr>
             <td>Rate Limiting</td>

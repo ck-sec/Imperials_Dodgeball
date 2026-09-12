@@ -1,0 +1,205 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const root = path.resolve(__dirname, '..', '..');
+const context = vm.createContext({ window: {} });
+vm.runInContext(fs.readFileSync(path.join(root, 'js', 'site-utils.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(root, 'js', 'league-scoring.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(root, 'js', 'league-ui.js'), 'utf8'), context);
+const ui = context.window.LeagueUI;
+const { buildSchedule, matchStandings } = require('../../lib/league-matches');
+
+function fixture(count = 6) {
+  return {
+    title: 'Thursday league',
+    session_date: '2026-09-17',
+    start_time: '19:00:00',
+    team_size: 6,
+    status: 'published',
+    teams: Array.from({ length: 5 }, (_, team) => ({
+      number: team + 1,
+      name: 'Team ' + (team + 1),
+      placement: team + 1,
+      points: 5 - team,
+      players: Array.from({ length: count }, (_, player) => ({
+        display_name: 'Player ' + (team * count + player + 1),
+        gender: 'unspecified',
+        is_rookie: true,
+        rating: 1234,
+        initial_rating: 876,
+        user_id: 'private-user-id'
+      }))
+    }))
+  };
+}
+
+test('public teams show all thirty players without private balancing fields', () => {
+  const html = ui.event(fixture(), 'en');
+  assert.equal((html.match(/<article /g) || []).length, 5);
+  assert.equal((html.match(/<li>/g) || []).length, 30);
+  assert.match(html, /6v6/);
+  assert.doesNotMatch(html, /1234|876|unspecified|rookie|private-user-id/);
+  assert.doesNotMatch(html, /Place 1/);
+});
+
+test('larger squads explicitly explain rotating substitutes', () => {
+  const html = ui.event(fixture(7), 'en');
+  assert.equal((html.match(/1 rotating substitutes/g) || []).length, 5);
+  assert.equal((html.match(/<li>/g) || []).length, 35);
+});
+
+test('only finalized results show per-player placement awards', () => {
+  const event = fixture();
+  event.status = 'finalized';
+  const html = ui.event(event, 'en');
+  assert.match(html, /Result confirmed/);
+  assert.match(html, /Place 1 &middot; 5 Points/);
+  assert.match(html, /Place 5 &middot; 1 Points/);
+});
+
+test('guest names, event titles and team names are escaped as text', () => {
+  const event = fixture();
+  event.title = '<img src=x onerror="alert(1)">';
+  event.teams[0].name = '<script>not markup</script>';
+  event.teams[0].players[0].display_name = 'Guest <b>& "quoted"</b>';
+  const html = ui.event(event, 'en');
+  assert.doesNotMatch(html, /<img|<script|<b>/);
+  assert.match(html, /&lt;script&gt;not markup&lt;\/script&gt;/);
+  assert.match(html, /Guest &lt;b&gt;&amp; &quot;quoted&quot;&lt;\/b&gt;/);
+});
+
+test('standings preserve shared ranks, zero points and server totals', () => {
+  const html = ui.standings([
+    { rank: 1, display_name: 'One', points: 20, played: 9, wins: 1 },
+    { rank: 1, display_name: 'Two', points: 20, played: 6, wins: 0 },
+    { rank: 3, display_name: 'Three', points: 0, played: 1, wins: 0 }
+  ], 'en');
+  assert.equal((html.match(/#1</g) || []).length, 2);
+  assert.match(html, /9 Trainings/);
+  assert.match(html, /league-points">0</);
+});
+
+test('movement renders localized signed points and rank direction without relying only on arrows', () => {
+  const rising = { rank: 2, points_gain: 1.5, previous_rank: 4, rank_gain: 2 };
+  const en = ui.movement(rising, 'en');
+  assert.match(en, /From the last scored training/);
+  assert.match(en, /\+1.5 Points/);
+  assert.match(en, /2 places up/);
+  assert.match(en, /aria-hidden="true">\u2191/);
+  const de = ui.movement(rising, 'de');
+  assert.match(de, /Durch das letzte gewertete Training/);
+  assert.match(de, /\+1,5 Punkte/);
+  assert.match(de, /2 Pl\u00e4tze gestiegen/);
+  const dropping = { rank: 3, points_gain: 0, previous_rank: 2, rank_gain: -1 };
+  assert.match(ui.movement(dropping, 'en'), /0 Points[\s\S]*1 place down/);
+  assert.match(ui.movement(dropping, 'de'), /0 Punkte[\s\S]*1 Platz gefallen/);
+  assert.match(ui.movement(dropping, 'en'), /aria-hidden="true">\u2193/);
+});
+
+test('movement distinguishes first appearance from unchanged rank, including zero points', () => {
+  const entrant = { rank: 5, points_gain: 0, previous_rank: null, rank_gain: null };
+  assert.match(ui.movement(entrant, 'en'), /0 Points[\s\S]*New/);
+  assert.match(ui.movement(entrant, 'de'), /0 Punkte[\s\S]*Neu/);
+  const unchanged = { rank: 1, points_gain: 3, previous_rank: 1, rank_gain: 0 };
+  assert.match(ui.movement(unchanged, 'en'), /\+3 Points[\s\S]*Rank unchanged/);
+  assert.match(ui.movement(unchanged, 'de'), /Rang unver\u00e4ndert/);
+  assert.doesNotMatch(ui.movement(unchanged, 'en'), /aria-hidden|New/);
+  assert.match(ui.movement(unchanged, 'unsupported'), /Rank unchanged/);
+});
+
+test('movement is absent for archives and incomplete, nonnumeric or unranked entries', () => {
+  const archive = { rank: 1, points: 70, legacy: { gain: 3, change: 2 }, gain: 3, change: 2 };
+  const valid = { rank: 2, points_gain: 1, previous_rank: 3, rank_gain: 1 };
+  const malformed = [
+    null, undefined, archive, {}, { ...valid, rank: null }, { ...valid, rank: 0 },
+    { ...valid, points_gain: NaN }, { ...valid, points_gain: Infinity },
+    { ...valid, points_gain: '<img src=x onerror=alert(1)>' },
+    { ...valid, previous_rank: '3' }, { ...valid, previous_rank: 0 },
+    { ...valid, rank_gain: '<script>bad</script>' }, { ...valid, rank_gain: 1.5 },
+    { ...valid, previous_rank: null },
+  ];
+  malformed.forEach(entry => assert.equal(ui.movement(entry, 'en'), ''));
+  assert.doesNotMatch(ui.standings([archive], 'en'), /league-movement/);
+});
+
+test('movement escapes localized content, formats singular gains, and normalizes negative zero', () => {
+  const entry = { rank: 1, points_gain: -0, previous_rank: 2, rank_gain: 1 };
+  assert.match(ui.movement(entry), /0 Points[\s\S]*1 place up/);
+  assert.doesNotMatch(ui.movement(entry), /-0/);
+  assert.match(ui.movement(entry, 'de'), /1 Platz gestiegen/);
+  const original = ui.text.en.movementCompared;
+  ui.text.en.movementCompared = '<img src=x onerror="bad()"> & context';
+  try {
+    const html = ui.movement(entry);
+    assert.doesNotMatch(html, /<img/);
+    assert.match(html, /&lt;img src=x onerror=&quot;bad\(\)&quot;&gt; &amp; context/);
+  } finally {
+    ui.text.en.movementCompared = original;
+  }
+});
+
+test('standings render server-provided movements for shared ranks and nonparticipants without recalculating', () => {
+  const html = ui.standings([
+    { rank: 1, display_name: 'A', points: 5, played: 2, wins: 1, points_gain: 3, previous_rank: 3, rank_gain: 2 },
+    { rank: 1, display_name: 'B', points: 5, played: 2, wins: 1, points_gain: 2, previous_rank: 2, rank_gain: 1 },
+    { rank: 3, display_name: '<Guest>', points: 4, played: 1, wins: 1, points_gain: 0, previous_rank: 1, rank_gain: -2 },
+  ], 'en');
+  assert.equal((html.match(/class="league-movement"/g) || []).length, 3);
+  assert.equal((html.match(/#1</g) || []).length, 2);
+  assert.match(html, /&lt;Guest&gt;/);
+  assert.match(html, /0 Points[\s\S]*2 places down/);
+});
+
+test('custom scoring describes whole-season accumulation, not best-N scoring', () => {
+  const html = ui.rules({ placement_points: [3, 2.5, 2, 1.5, 1], scoring_mode: 'fixed' }, 'en');
+  assert.match(html, /Every training counts/);
+  assert.match(html, /2\. Place: 2.5 Points/);
+  assert.match(html, /Further places: 1 Points/);
+  assert.doesNotMatch(html, /best 8/);
+});
+
+test('relative scoring rules show the exact team-count scale', () => {
+  const html = ui.rules({ placement_points: [3, 2.5, 2, 1, 0.5], scoring_mode: 'relative', points_step: 0.5 }, 'en');
+  assert.match(html, /3 Teams<\/dt><dd>\+3 \/ \+2 \/ \+0.5/);
+  assert.match(html, /6 Teams<\/dt><dd>\+3 \/ \+2.5 \/ \+2 \/ \+1.5 \/ \+1 \/ \+0.5/);
+});
+
+test('season selectors escape names and select the requested season', () => {
+  const html = ui.seasonOptions([{ id: 'one', name: '<Autumn>' }, { id: 'two', name: 'Winter' }], 'two');
+  assert.match(html, /&lt;Autumn&gt;/);
+  assert.match(html, /value="two" selected/);
+});
+
+test('public fixtures show two-hour timing, rests and separate match-table points', () => {
+  const event = fixture();
+  event.schedule = buildSchedule(5);
+  event.match_standings = matchStandings(5, event.schedule);
+  const html = ui.schedule(event, 'en');
+  assert.match(html, /19:00 &ndash; 19:20/);
+  assert.match(html, /20:40 &ndash; 21:00/);
+  assert.match(html, /No time buffer/);
+  assert.match(html, /not season points/);
+  assert.equal((html.match(/class="league-match"/g) || []).length, 10);
+  assert.match(html, /Rest: Team 1/);
+  assert.doesNotMatch(html, /1234|rookie|private-user-id/);
+});
+
+test('public finalized ties show the confirmed winner rather than a pending decision', () => {
+  const event = fixture();
+  event.status = 'finalized';
+  event.teams.forEach(team => { team.placement = 6 - team.number; });
+  event.schedule = buildSchedule(5);
+  event.schedule.rounds.flatMap(round => round.matches).forEach(match => {
+    match.score_a = 0;
+    match.score_b = 0;
+  });
+  event.match_standings = matchStandings(5, event.schedule);
+  const html = ui.schedule(event, 'en');
+  assert.match(html, /Winner: Team 5/);
+  assert.match(html, /Admins have confirmed/);
+  assert.doesNotMatch(html, /admins must confirm/);
+  assert.ok(html.indexOf('league-player-name">Team 5') < html.indexOf('league-player-name">Team 1'));
+});

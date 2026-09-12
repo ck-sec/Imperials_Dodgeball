@@ -1,737 +1,220 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8" />
+  <script src="/js/member-recovery-token.js?v=20260912"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" href="/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <title>Member Area — Vienna Imperials</title>
-  <meta name="description" content="Vienna Imperials member dashboard. View your stats, rankings, and tier." />
   <meta name="robots" content="noindex" />
-
-  <link rel="stylesheet" href="/tailwind.min.css" />
-  <link rel="stylesheet" href="/shared.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" as="style" />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-
-  <style>
-    body { min-height: 100vh; }
-
-    /* ── Navigation ── */
-    nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      padding: 0 2rem; height: 72px;
-      display: flex; align-items: center; justify-content: space-between;
-      background: rgba(12, 27, 58, 0.95);
-      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-      box-shadow: 0 4px 32px rgba(0,0,0,0.4), 0 1px 0 rgba(212,150,26,0.15);
-    }
-    .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-    .nav-logo img { height: 44px; width: auto; }
-    .nav-logo span { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.06em; color: var(--gold-lt); line-height: 1; }
-    .nav-links { display: flex; align-items: center; gap: 2rem; list-style: none; }
-    .nav-links a { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(244,247,255,0.75); text-decoration: none; transition: color 0.2s ease; }
-    .nav-links a:hover { color: var(--gold-lt); }
-    .nav-cta { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--deep) !important; background: linear-gradient(135deg, var(--gold), var(--gold-lt)); padding: 8px 20px; border-radius: 4px; transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease !important; }
-    .nav-cta:hover { color: var(--deep) !important; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(212,150,26,0.5); filter: brightness(1.1); }
-
-    .nav-toggle { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 4px; z-index: 101; }
-    .nav-toggle span { display: block; width: 22px; height: 2px; background: var(--cloud); border-radius: 2px; transition: transform 0.25s ease, opacity 0.2s ease; }
-    body.nav-open .nav-toggle span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
-    body.nav-open .nav-toggle span:nth-child(2) { opacity: 0; }
-    body.nav-open .nav-toggle span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
-
-    .member-nav-identity { display: flex; align-items: center; gap: 0.6rem; }
-    .member-nav-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold-lt); }
-    .member-nav-logout { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; background: transparent; border: 1px solid rgba(244,247,255,0.1); border-radius: 6px; padding: 5px 12px; color: rgba(244,247,255,0.45); cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
-    .member-nav-logout:hover { background: rgba(248,113,113,0.08); color: #F87171; border-color: rgba(248,113,113,0.4); }
-
-    /* ── Auth card ── */
-    .auth-wrap {
-      min-height: 100vh; display: flex; align-items: center; justify-content: center;
-      padding: 1rem; padding-top: 88px;
-    }
-    .auth-card {
-      width: 100%; max-width: 440px;
-      background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
-      padding: 2.5rem;
-      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
-      transition: opacity 0.2s ease, transform 0.2s ease;
-    }
-    .auth-card.hidden { display: none; }
-    .auth-logo { text-align: center; margin-bottom: 1.75rem; }
-    .auth-logo img { height: 72px; filter: drop-shadow(0 4px 16px rgba(212,150,26,0.25)); }
-    .auth-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.08em; color: var(--gold-lt); text-align: center; display: block; margin-top: 0.5rem; }
-    .auth-sub { font-size: 0.8rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(244,247,255,0.55); text-align: center; margin-top: 4px; margin-bottom: 1.5rem; }
-    .auth-divider { width: 32px; height: 2px; background: linear-gradient(90deg, var(--gold), var(--gold-lt)); margin: 0 auto 1.75rem; border-radius: 2px; }
-
-    .field-group { margin-bottom: 16px; }
-    .field-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(244,247,255,0.6); display: block; margin-bottom: 6px; }
-    .field-input {
-      width: 100%; background: rgba(12,27,58,0.8); border: 1px solid var(--border); border-radius: 8px;
-      padding: 11px 14px; font-family: 'Inter', sans-serif; font-size: 0.95rem; color: var(--cloud);
-      outline: none; transition: border-color 0.2s ease; letter-spacing: 0.04em;
-    }
-    .field-input:focus { border-color: rgba(212,150,26,0.5); }
-    .field-input::placeholder { color: rgba(244,247,255,0.2); }
-    .field-input.error { border-color: rgba(248,113,113,0.5); }
-    .field-error { font-size: 0.78rem; color: #F87171; font-weight: 600; margin-top: 4px; display: none; }
-    .field-error.show { display: block; }
-
-    .password-wrap { position: relative; }
-    .password-wrap .field-input { padding-right: 44px; }
-    .password-toggle {
-      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-      width: 32px; height: 32px; background: none; border: none; cursor: pointer;
-      color: rgba(244,247,255,0.3); display: flex; align-items: center; justify-content: center;
-      transition: color 0.15s ease;
-    }
-    .password-toggle:hover { color: rgba(244,247,255,0.6); }
-
-    .strength-bar { height: 4px; border-radius: 2px; background: rgba(244,247,255,0.05); margin-top: 8px; overflow: hidden; }
-    .strength-fill { height: 100%; border-radius: 2px; width: 0; transition: width 0.3s ease, background 0.3s ease; }
-    .strength-label { font-size: 0.7rem; font-weight: 600; margin-top: 4px; }
-
-    .remember-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-    .remember-row input[type="checkbox"] {
-      width: 18px; height: 18px; border: 1px solid var(--border); border-radius: 4px;
-      background: rgba(12,27,58,0.8); appearance: none; -webkit-appearance: none;
-      cursor: pointer; position: relative; flex-shrink: 0;
-    }
-    .remember-row input[type="checkbox"]:checked { background: var(--gold); border-color: var(--gold); }
-    .remember-row input[type="checkbox"]:checked::after {
-      content: ''; position: absolute; left: 5px; top: 2px; width: 5px; height: 9px;
-      border: solid var(--deep); border-width: 0 2px 2px 0; transform: rotate(45deg);
-    }
-    .remember-row label { font-size: 0.85rem; color: rgba(244,247,255,0.55); font-weight: 500; cursor: pointer; }
-
-    .auth-btn {
-      width: 100%; margin-top: 1.25rem;
-      font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1rem;
-      letter-spacing: 0.14em; text-transform: uppercase; padding: 12px; border-radius: 8px;
-      border: none; background: linear-gradient(135deg, var(--gold), var(--gold-lt)); color: var(--deep);
-      cursor: pointer; position: relative; overflow: hidden;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-      box-shadow: 0 4px 20px rgba(212,150,26,0.3);
-    }
-    .auth-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(212,150,26,0.4); }
-    .auth-btn:active { transform: none; }
-    .auth-btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
-    .auth-btn:focus-visible { outline: 2px solid var(--gold-lt); outline-offset: 2px; }
-
-    .auth-spinner {
-      display: inline-block; width: 16px; height: 16px;
-      border: 2px solid var(--deep); border-top-color: transparent;
-      border-radius: 50%; animation: spin 0.6s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .auth-footer { text-align: center; margin-top: 1.25rem; font-size: 0.85rem; color: rgba(244,247,255,0.45); }
-    .auth-footer a { color: var(--gold-lt); text-decoration: none; font-weight: 600; }
-    .auth-footer a:hover { text-decoration: underline; }
-
-    .auth-error-banner {
-      background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2);
-      border-radius: 8px; padding: 12px 16px; color: #F87171;
-      font-size: 0.85rem; font-weight: 600; margin-bottom: 16px;
-      display: none; align-items: center; justify-content: space-between;
-    }
-    .auth-error-banner.show { display: flex; }
-    .auth-error-banner button { background: none; border: none; color: #F87171; cursor: pointer; font-size: 1.1rem; padding: 0 0 0 8px; }
-
-    .auth-success { text-align: center; padding: 2rem 0; }
-    .auth-success-icon { font-size: 48px; color: #4ADE80; margin-bottom: 1rem; }
-    .auth-success-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; color: var(--gold-lt); letter-spacing: 0.08em; }
-    .auth-success-text { font-size: 0.85rem; color: rgba(244,247,255,0.6); margin-top: 0.5rem; }
-
-    @keyframes shake { 0%,100%{transform:translateX(0)} 15%{transform:translateX(-6px)} 30%{transform:translateX(5px)} 45%{transform:translateX(-4px)} 60%{transform:translateX(3px)} 75%{transform:translateX(-2px)} }
-    .shake { animation: shake 0.4s ease; }
-
-    /* ── Dashboard ── */
-    .dashboard { display: none; padding-top: 72px; }
-    .dashboard.active { display: block; }
-
-    /* ── Tab Navigation ── */
-    .dash-tabs {
-      display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 2rem;
-    }
-    .dash-tab {
-      font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.85rem;
-      letter-spacing: 0.1em; text-transform: uppercase; padding: 12px 24px;
-      background: transparent; border: none; color: rgba(244,247,255,0.6);
-      cursor: pointer; position: relative;
-      transition: color 0.2s ease;
-    }
-    .dash-tab:hover { color: rgba(244,247,255,0.7); }
-    .dash-tab.active { color: var(--gold-lt); }
-    .dash-tab.active::after {
-      content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
-      height: 2px; background: linear-gradient(90deg, var(--gold), var(--gold-lt));
-    }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-
-    /* ── Training Calendar ── */
-    .training-nudge {
-      display: flex; align-items: center; gap: 12px;
-      background: rgba(212,150,26,0.08); border: 1px solid rgba(212,150,26,0.2);
-      border-radius: 10px; padding: 12px 16px; margin-bottom: 1.5rem;
-      font-size: 0.85rem; color: var(--gold-lt); font-weight: 600;
-    }
-    .training-nudge svg { flex-shrink: 0; }
-
-    .session-card {
-      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-      padding: 20px 24px; margin-bottom: 1rem;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-      transition: border-color 0.2s ease;
-    }
-    .session-card:hover { border-color: rgba(53,103,192,0.35); }
-    .session-card.cancelled { opacity: 0.5; }
-    .session-card.cancelled .session-title::after {
-      content: 'CANCELLED'; display: inline-block; margin-left: 10px;
-      font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.65rem;
-      letter-spacing: 0.1em; background: rgba(248,113,113,0.12); color: #F87171;
-      padding: 2px 8px; border-radius: 4px; vertical-align: middle;
-    }
-
-    .session-date-badge {
-      font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.7rem;
-      letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold-lt);
-      margin-bottom: 6px;
-    }
-    .session-title {
-      font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.1rem;
-      color: var(--cloud); margin-bottom: 4px;
-    }
-    .session-meta {
-      font-size: 0.8rem; color: rgba(244,247,255,0.45); margin-bottom: 12px;
-      display: flex; flex-wrap: wrap; gap: 6px 16px;
-    }
-    .session-meta span { display: flex; align-items: center; gap: 4px; }
-
-    .session-counts {
-      display: flex; gap: 16px; font-size: 0.78rem; font-weight: 600;
-      margin-bottom: 14px; flex-wrap: wrap;
-    }
-    .count-attending { color: #4ADE80; }
-    .count-not { color: #F87171; }
-
-    .rsvp-buttons { display: flex; gap: 8px; margin-bottom: 8px; }
-    .rsvp-btn {
-      font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.78rem;
-      letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 18px;
-      border-radius: 6px; border: 1px solid var(--border); background: transparent;
-      color: rgba(244,247,255,0.5); cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
-    }
-    .rsvp-btn:hover { transform: translateY(-1px); }
-    .rsvp-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-    .rsvp-btn.rsvp-attending.active {
-      background: rgba(74,222,128,0.12); color: #4ADE80; border-color: rgba(74,222,128,0.35);
-    }
-    .rsvp-btn.rsvp-not-attending.active {
-      background: rgba(248,113,113,0.1); color: #F87171; border-color: rgba(248,113,113,0.3);
-    }
-
-    .session-attendees {
-      margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
-    }
-    .attendees-toggle {
-      font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 0.75rem;
-      letter-spacing: 0.08em; text-transform: uppercase; background: none; border: none;
-      color: rgba(244,247,255,0.55); cursor: pointer; padding: 0;
-      transition: color 0.15s ease;
-    }
-    .attendees-toggle:hover { color: rgba(244,247,255,0.6); }
-    .attendees-list {
-      display: none; margin-top: 8px; font-size: 0.8rem; color: rgba(244,247,255,0.55);
-      line-height: 1.6;
-    }
-    .attendees-list.open { display: block; }
-    .attendees-label {
-      font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.68rem;
-      letter-spacing: 0.1em; text-transform: uppercase; margin-top: 6px; margin-bottom: 2px;
-    }
-    .attendees-label.att-yes { color: #4ADE80; }
-    .attendees-label.att-no { color: #F87171; }
-
-    .training-empty {
-      text-align: center; padding: 3rem 1rem; color: rgba(244,247,255,0.6); font-size: 0.9rem;
-    }
-    .training-empty svg { margin-bottom: 1rem; }
-
-    .training-loading {
-      display: flex; flex-direction: column; gap: 1rem;
-    }
-    .session-skeleton {
-      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-      padding: 20px 24px; height: 140px;
-    }
-
-    .dash-header {
-      position: relative; background: var(--deep); padding: 2rem 2rem 1.5rem; overflow: hidden;
-    }
-    .dash-header::after {
-      content: ''; position: absolute; bottom: 0; left: 0; right: 0;
-      height: 2px; background: linear-gradient(90deg, var(--gold), var(--gold-lt), var(--gold));
-    }
-    .dash-header-inner {
-      max-width: 1100px; margin: 0 auto;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .dash-welcome { font-family: 'Bebas Neue', sans-serif; font-size: 1.75rem; color: var(--cloud); letter-spacing: 0.04em; }
-    .dash-welcome .name { color: var(--gold-lt); }
-
-    .dash-content { max-width: 1100px; margin: 0 auto; padding: 2rem; }
-
-    /* Stats card */
-    .stats-card {
-      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-      padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin-bottom: 2rem;
-    }
-    .stats-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
-    .stats-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.25rem; color: var(--cloud); }
-    .stats-rank-block { text-align: right; }
-    .stats-rank-num { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--gold-lt); line-height: 1; }
-    .stats-rank-label { font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(244,247,255,0.55); }
-
-    .stats-grid {
-      display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;
-    }
-    .stat-cell { text-align: center; }
-    .stat-value { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.05rem; color: var(--cloud); }
-    .stat-label { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(244,247,255,0.55); margin-top: 2px; }
-    .stat-value.gold { color: var(--gold-lt); }
-    .stat-value.purple { color: #C084FC; }
-    .stat-value.gain-pos { color: #4ADE80; }
-    .stat-value.gain-neg { color: #F87171; }
-
-    .stats-empty {
-      text-align: center; padding: 24px 0; font-size: 0.9rem;
-      color: rgba(244,247,255,0.5);
-    }
-
-    /* Skeleton loading */
-    .skeleton { background: linear-gradient(90deg, rgba(244,247,255,0.03) 25%, rgba(244,247,255,0.06) 50%, rgba(244,247,255,0.03) 75%); background-size: 200% 100%; animation: shimmer 1.5s ease infinite; border-radius: 4px; }
-    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-
-    /* Leaderboard */
-    .leaderboard-section { margin-top: 2rem; }
-    .leaderboard-title {
-      font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; color: var(--cloud);
-      letter-spacing: 0.04em; margin-bottom: 0.5rem;
-    }
-    .leaderboard-line { width: 32px; height: 2px; background: linear-gradient(90deg, var(--gold), var(--gold-lt)); border-radius: 2px; margin-bottom: 1.5rem; }
-
-    .lb-controls { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
-    .lb-tab {
-      font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.78rem;
-      letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 14px; border-radius: 6px;
-      border: 1px solid var(--border); background: transparent; color: rgba(244,247,255,0.45);
-      cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-    }
-    .lb-tab:hover { background: rgba(53,103,192,0.1); color: var(--cloud); }
-    .lb-tab.active { background: rgba(212,150,26,0.12); color: var(--gold-lt); border-color: rgba(212,150,26,0.3); }
-    .lb-search {
-      margin-left: auto; background: rgba(12,27,58,0.8); border: 1px solid var(--border);
-      border-radius: 6px; padding: 6px 12px; font-family: 'Inter', sans-serif; font-size: 0.85rem;
-      color: var(--cloud); outline: none; width: 180px; transition: border-color 0.2s ease;
-    }
-    .lb-search:focus { border-color: rgba(212,150,26,0.5); }
-    .lb-search::placeholder { color: rgba(244,247,255,0.2); }
-
-    .lb-table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
-    .lb-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .lb-table th {
-      font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.7rem;
-      letter-spacing: 0.12em; text-transform: uppercase; color: rgba(244,247,255,0.6);
-      padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border);
-      background: rgba(12,27,58,0.5); white-space: nowrap; cursor: pointer;
-    }
-    .lb-table th:hover { color: var(--gold-lt); }
-    .lb-table td { padding: 10px 12px; border-bottom: 1px solid rgba(53,103,192,0.08); white-space: nowrap; }
-    .lb-table tbody tr { transition: background 0.15s ease; }
-    .lb-table tbody tr:hover { background: rgba(53,103,192,0.05); }
-    .lb-table .row-self { background: rgba(212,150,26,0.06); border-left: 3px solid var(--gold); }
-    .lb-table .row-self td:first-child { padding-left: 9px; }
-    .lb-table .row-self .player-name { color: var(--gold-lt); }
-    .you-badge {
-      display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
-      font-size: 0.55rem; letter-spacing: 0.1em; text-transform: uppercase;
-      background: rgba(212,150,26,0.15); color: var(--gold-lt); padding: 1px 6px;
-      border-radius: 3px; margin-left: 6px; vertical-align: middle;
-    }
-    .player-name { color: var(--cloud); font-weight: 500; }
-    .points-val { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1.05rem; color: var(--cloud); }
-    .gain-pos { color: #4ADE80; font-weight: 700; }
-    .gain-neg { color: #F87171; font-weight: 700; }
-    .gain-neu { color: rgba(244,247,255,0.5); }
-    .streak-val { color: var(--gold-lt); font-weight: 700; }
-    .ref-val { color: #C084FC; font-weight: 700; }
-
-    .rank-medal { font-size: 1rem; }
-    .rank-num { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 0.9rem; color: rgba(244,247,255,0.55); }
-
-    .lb-empty { text-align: center; padding: 2rem; color: rgba(244,247,255,0.6); font-size: 0.9rem; }
-    .lb-load-more { display: block; width: 100%; margin-top: .75rem; padding: .65rem; background: rgba(53,103,192,0.12); color: rgba(244,247,255,0.7); border: 1px solid rgba(53,103,192,0.25); border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: background .15s, color .15s; }
-    .lb-load-more:hover { background: rgba(53,103,192,0.22); color: #F4F7FF; }
-
-    /* Session expired overlay */
-    .session-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-      z-index: 200; display: flex; align-items: center; justify-content: center;
-      padding: 1rem; opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
-    }
-    .session-overlay.open { opacity: 1; pointer-events: all; }
-
-    /* ── Responsive ── */
-    @media (max-width: 1024px) {
-      .stats-grid { grid-template-columns: repeat(3, 1fr); }
-    }
-    @media (max-width: 640px) {
-      nav { padding: 0 1rem; }
-      .nav-links { display: none; }
-      .nav-toggle { display: flex; }
-      body.nav-open .nav-links {
-        display: flex; flex-direction: column; position: fixed;
-        top: 72px; left: 0; right: 0; bottom: 0;
-        background: rgba(12,27,58,0.98); padding: 2rem;
-        gap: 1.5rem; z-index: 99;
-      }
-      .auth-card { border-radius: 16px 16px 0 0; }
-      .auth-wrap { align-items: flex-end; padding: 0; padding-top: 72px; }
-      .stats-grid { grid-template-columns: repeat(2, 1fr); }
-      .dash-welcome { font-size: 1.3rem; }
-      .dash-header-inner { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
-      .dash-content { padding: 1.5rem 1rem; }
-      .leaderboard-title { font-size: 1.25rem; }
-      .lb-search { width: 100%; margin-left: 0; margin-top: 8px; }
-      .dash-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      .dash-tab { padding: 10px 16px; font-size: 0.78rem; white-space: nowrap; }
-      .session-card { padding: 16px; }
-      .rsvp-buttons { flex-direction: column; }
-      .rsvp-btn { text-align: center; }
-    }
-  </style>
+  <meta name="referrer" content="same-origin" />
+  <title>Mitglieder — Vienna Imperials</title>
+  <meta name="description" content="Dein Training, dein Team und deine Liga bei den Vienna Imperials." />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/shared.css?v=20260912" />
+  <link rel="stylesheet" href="/league.css?v=20260912" />
+  <link rel="stylesheet" href="/member.css?v=20260912" />
+  <link rel="stylesheet" href="/fonts/fonts.css?v=20260912" />
 </head>
 <body>
-  <a href="#main-content" class="sr-only focus:not-sr-only" id="skipLink" style="position:absolute;top:-40px;left:0;background:var(--gold);color:var(--deep);padding:8px 16px;z-index:10000;font-family:'Barlow Condensed',sans-serif;font-weight:700;text-decoration:none;transition:top 0.2s ease;">Skip to content</a>
-
-  <!-- ══ NAVIGATION ══ -->
-  <nav id="navbar" role="navigation" aria-label="Member navigation">
-    <a href="/" class="nav-logo">
-      <img src="/cropped-Vienna-Imperials-03-1.png" alt="Vienna Imperials Logo" width="44" height="44" />
+  <a href="#main-content" class="skip-link" data-de="Zum Inhalt" data-en="Skip to content">Zum Inhalt</a>
+  <header class="member-header">
+    <a href="/" class="nav-logo" aria-label="Vienna Imperials">
+      <img src="/cropped-Vienna-Imperials-03-1.png" alt="" width="44" height="44" />
       <span>Vienna Imperials</span>
     </a>
-    <ul class="nav-links" id="navLinks">
-      <!-- Logged out -->
-      <li class="nav-guest"><a href="/">Back to Site</a></li>
-      <li class="nav-guest"><a href="#" class="nav-cta" id="navLoginBtn">Log In</a></li>
-      <!-- Logged in -->
-      <li class="nav-member" style="display:none;"><a href="#" data-nav-tab="stats">My Stats</a></li>
-      <li class="nav-member" style="display:none;"><a href="#" data-nav-tab="rankings">Rankings</a></li>
-      <li class="nav-member" style="display:none;"><a href="#" data-nav-tab="training">Training</a></li>
-      <li class="nav-member" style="display:none;"><a href="/">Back to Site</a></li>
-      <li class="nav-member" style="display:none;">
-        <span class="member-nav-identity">
-          <span class="member-nav-name" id="navMemberName"></span>
-          <button class="member-nav-logout" id="navLogoutBtn" aria-label="Log out of member account">Log Out</button>
-        </span>
-      </li>
-    </ul>
-    <button class="nav-toggle" aria-label="Toggle menu" id="navToggleBtn">
-      <span></span><span></span><span></span>
-    </button>
-  </nav>
-
-  <div id="main-content">
-  <!-- ══ LOGIN VIEW ══ -->
-  <div class="auth-wrap" id="loginView">
-    <div class="auth-card" id="loginCard">
-      <div class="auth-logo">
-        <img src="/cropped-Vienna-Imperials-03-1.png" alt="Vienna Imperials" />
-        <span class="auth-title">MEMBER LOGIN</span>
-        <div class="auth-sub">WELCOME BACK</div>
-      </div>
-      <div class="auth-divider"></div>
-
-      <div class="auth-error-banner" id="loginBanner" role="alert">
-        <span id="loginBannerText"></span>
-        <button class="dismiss-banner" aria-label="Dismiss">&times;</button>
-      </div>
-
-      <form id="loginForm" novalidate>
-        <div class="field-group">
-          <label class="field-label" for="loginEmail">Email</label>
-          <input class="field-input" type="email" id="loginEmail" placeholder="you@example.com" required autocomplete="email" />
-          <div class="field-error" id="loginEmailError" role="alert"></div>
-        </div>
-        <div class="field-group">
-          <label class="field-label" for="loginPassword">Password</label>
-          <div class="password-wrap">
-            <input class="field-input" type="password" id="loginPassword" placeholder="Enter your password..." required autocomplete="current-password" />
-            <button type="button" class="password-toggle" aria-label="Toggle password visibility">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
+    <div class="language-switch" role="group" aria-label="Sprache / Language">
+      <button type="button" data-site-language="de" aria-pressed="true" lang="de">DE</button>
+      <button type="button" data-site-language="en" aria-pressed="false" lang="en">EN</button>
+    </div>
+  </header>
+  <main id="main-content" tabindex="-1">
+    <noscript><p class="member-notice">Bitte aktiviere JavaScript für Anmeldung und Training. / Please enable JavaScript to sign in and RSVP.</p></noscript>
+    <section class="auth-wrap" id="loginView" aria-labelledby="loginHeading">
+      <div class="auth-card" id="loginCard">
+        <p class="eyebrow">Vienna Imperials</p>
+        <h1 id="loginHeading" data-de="Willkommen zurück" data-en="Welcome back">Willkommen zurück</h1>
+        <p class="muted" data-de="Anmelden. Training wählen. Mitspielen." data-en="Sign in. Choose training. Play.">Anmelden. Training wählen. Mitspielen.</p>
+        <p class="form-message" id="loginMessage" role="status" hidden></p>
+        <form id="loginForm" novalidate>
+          <div class="field-group">
+            <label for="loginEmail" data-de="E-Mail" data-en="Email">E-Mail</label>
+            <input type="email" id="loginEmail" required maxlength="254" autocomplete="email" inputmode="email" aria-describedby="loginEmailError" />
+            <p class="field-error" id="loginEmailError" role="alert" hidden></p>
           </div>
-          <div class="field-error" id="loginPasswordError" role="alert"></div>
-        </div>
-        <div class="remember-row">
-          <input type="checkbox" id="rememberMe" />
-          <label for="rememberMe">Remember me</label>
-        </div>
-        <button type="submit" class="auth-btn" id="loginBtn">Log In</button>
-        <div class="field-error" id="loginError" role="alert" style="text-align:center;margin-top:0.75rem;"></div>
-      </form>
-      <div class="auth-footer">Don't have an account? <a href="#" id="showRegisterLink">Register</a></div>
-    </div>
-  </div>
-
-  <!-- ══ PENDING APPROVAL STATE ══ -->
-  <div class="auth-wrap" id="pendingView" style="display:none;">
-    <div class="auth-card">
-      <div style="text-align:center; padding:3rem 2rem;">
-        <div style="font-size:3rem; margin-bottom:1rem;">⏳</div>
-        <h2 style="font-family:'Bebas Neue',sans-serif; font-size:2rem; color:#D4961A; letter-spacing:.05em; margin-bottom:.75rem;">ACCOUNT PENDING APPROVAL</h2>
-        <p style="color:#8899bb; font-size:.95rem; max-width:400px; margin:0 auto 1.5rem;">
-          Your registration was successful! A club admin will review and activate your account shortly.
-        </p>
-        <p style="color:#8899bb; font-size:.85rem;">
-          Questions? Email <a href="mailto:imperialsdodgeball@gmail.com" style="color:#D4961A;">imperialsdodgeball@gmail.com</a>
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══ REGISTER VIEW ══ -->
-  <div class="auth-wrap hidden" id="registerView" style="display:none;">
-    <div class="auth-card" id="registerCard">
-      <div class="auth-logo">
-        <img src="/cropped-Vienna-Imperials-03-1.png" alt="Vienna Imperials" />
-        <span class="auth-title">CREATE ACCOUNT</span>
-        <div class="auth-sub">MEMBER REGISTRATION</div>
-      </div>
-      <div class="auth-divider"></div>
-
-      <div class="auth-error-banner" id="registerBanner" role="alert">
-        <span id="registerBannerText"></span>
-        <button class="dismiss-banner" aria-label="Dismiss">&times;</button>
-      </div>
-
-      <form id="registerForm" novalidate>
-        <div class="field-group">
-          <label class="field-label" for="regName">Display Name</label>
-          <input class="field-input" type="text" id="regName" placeholder="Your display name..." required minlength="2" maxlength="50" autocomplete="name" />
-          <div class="field-error" id="regNameError" role="alert"></div>
-        </div>
-        <div class="field-group">
-          <label class="field-label" for="regEmail">Email</label>
-          <input class="field-input" type="email" id="regEmail" placeholder="you@example.com" required autocomplete="email" />
-          <div class="field-error" id="regEmailError" role="alert"></div>
-        </div>
-        <div class="field-group">
-          <label class="field-label" for="regPassword">Password</label>
-          <div class="password-wrap">
-            <input class="field-input" type="password" id="regPassword" placeholder="Minimum 8 characters..." required minlength="8" autocomplete="new-password" />
-            <button type="button" class="password-toggle" aria-label="Toggle password visibility">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-          </div>
-          <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
-          <div class="strength-label" id="strengthLabel" aria-live="polite"></div>
-          <div class="field-error" id="regPasswordError" role="alert"></div>
-        </div>
-        <div class="field-group">
-          <label class="field-label" for="regConfirm">Confirm Password</label>
-          <div class="password-wrap">
-            <input class="field-input" type="password" id="regConfirm" placeholder="Confirm your password..." required autocomplete="new-password" />
-            <button type="button" class="password-toggle" aria-label="Toggle password visibility">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-          </div>
-          <div class="field-error" id="regConfirmError" role="alert"></div>
-        </div>
-        <button type="submit" class="auth-btn" id="registerBtn">Create Account</button>
-      </form>
-      <div class="auth-footer">Already have an account? <a href="#" id="showLoginLink">Log in</a></div>
-    </div>
-
-    <!-- Success state (hidden by default) -->
-    <div class="auth-card hidden" id="registerSuccess" style="display:none;">
-      <div class="auth-success">
-        <div class="auth-success-icon">&#10003;</div>
-        <div class="auth-success-title">ACCOUNT CREATED</div>
-        <div class="auth-success-text">Welcome to the Imperials. Redirecting to your dashboard...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══ DASHBOARD VIEW ══ -->
-  <div class="dashboard" id="dashboardView">
-    <div class="dash-header noise">
-      <div class="dash-header-inner">
-        <div class="dash-welcome">WELCOME BACK, <span class="name" id="dashName"></span></div>
-      </div>
-    </div>
-
-    <div class="dash-content">
-      <!-- Tab Navigation -->
-      <div class="dash-tabs" role="tablist">
-        <button class="dash-tab active" data-tab="stats" role="tab" aria-selected="true">My Stats</button>
-        <button class="dash-tab" data-tab="rankings" role="tab" aria-selected="false">Rankings</button>
-        <button class="dash-tab" data-tab="training" role="tab" aria-selected="false">Training</button>
-        <button class="dash-tab" data-tab="settings" role="tab" aria-selected="false">Settings</button>
-      </div>
-
-      <!-- Stats Tab -->
-      <div class="tab-panel" id="tab-stats" role="tabpanel" style="display:block;">
-        <div class="stats-card" id="statsCard">
-          <div class="stats-top">
-            <div>
-              <span class="stats-name" id="statsName"></span>
-              <span class="tier-badge" id="statsTier" style="display:none;"></span>
+          <div class="field-group">
+            <label for="loginPassword" data-de="Passwort" data-en="Password">Passwort</label>
+            <div class="password-wrap">
+              <input type="password" id="loginPassword" required autocomplete="current-password" aria-describedby="loginPasswordError" />
+              <button type="button" class="password-toggle" aria-controls="loginPassword" aria-pressed="false" data-de="Zeigen" data-en="Show">Zeigen</button>
             </div>
-            <div class="stats-rank-block">
-              <div class="stats-rank-num" id="statsRank">—</div>
-              <div class="stats-rank-label">OVERALL RANK</div>
+            <p class="field-error" id="loginPasswordError" role="alert" hidden></p>
+          </div>
+          <label class="check-row"><input type="checkbox" id="rememberMe" /><span data-de="Angemeldet bleiben" data-en="Stay signed in">Angemeldet bleiben</span></label>
+          <button type="submit" class="primary-btn" id="loginBtn" data-de="Anmelden" data-en="Sign in">Anmelden</button>
+          <p class="field-error" id="loginError" role="alert" hidden></p>
+        </form>
+        <div class="auth-links">
+          <button type="button" data-auth-view="recovery" data-de="Passwort vergessen?" data-en="Forgot password?">Passwort vergessen?</button>
+          <button type="button" data-auth-view="register" data-de="Konto erstellen" data-en="Create account">Konto erstellen</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="auth-wrap" id="registerView" aria-labelledby="registerHeading" hidden>
+      <div class="auth-card">
+        <h1 id="registerHeading" data-de="Konto erstellen" data-en="Create account">Konto erstellen</h1>
+        <p class="muted" data-de="Für Vereinsmitglieder. Dein Konto wird vom Club freigeschaltet." data-en="For club members. The club will approve your account.">Für Vereinsmitglieder. Dein Konto wird vom Club freigeschaltet.</p>
+        <form id="registerForm" novalidate>
+          <div class="field-group">
+            <label for="regName" data-de="Anzeigename" data-en="Display name">Anzeigename</label>
+            <input type="text" id="regName" required minlength="2" maxlength="50" autocomplete="name" aria-describedby="regNameError" />
+            <p class="field-error" id="regNameError" role="alert" hidden></p>
+          </div>
+          <div class="field-group">
+            <label for="regEmail" data-de="E-Mail" data-en="Email">E-Mail</label>
+            <input type="email" id="regEmail" required maxlength="254" autocomplete="email" inputmode="email" aria-describedby="regEmailError" />
+            <p class="field-error" id="regEmailError" role="alert" hidden></p>
+          </div>
+          <div class="field-group">
+            <label for="regPassword" data-de="Passwort" data-en="Password">Passwort</label>
+            <div class="password-wrap">
+              <input type="password" id="regPassword" required minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="regPasswordHint regPasswordError" />
+              <button type="button" class="password-toggle" aria-controls="regPassword" aria-pressed="false" data-de="Zeigen" data-en="Show">Zeigen</button>
             </div>
+            <p class="field-hint" id="regPasswordHint" data-de="8–128 Zeichen, mit Buchstabe und Zahl." data-en="8–128 characters, including a letter and a number.">8–128 Zeichen, mit Buchstabe und Zahl.</p>
+            <p class="field-error" id="regPasswordError" role="alert" hidden></p>
           </div>
-          <div class="stats-grid" id="statsGrid">
-            <div class="stat-cell"><div class="stat-value" id="statPoints">—</div><div class="stat-label">Points</div></div>
-            <div class="stat-cell"><div class="stat-value gold" id="statStreak">—</div><div class="stat-label">Streak</div></div>
-            <div class="stat-cell"><div class="stat-value" id="statPlayed">—</div><div class="stat-label">Played</div></div>
-            <div class="stat-cell"><div class="stat-value purple" id="statRef">—</div><div class="stat-label">Bonus Pts</div></div>
-            <div class="stat-cell"><div class="stat-value" id="statGain">—</div><div class="stat-label">Last Gain</div></div>
+          <div class="field-group">
+            <label for="regConfirm" data-de="Passwort wiederholen" data-en="Confirm password">Passwort wiederholen</label>
+            <input type="password" id="regConfirm" required maxlength="128" autocomplete="new-password" aria-describedby="regConfirmError" />
+            <p class="field-error" id="regConfirmError" role="alert" hidden></p>
           </div>
-          <div class="stats-empty" id="statsEmpty" style="display:none;">
-            You haven't played any games yet. Join a session to start earning points!
-          </div>
-        </div>
+          <button type="submit" class="primary-btn" id="registerBtn" data-de="Konto erstellen" data-en="Create account">Konto erstellen</button>
+          <p class="field-error" id="registerError" role="alert" hidden></p>
+        </form>
+        <div class="auth-links"><button type="button" data-auth-view="login" data-de="Zur Anmeldung" data-en="Back to sign in">Zur Anmeldung</button></div>
       </div>
+    </section>
 
-      <!-- Rankings Tab -->
-      <div class="tab-panel" id="tab-rankings" role="tabpanel">
-        <div class="leaderboard-section" id="leaderboard">
-          <div class="leaderboard-title">LEADERBOARD</div>
-          <div class="leaderboard-line"></div>
-
-          <div class="lb-controls">
-            <button class="lb-tab active" data-filter="all">All</button>
-            <button class="lb-tab" data-filter="male">Male</button>
-            <button class="lb-tab" data-filter="female">Female</button>
-            <input class="lb-search" type="text" placeholder="Search players..." id="lbSearch" />
-          </div>
-
-          <div class="lb-table-wrap">
-            <table class="lb-table" role="table">
-              <thead>
-                <tr>
-                  <th data-sort="rank">#</th>
-                  <th data-sort="name">Player</th>
-                  <th data-sort="points">Points</th>
-                  <th data-sort="gain">Gain</th>
-                  <th data-sort="played">Played</th>
-                  <th data-sort="streak">Streak</th>
-                  <th data-sort="bp">BP</th>
-                  <th data-sort="change">Change</th>
-                </tr>
-              </thead>
-              <tbody id="lbBody"></tbody>
-            </table>
-          </div>
-          <div class="lb-empty" id="lbEmpty" style="display:none;">No players found.</div>
-        </div>
+    <section class="auth-wrap" id="pendingView" aria-labelledby="pendingHeading" hidden>
+      <div class="auth-card">
+        <h1 id="pendingHeading" tabindex="-1" data-de="Freischaltung ausstehend" data-en="Awaiting approval">Freischaltung ausstehend</h1>
+        <p class="muted" data-de="Dein Konto wartet auf die Freigabe durch den Club. Danach kannst du Trainings zusagen." data-en="The club needs to approve your account before you can RSVP to training.">Dein Konto wartet auf die Freigabe durch den Club. Danach kannst du Trainings zusagen.</p>
+        <a class="text-link" href="mailto:imperialsdodgeball@gmail.com" data-de="Club kontaktieren" data-en="Contact the club">Club kontaktieren</a>
+        <div class="auth-links"><button type="button" data-auth-view="login" data-de="Zur Anmeldung" data-en="Back to sign in">Zur Anmeldung</button></div>
       </div>
+    </section>
 
-      <!-- Training Tab -->
-      <div class="tab-panel" id="tab-training" role="tabpanel">
-        <!-- Nudge banner for unresponded sessions -->
-        <div class="training-nudge" id="trainingNudge" style="display:none;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span id="nudgeText"></span>
-        </div>
-
-        <!-- Loading skeleton -->
-        <div class="training-loading" id="trainingLoading" style="display:none;">
-          <div class="session-skeleton skeleton"></div>
-          <div class="session-skeleton skeleton"></div>
-          <div class="session-skeleton skeleton"></div>
-        </div>
-
-        <!-- Session list -->
-        <div id="trainingList"></div>
-
-        <!-- Empty state -->
-        <div class="training-empty" id="trainingEmpty" style="display:none;">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(244,247,255,0.25)" stroke-width="1.5">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-          <div>No upcoming sessions scheduled.</div>
-        </div>
-      </div>
-
-      <!-- Settings Tab -->
-      <div class="tab-panel" id="tab-settings" role="tabpanel">
-        <div class="stats-card">
-          <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold-lt);letter-spacing:0.05em;margin:0 0 1.25rem;">EINSTELLUNGEN / SETTINGS</h3>
-
-          <div style="margin-bottom:1.5rem;">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(244,247,255,0.45);margin-bottom:0.75rem;">E-Mail-Benachrichtigungen / Email Notifications</div>
-
-            <label style="display:flex;align-items:center;gap:0.75rem;cursor:pointer;padding:12px 16px;background:rgba(12,27,58,0.6);border:1px solid var(--border);border-radius:8px;">
-              <input type="checkbox" id="emailNotifToggle" checked style="width:18px;height:18px;cursor:pointer;accent-color:#D4961A;" />
-              <div>
-                <div style="font-size:0.9rem;color:var(--cloud);font-weight:600;">Training-Erinnerungen / Training Reminders</div>
-                <div style="font-size:0.78rem;color:rgba(244,247,255,0.45);margin-top:2px;">E-Mail-Erinnerung 24h vor dem Training / Email reminder 24h before training</div>
-              </div>
-            </label>
+    <section class="auth-wrap" id="recoveryView" aria-labelledby="recoveryHeading" hidden>
+      <div class="auth-card">
+        <h1 id="recoveryHeading" data-de="Passwort vergessen?" data-en="Forgot password?">Passwort vergessen?</h1>
+        <p class="muted" data-de="Wir senden dir einen Link zum Zurücksetzen." data-en="We’ll email you a password reset link.">Wir senden dir einen Link zum Zurücksetzen.</p>
+        <form id="recoveryForm" novalidate>
+          <div class="field-group">
+            <label for="recoveryEmail" data-de="E-Mail" data-en="Email">E-Mail</label>
+            <input type="email" id="recoveryEmail" required maxlength="254" autocomplete="email" inputmode="email" aria-describedby="recoveryEmailError" />
+            <p class="field-error" id="recoveryEmailError" role="alert" hidden></p>
           </div>
-
-          <button id="savePrefsBtn" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:0.88rem;letter-spacing:0.1em;text-transform:uppercase;padding:10px 24px;border-radius:6px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold-lt));color:var(--deep);transition:transform 0.15s ease,box-shadow 0.15s ease;box-shadow:0 3px 16px rgba(212,150,26,0.3);">Speichern / Save</button>
-          <span id="settingsSaved" style="display:none;font-size:0.82rem;color:#4ADE80;font-weight:600;margin-left:12px;">Gespeichert / Saved</span>
-        </div>
+          <button type="submit" class="primary-btn" id="recoveryBtn" data-de="Link anfordern" data-en="Send reset link">Link anfordern</button>
+          <p class="field-error" id="recoveryError" role="alert" hidden></p>
+        </form>
+        <p class="form-message" id="recoveryMessage" role="status" tabindex="-1" hidden></p>
+        <div class="auth-links"><button type="button" data-auth-view="login" data-de="Zur Anmeldung" data-en="Back to sign in">Zur Anmeldung</button></div>
       </div>
-    </div>
-  </div>
-  </div><!-- /main-content -->
+    </section>
 
-  <!-- ══ SESSION EXPIRED OVERLAY ══ -->
-  <div class="session-overlay" id="sessionOverlay">
+    <section class="auth-wrap" id="resetView" aria-labelledby="resetHeading" hidden>
+      <div class="auth-card">
+        <h1 id="resetHeading" data-de="Neues Passwort" data-en="New password">Neues Passwort</h1>
+        <form id="resetForm" novalidate>
+          <div class="field-group">
+            <label for="resetPassword" data-de="Neues Passwort" data-en="New password">Neues Passwort</label>
+            <div class="password-wrap">
+              <input type="password" id="resetPassword" required minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="resetPasswordHint resetPasswordError" />
+              <button type="button" class="password-toggle" aria-controls="resetPassword" aria-pressed="false" data-de="Zeigen" data-en="Show">Zeigen</button>
+            </div>
+            <p class="field-hint" id="resetPasswordHint" data-de="8–128 Zeichen, mit Buchstabe und Zahl." data-en="8–128 characters, including a letter and a number.">8–128 Zeichen, mit Buchstabe und Zahl.</p>
+            <p class="field-error" id="resetPasswordError" role="alert" hidden></p>
+          </div>
+          <div class="field-group">
+            <label for="resetConfirm" data-de="Passwort wiederholen" data-en="Confirm password">Passwort wiederholen</label>
+            <input type="password" id="resetConfirm" required maxlength="128" autocomplete="new-password" aria-describedby="resetConfirmError" />
+            <p class="field-error" id="resetConfirmError" role="alert" hidden></p>
+          </div>
+          <button type="submit" class="primary-btn" id="resetBtn" data-de="Passwort speichern" data-en="Save password">Passwort speichern</button>
+        </form>
+        <p class="field-error" id="resetError" role="alert" hidden></p>
+        <div class="auth-links"><button type="button" data-auth-view="recovery" data-de="Neuen Link anfordern" data-en="Request a new link">Neuen Link anfordern</button><button type="button" data-auth-view="login" data-de="Zur Anmeldung" data-en="Back to sign in">Zur Anmeldung</button></div>
+      </div>
+    </section>
+
+    <section class="dashboard" id="dashboardView" hidden>
+      <div class="dash-welcome"><h1><span data-de="Hallo," data-en="Hi,">Hallo,</span> <span id="dashName"></span></h1></div>
+      <div class="dash-tabs" role="tablist" aria-label="Mitglieder / Members">
+        <button type="button" class="dash-tab active" id="tabButton-training" data-tab="training" role="tab" aria-controls="tab-training" aria-selected="true">Training</button>
+        <button type="button" class="dash-tab" id="tabButton-league" data-tab="league" role="tab" aria-controls="tab-league" aria-selected="false" tabindex="-1" data-de="Liga" data-en="League">Liga</button>
+        <button type="button" class="dash-tab" id="tabButton-account" data-tab="account" role="tab" aria-controls="tab-account" aria-selected="false" tabindex="-1" data-de="Konto" data-en="Account">Konto</button>
+      </div>
+      <div class="dash-content">
+        <section class="tab-panel" id="tab-training" role="tabpanel" aria-labelledby="tabButton-training">
+          <div id="trainingLeagueSummary" class="league member-summary" aria-live="polite"></div>
+          <div class="section-heading">
+            <h2 data-de="Dein nächstes Training" data-en="Your next training">Dein nächstes Training</h2>
+            <button type="button" class="text-button" data-training-refresh data-de="Aktualisieren" data-en="Refresh">Aktualisieren</button>
+          </div>
+          <div id="trainingLoading" class="member-notice" role="status" hidden data-de="Trainings werden geladen …" data-en="Loading training …">Trainings werden geladen …</div>
+          <div id="trainingList"></div>
+          <p id="trainingEmpty" class="member-notice" hidden data-de="Noch keine kommenden Trainings geplant." data-en="No upcoming training scheduled yet.">Noch keine kommenden Trainings geplant.</p>
+          <div id="otherMemberEvents" class="league"></div>
+          <details class="member-details">
+            <summary data-de="Gut zu wissen" data-en="Good to know">Gut zu wissen</summary>
+            <p class="muted" data-de="Bei Ligatrainings werden Namen, Teams und Ergebnisse veröffentlicht. Nach der Teamfreigabe sind Änderungen nur über den Club möglich." data-en="League training names, teams and results are public. After teams are published, contact the club for changes.">Bei Ligatrainings werden Namen, Teams und Ergebnisse veröffentlicht. Nach der Teamfreigabe sind Änderungen nur über den Club möglich.</p>
+            <a class="text-link" href="mailto:imperialsdodgeball@gmail.com" data-de="Club kontaktieren" data-en="Contact the club">Club kontaktieren</a>
+          </details>
+        </section>
+        <section class="tab-panel league" id="tab-league" role="tabpanel" aria-labelledby="tabButton-league" hidden>
+          <h2>Imperials Social League</h2>
+          <div id="memberLeagueContent" aria-live="polite"></div>
+          <details class="member-details" id="seasonOneArchive">
+            <summary data-de="Season 1 · Archiv" data-en="Season 1 · Archive">Season 1 · Archiv</summary>
+            <div id="memberArchiveContent"></div>
+          </details>
+        </section>
+        <section class="tab-panel" id="tab-account" role="tabpanel" aria-labelledby="tabButton-account" hidden>
+          <div class="member-card">
+            <h2 data-de="Dein Konto" data-en="Your account">Dein Konto</h2>
+            <p id="accountName"></p><p id="accountEmail" class="muted"></p>
+            <p class="form-message" id="accountMessage" role="status" hidden></p>
+            <label class="check-row"><input type="checkbox" id="emailNotifToggle" checked /><span data-de="Training-Erinnerungen per E-Mail" data-en="Training reminders by email">Training-Erinnerungen per E-Mail</span></label>
+            <button type="button" class="primary-btn" id="savePrefsBtn" data-de="Speichern" data-en="Save">Speichern</button>
+            <p class="form-message" id="settingsSaved" role="status" hidden></p>
+            <div class="auth-links"><button type="button" data-auth-view="recovery" data-de="Passwort zurücksetzen" data-en="Reset password">Passwort zurücksetzen</button><button type="button" id="navLogoutBtn" data-de="Abmelden" data-en="Sign out">Abmelden</button></div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <footer class="member-footer"><a href="/" data-de="Zur Vereinsseite" data-en="Club website">Zur Vereinsseite</a><a href="/datenschutz.html" data-de="Datenschutz" data-en="Privacy">Datenschutz</a></footer>
+  <dialog id="sessionOverlay" aria-labelledby="reAuthHeading">
     <div class="auth-card">
-      <div style="text-align:center; margin-bottom:1.5rem;">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gold-lt)" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      </div>
-      <span class="auth-title">SESSION EXPIRED</span>
-      <div class="auth-sub">Please log in again to continue.</div>
-      <div class="auth-divider"></div>
+      <h2 id="reAuthHeading" data-de="Bitte erneut anmelden" data-en="Please sign in again">Bitte erneut anmelden</h2>
       <form id="reAuthForm" novalidate>
-        <div class="field-group">
-          <label class="field-label" for="reAuthEmail">Email</label>
-          <input class="field-input" type="email" id="reAuthEmail" placeholder="Enter your email..." autocomplete="email" />
-        </div>
-        <div class="field-group">
-          <label class="field-label" for="reAuthPassword">Password</label>
-          <input class="field-input" type="password" id="reAuthPassword" placeholder="Enter your password..." autocomplete="current-password" />
-          <div class="field-error" id="reAuthError" role="alert"></div>
-        </div>
-        <button type="submit" class="auth-btn" id="reAuthBtn">Log Back In</button>
+        <div class="field-group"><label for="reAuthEmail" data-de="E-Mail" data-en="Email">E-Mail</label><input type="email" id="reAuthEmail" required autocomplete="email" /></div>
+        <div class="field-group"><label for="reAuthPassword" data-de="Passwort" data-en="Password">Passwort</label><input type="password" id="reAuthPassword" required autocomplete="current-password" aria-describedby="reAuthError" /></div>
+        <p class="field-error" id="reAuthError" role="alert" hidden></p>
+        <button type="submit" class="primary-btn" id="reAuthBtn" data-de="Anmelden" data-en="Sign in">Anmelden</button>
       </form>
-      <div class="auth-footer" style="margin-top:1rem;">
-        <a href="#" id="fullLogoutLink">Use a different account</a>
-      </div>
+      <div class="auth-links"><button type="button" data-auth-view="recovery" data-de="Passwort vergessen?" data-en="Forgot password?">Passwort vergessen?</button><button type="button" id="fullLogoutLink" data-de="Abmelden" data-en="Sign out">Abmelden</button></div>
     </div>
-  </div>
-
-  <script src="/js/member-core.js?v=2" defer></script>
-  <script src="/js/member-auth.js?v=2" defer></script>
-  <script src="/js/member-dashboard.js?v=2" defer></script>
-  <script src="/js/member-training.js?v=2" defer></script>
-  <script src="/js/member-init.js?v=2" defer></script>
+  </dialog>
+  <script src="/js/site-language.js?v=20260912" defer></script>
+  <script src="/js/member-core.js?v=20260912" defer></script>
+  <script src="/js/member-auth.js?v=20260912" defer></script>
+  <script src="/js/league-scoring.js?v=20260912" defer></script>
+  <script src="/js/league-ui.js?v=20260912" defer></script>
+  <script src="/js/member-league.js?v=20260912" defer></script>
+  <script src="/js/member-dashboard.js?v=20260912" defer></script>
+  <script src="/js/member-training.js?v=20260912" defer></script>
+  <script src="/js/member-init.js?v=20260912" defer></script>
 </body>
 </html>

@@ -10,7 +10,8 @@
   "rewrites": [
     { "source": "/member", "destination": "/member.html" },
     { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/dodgeball-wien", "destination": "/dodgeball-wien.html" }
+    { "source": "/dodgeball-wien", "destination": "/dodgeball-wien.html" },
+    { "source": "/jugendtraining-wien", "destination": "/jugendtraining-wien.html" }
   ],
   "headers": [
     {

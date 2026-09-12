@@ -1,7 +1,8 @@
 const { getDb } = require('../../lib/db');
 const { setCors } = require('../../lib/cors');
 const { requireMember } = require('../../lib/auth');
-const { DEFAULT_PLAYERS } = require('../../lib/defaults');
+const { players: seasonOnePlayers } = require('../../data/season-1.json');
+const { rankPlayers } = require('../../js/league-archive');
 
 module.exports = async (req, res) => {
   setCors(req, res, 'GET, PATCH, OPTIONS');
@@ -35,40 +36,33 @@ module.exports = async (req, res) => {
     }
 
     const user = users[0];
-
-    // Fetch rankings (from DB or fallback)
-    let rankings = DEFAULT_PLAYERS;
-    try {
-      const rankRows = await sql`SELECT data FROM rankings_data WHERE id = 1`;
-      if (rankRows.length > 0 && rankRows[0].data) {
-        rankings = rankRows[0].data;
-      }
-    } catch (err) {
-      console.error('Failed to load rankings for stats:', err);
+    const account = {
+      id: user.id,
+      display_name: user.display_name,
+      email: user.email,
+      ranking_player_name: user.ranking_player_name,
+      email_notifications: user.email_notifications !== false,
+      member_since: user.created_at
+    };
+    if (req.query && req.query.view === 'account') {
+      return res.status(200).json({ user: account });
     }
+
+    const rankings = rankPlayers(seasonOnePlayers);
 
     // Match user to their ranking entry
     let stats = null;
     if (user.ranking_player_name) {
-      const sorted = [...rankings].sort((a, b) => (b.points || 0) - (a.points || 0));
-      const idx = sorted.findIndex(
+      const player = rankings.find(
         p => p.name && p.name.toLowerCase() === user.ranking_player_name.toLowerCase()
       );
-      if (idx !== -1) {
-        stats = { ...sorted[idx], rank: idx + 1 };
-      }
+      if (player) stats = { ...player };
     }
 
     return res.status(200).json({
-      user: {
-        id: user.id,
-        display_name: user.display_name,
-        email: user.email,
-        ranking_player_name: user.ranking_player_name,
-        email_notifications: user.email_notifications !== false,
-        member_since: user.created_at
-      },
+      user: account,
       stats,
+      rankings_season: 'Season 1',
       rankings
     });
   } catch (err) {

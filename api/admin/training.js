@@ -2,6 +2,7 @@ const { getDb } = require('../../lib/db');
 const { setCors } = require('../../lib/cors');
 const { requireAdmin } = require('../../lib/auth');
 const { isValidUuid } = require('../../lib/validation');
+const { trainingMutationGuards, leagueTransaction, trainingError } = require('../../lib/league-db');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/;
@@ -24,18 +25,14 @@ module.exports = async (req, res) => {
       const range = req.query.range || 'month';
       const interval = range === 'week' ? '7 days' : '30 days';
       try {
-        // Auto-cleanup: delete sessions older than 1 day past their date
-        await sql`
-          DELETE FROM training_sessions
-          WHERE session_date < (NOW() AT TIME ZONE 'Europe/Vienna')::date - INTERVAL '1 day'
-        `;
+        // GET must not delete sessions: league seasons need persistent training history.
         const sessions = await sql`
           WITH active_count AS (
             SELECT COUNT(*) AS cnt FROM users WHERE is_active = true AND status = 'approved'
           )
           SELECT
             s.id, s.title, s.description, s.location,
-            s.session_date, s.start_time, s.end_time,
+            s.session_date::text AS session_date, s.start_time, s.end_time,
             s.max_capacity, s.is_cancelled, s.recurring_day,
             s.created_at, s.updated_at,
             COUNT(*) FILTER (WHERE ta.status = 'attending') AS attending_count,
@@ -65,7 +62,7 @@ module.exports = async (req, res) => {
 
       try {
         const sessions = await sql`
-          SELECT id, title, description, location, session_date, start_time, end_time,
+          SELECT id, title, description, location, session_date::text AS session_date, start_time, end_time,
                  max_capacity, is_cancelled, recurring_day, created_at, updated_at
           FROM training_sessions WHERE id = ${id}
         `;
@@ -98,7 +95,7 @@ module.exports = async (req, res) => {
     if (view === 'matrix') {
       try {
         const sessions = await sql`
-          SELECT id, title, session_date
+          SELECT id, title, session_date::text AS session_date
           FROM training_sessions
           WHERE session_date >= (NOW() AT TIME ZONE 'Europe/Vienna')::date - INTERVAL '60 days'
           ORDER BY session_date ASC
@@ -170,7 +167,7 @@ module.exports = async (req, res) => {
         const result = await sql`
           INSERT INTO training_sessions (title, description, location, session_date, start_time, end_time, max_capacity)
           VALUES (${title}, ${description || null}, ${location || null}, ${session_date}, ${start_time}, ${end_time}, ${max_capacity || null})
-          RETURNING id, title, description, location, session_date, start_time, end_time, max_capacity, is_cancelled, recurring_day, created_at, updated_at
+          RETURNING id, title, description, location, session_date::text AS session_date, start_time, end_time, max_capacity, is_cancelled, recurring_day, created_at, updated_at
         `;
         console.log('[AUDIT]', { action: 'create_session', resourceId: result[0].id, timestamp: new Date().toISOString() });
         return res.status(201).json({ session: result[0] });
@@ -189,7 +186,9 @@ module.exports = async (req, res) => {
       if (start_time !== undefined && !TIME_RE.test(start_time)) return res.status(400).json({ error: 'start_time must be HH:MM format', code: 'VALIDATION_ERROR' });
       if (end_time !== undefined && !TIME_RE.test(end_time)) return res.status(400).json({ error: 'end_time must be HH:MM format', code: 'VALIDATION_ERROR' });
       try {
-        const result = await sql`
+        const transaction = await leagueTransaction(sql, [
+          ...trainingMutationGuards(sql, id, session_date),
+          sql`
           UPDATE training_sessions SET
             title = COALESCE(${title !== undefined ? title : null}, title),
             description = COALESCE(${description !== undefined ? description : null}, description),
@@ -200,12 +199,14 @@ module.exports = async (req, res) => {
             max_capacity = COALESCE(${max_capacity !== undefined ? max_capacity : null}, max_capacity),
             updated_at = NOW()
           WHERE id = ${id}
-          RETURNING id, title, description, location, session_date, start_time, end_time, max_capacity, is_cancelled, recurring_day, created_at, updated_at
-        `;
+          RETURNING id, title, description, location, session_date::text AS session_date, start_time, end_time, max_capacity, is_cancelled, recurring_day, created_at, updated_at
+        `]);
+        const result = transaction[transaction.length - 1];
         if (result.length === 0) return res.status(404).json({ error: 'Session not found', code: 'NOT_FOUND' });
         console.log('[AUDIT]', { action: 'update_session', resourceId: result[0].id, timestamp: new Date().toISOString() });
         return res.status(200).json({ session: result[0] });
       } catch (err) {
+        if (trainingError(err, res)) return;
         console.error('Failed to update session:', err);
         return res.status(500).json({ error: 'Failed to update session', code: 'SERVER_ERROR' });
       }
@@ -217,15 +218,19 @@ module.exports = async (req, res) => {
       if (!id) return res.status(400).json({ error: 'Session id required', code: 'VALIDATION_ERROR' });
       if (!isValidUuid(id)) return res.status(400).json({ error: 'Invalid session id format', code: 'VALIDATION_ERROR' });
       try {
-        const result = await sql`
+        const transaction = await leagueTransaction(sql, [
+          ...trainingMutationGuards(sql, id, undefined, true),
+          sql`
           UPDATE training_sessions SET is_cancelled = true, updated_at = NOW()
           WHERE id = ${id}
-          RETURNING id, title, description, location, session_date, start_time, end_time, max_capacity, is_cancelled, recurring_day, created_at, updated_at
-        `;
+          RETURNING id, title, description, location, session_date::text AS session_date, start_time, end_time, max_capacity, is_cancelled, recurring_day, created_at, updated_at
+        `]);
+        const result = transaction[transaction.length - 1];
         if (result.length === 0) return res.status(404).json({ error: 'Session not found', code: 'NOT_FOUND' });
         console.log('[AUDIT]', { action: 'cancel_session', resourceId: result[0].id, timestamp: new Date().toISOString() });
         return res.status(200).json({ session: result[0] });
       } catch (err) {
+        if (trainingError(err, res)) return;
         console.error('Failed to cancel session:', err);
         return res.status(500).json({ error: 'Failed to cancel session', code: 'SERVER_ERROR' });
       }
@@ -276,7 +281,7 @@ module.exports = async (req, res) => {
             ${day}::int,
             ${max_capacity || null}::int
           FROM unnest(${datesToInsert}::text[]) AS d
-          RETURNING id, title, description, location, session_date, start_time, end_time, max_capacity, is_cancelled, recurring_day, created_at, updated_at
+          RETURNING id, title, description, location, session_date::text AS session_date, start_time, end_time, max_capacity, is_cancelled, recurring_day, created_at, updated_at
         `;
 
         console.log('[AUDIT]', { action: 'generate_sessions', resourceId: sessions.map(s => s.id), timestamp: new Date().toISOString() });
@@ -297,11 +302,16 @@ module.exports = async (req, res) => {
     if (!isValidUuid(id)) return res.status(400).json({ error: 'Invalid session id format', code: 'VALIDATION_ERROR' });
 
     try {
-      const result = await sql`DELETE FROM training_sessions WHERE id = ${id} RETURNING id`;
+      const transaction = await leagueTransaction(sql, [
+        ...trainingMutationGuards(sql, id, undefined, false, true),
+        sql`DELETE FROM training_sessions WHERE id = ${id} RETURNING id`,
+      ]);
+      const result = transaction[transaction.length - 1];
       if (result.length === 0) return res.status(404).json({ error: 'Session not found', code: 'NOT_FOUND' });
       console.log('[AUDIT]', { action: 'delete_session', resourceId: id, timestamp: new Date().toISOString() });
       return res.status(200).json({ success: true });
     } catch (err) {
+      if (trainingError(err, res)) return;
       console.error('Failed to delete session:', err);
       return res.status(500).json({ error: 'Failed to delete session', code: 'SERVER_ERROR' });
     }

@@ -1,258 +1,176 @@
-/* ═══════════════════════════════════════
-   TRAINING CALENDAR
-═══════════════════════════════════════ */
 const attendeeCache = {};
+const trainingErrors = {};
+let trainingRequest = 0;
+let trainingLoading = false;
 
 async function loadTrainingSessions() {
-  const loading = document.getElementById('trainingLoading');
-  const list = document.getElementById('trainingList');
-  const empty = document.getElementById('trainingEmpty');
-  const nudge = document.getElementById('trainingNudge');
-
-  loading.style.display = '';
-  list.innerHTML = '';
-  empty.style.display = 'none';
-  nudge.style.display = 'none';
-
+  const request = ++trainingRequest;
+  const epoch = memberEpoch;
+  trainingLoading = true;
+  byId('trainingLoading').hidden = false;
+  byId('trainingEmpty').hidden = true;
   try {
-    const res = await api('/api/training?view=upcoming');
-    if (!res.ok) throw new Error('Failed to load sessions');
-    const data = await res.json();
-    trainingSessions = data.sessions || [];
+    const response = await api('/api/training?view=upcoming', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Training request failed');
+    const data = await response.json();
+    if (request !== trainingRequest || epoch !== memberEpoch || !currentUser) return;
+    if (!Array.isArray(data.sessions)) throw new Error('Missing training sessions');
+    trainingSessions = data.sessions;
     trainingLoaded = true;
-    loading.style.display = 'none';
     renderTrainingSessions();
-  } catch (err) {
-    loading.style.display = 'none';
-    if (err.message === 'SESSION_EXPIRED') return;
-    list.innerHTML = '<div class="training-empty">Failed to load training sessions.</div>';
+    renderOtherMemberEvents();
+  } catch (error) {
+    if (request !== trainingRequest || epoch !== memberEpoch || error.message === 'SESSION_EXPIRED') return;
+    console.error('Member training load failed:', error);
+    byId('trainingList').innerHTML = `<p class="member-error" role="alert">${mt('Trainings konnten nicht geladen werden.', 'Training could not be loaded.')}</p><button type="button" class="text-button" data-training-refresh>${mt('Erneut versuchen', 'Try again')}</button>`;
+  } finally {
+    if (request === trainingRequest) {
+      trainingLoading = false;
+      byId('trainingLoading').hidden = true;
+    }
   }
+}
+
+function sessionIsLocked(session) {
+  return session.rsvp_locked === true || ['published', 'finalized'].includes(session.league_status) || !!publishedEventForSession(session.id);
+}
+
+function canRsvpToSession(session) {
+  return !session.is_cancelled && !sessionIsLocked(session) && String(session.session_date).slice(0, 10) >= viennaNow().date;
 }
 
 function renderTrainingSessions() {
-  const list = document.getElementById('trainingList');
-  const empty = document.getElementById('trainingEmpty');
-  const nudge = document.getElementById('trainingNudge');
-
-  if (trainingSessions.length === 0) {
-    list.innerHTML = '';
-    empty.style.display = '';
-    nudge.style.display = 'none';
-    return;
+  const list = byId('trainingList');
+  const focus = document.activeElement && document.activeElement.dataset;
+  const focusSession = focus && focus.rsvpSession;
+  const focusStatus = focus && focus.rsvpStatus;
+  list.innerHTML = trainingSessions.map(renderSessionCard).join('');
+  byId('trainingEmpty').hidden = trainingSessions.length !== 0;
+  if (focusSession) {
+    const button = Array.from(list.querySelectorAll('[data-rsvp-session]')).find(element =>
+      element.dataset.rsvpSession === focusSession && element.dataset.rsvpStatus === focusStatus);
+    if (button && !button.disabled) button.focus({ preventScroll: true });
   }
-  empty.style.display = 'none';
-
-  // Count sessions needing response (future, not cancelled, no RSVP)
-  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Vienna' });
-  const pending = trainingSessions.filter(s =>
-    !s.is_cancelled && s.session_date >= today && (!s.my_status || s.my_status === 'pending')
-  );
-  if (pending.length > 0) {
-    document.getElementById('nudgeText').textContent =
-      pending.length === 1
-        ? 'You have 1 session awaiting your response.'
-        : `You have ${pending.length} sessions awaiting your response.`;
-    nudge.style.display = '';
-  } else {
-    nudge.style.display = 'none';
-  }
-
-  list.innerHTML = trainingSessions.map(s => renderSessionCard(s)).join('');
 }
 
-function renderSessionCard(s) {
-  const dateOnly = typeof s.session_date === 'string' ? s.session_date.slice(0, 10) : s.session_date.toISOString().slice(0, 10);
-  const d = new Date(dateOnly + 'T00:00:00');
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const dateStr = `${dayNames[d.getDay()]} ${d.getDate()} ${monthNames[d.getMonth()]}`;
-
-  const startTime = formatTime(s.start_time);
-  const endTime = formatTime(s.end_time);
-
-  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Vienna' });
-  const isPast = s.session_date < today;
-  const isCancelled = s.is_cancelled;
-  const canRsvp = !isPast && !isCancelled;
-
-  const attending = parseInt(s.attending_count) || 0;
-  const notAttending = parseInt(s.not_attending_count) || 0;
-  const myStatus = s.my_status || 'pending';
-
-  const cardClass = isCancelled ? 'session-card cancelled' : 'session-card';
-
-  let rsvpHtml = '';
-  if (canRsvp) {
-    rsvpHtml = `
-      <div class="rsvp-buttons">
-        <button class="rsvp-btn rsvp-attending${myStatus === 'attending' ? ' active' : ''}"
-                data-rsvp-session="${escapeHtml(s.id)}" data-rsvp-status="attending"
-                ${myStatus === 'attending' ? 'aria-pressed="true"' : 'aria-pressed="false"'}>
-          Attending
-        </button>
-        <button class="rsvp-btn rsvp-not-attending${myStatus === 'not_attending' ? ' active' : ''}"
-                data-rsvp-session="${escapeHtml(s.id)}" data-rsvp-status="not_attending"
-                ${myStatus === 'not_attending' ? 'aria-pressed="true"' : 'aria-pressed="false"'}>
-          Not Attending
-        </button>
-      </div>`;
-  } else if (isPast && !isCancelled) {
-    if (myStatus === 'attending') {
-      rsvpHtml = '<div style="font-size:0.78rem; color:#4ADE80; font-weight:600;">You attended</div>';
-    } else if (myStatus === 'not_attending') {
-      rsvpHtml = '<div style="font-size:0.78rem; color:#F87171; font-weight:600;">You did not attend</div>';
-    }
-  }
-
-  const locationHtml = s.location
-    ? `<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${escapeHtml(s.location)}</span>`
-    : '';
-
-  return `
-    <div class="${cardClass}" data-session-id="${s.id}">
-      <div class="session-date-badge">${escapeHtml(dateStr)}</div>
-      <div class="session-title">${escapeHtml(s.title)}</div>
-      <div class="session-meta">
-        <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ${startTime} \u2013 ${endTime}</span>
-        ${locationHtml}
-      </div>
-      ${!isCancelled ? `
-        <div class="session-counts">
-          <span class="count-attending">${attending} attending</span>
-          <span class="count-not">${notAttending} not attending</span>
-        </div>
-        ${rsvpHtml}
-        <div class="session-attendees">
-          <button class="attendees-toggle" data-attendees-session="${escapeHtml(s.id)}">${isPast ? 'Show who attended' : 'Show who\u2019s coming'}</button>
-          <div class="attendees-list" id="attendees-${s.id}"></div>
-        </div>
-      ` : ''}
+function renderSessionCard(session) {
+  const id = String(session.id);
+  const date = String(session.session_date).slice(0, 10);
+  const published = publishedEventForSession(id);
+  const locked = sessionIsLocked(session);
+  const status = session.my_status || 'pending';
+  const assignedWithoutRsvp = status !== 'attending' && !!memberEventForSession(id);
+  const attending = Number(session.attending_count) || 0;
+  const capacity = Number(session.max_capacity);
+  const full = capacity > 0 && attending >= capacity && status !== 'attending';
+  let rsvp = '';
+  if (canRsvpToSession(session)) {
+    rsvp = `<div class="rsvp-buttons">
+      <button type="button" class="rsvp-btn rsvp-attending${status === 'attending' ? ' active' : ''}" data-rsvp-session="${escapeHtml(id)}" data-rsvp-status="attending" aria-pressed="${status === 'attending'}"${rsvpInFlight.has(id) || full ? ' disabled' : ''}>${full ? mt('Ausgebucht', 'Full') : mt('Dabei', 'Going')}</button>
+      <button type="button" class="rsvp-btn rsvp-not-attending${status === 'not_attending' ? ' active' : ''}" data-rsvp-session="${escapeHtml(id)}" data-rsvp-status="not_attending" aria-pressed="${status === 'not_attending'}"${rsvpInFlight.has(id) ? ' disabled' : ''}>${mt('Nicht dabei', 'Not going')}</button>
     </div>`;
+  } else if (session.is_cancelled) {
+    rsvp = `<p class="rsvp-notice">${mt('Abgesagt', 'Cancelled')}</p>`;
+  } else if (locked) {
+    rsvp = `<p class="rsvp-notice">${mt('Teams veröffentlicht. Änderungen nur über den', 'Teams published. For changes contact the')} <a href="mailto:imperialsdodgeball@gmail.com">Club</a>.</p>`;
+    if (!published) rsvp += `<p class="league-copy">${mt('Teamdaten noch nicht geladen.', 'Team details not loaded yet.')}</p><button type="button" class="text-button" data-member-league-refresh>${mt('Teams laden', 'Load teams')}</button>`;
+  }
+  return `<article class="session-card${session.is_cancelled ? ' cancelled' : ''}" data-session-id="${escapeHtml(id)}">
+    <p class="session-date-badge">${escapeHtml(new Date(date + 'T12:00:00Z').toLocaleDateString(memberLang() === 'de' ? 'de-AT' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Vienna' }))}</p>
+    <h3 class="session-title">${escapeHtml(session.title)}</h3>
+    <div class="session-meta"><span>${escapeHtml(formatTime(session.start_time))}${session.end_time ? ' – ' + escapeHtml(formatTime(session.end_time)) : ''}</span>${session.location ? `<span>${escapeHtml(session.location)}</span>` : ''}</div>
+    ${!session.is_cancelled ? `<div class="session-counts"><span>${attending}${capacity > 0 ? '/' + capacity : ''} ${mt(attending === 1 ? 'Zusage' : 'Zusagen', attending === 1 ? 'RSVP' : 'RSVPs')}</span>
+      <span class="rsvp-status" role="status">${assignedWithoutRsvp ? mt('Im Team eingeplant', 'Assigned to a team') : status === 'attending' ? mt('Du bist dabei', 'You’re going') : status === 'not_attending' ? mt('Du bist nicht dabei', 'You’re not going') : mt('Noch keine Antwort', 'No response yet')}</span></div>` : ''}
+    ${rsvp}
+    ${trainingErrors[id] ? `<p class="member-error" role="alert">${escapeHtml(mt(trainingErrors[id].de, trainingErrors[id].en))}</p>` : ''}
+    ${!session.is_cancelled && published ? renderMemberEvent(published) : ''}
+    ${!session.is_cancelled ? `<button type="button" class="attendees-toggle" data-attendees-session="${escapeHtml(id)}" aria-expanded="false" aria-controls="attendees-${escapeHtml(id)}">${mt('Wer ist dabei?', 'Who’s going?')}</button>
+      <div class="attendees-list" id="attendees-${escapeHtml(id)}" hidden></div>` : ''}
+  </article>`;
 }
 
 async function handleRsvp(sessionId, status) {
-  // Debounce: prevent double-clicks while request is in flight
-  if (rsvpInFlight.has(sessionId)) return;
-  rsvpInFlight.add(sessionId);
-
-  // Disable buttons while in flight
-  const card = document.querySelector(`[data-session-id="${sessionId}"]`);
-  if (card) card.querySelectorAll('.rsvp-btn').forEach(b => b.disabled = true);
-
-  // Optimistic UI update
-  const session = trainingSessions.find(s => s.id === sessionId);
-  if (!session) { rsvpInFlight.delete(sessionId); return; }
-
-  const oldStatus = session.my_status;
-  const oldAttending = parseInt(session.attending_count) || 0;
-  const oldNot = parseInt(session.not_attending_count) || 0;
-
-  // Update counts optimistically
-  session.my_status = status;
-  if (status === 'attending') {
-    session.attending_count = oldAttending + (oldStatus !== 'attending' ? 1 : 0);
-    session.not_attending_count = oldNot - (oldStatus === 'not_attending' ? 1 : 0);
-  } else {
-    session.not_attending_count = oldNot + (oldStatus !== 'not_attending' ? 1 : 0);
-    session.attending_count = oldAttending - (oldStatus === 'attending' ? 1 : 0);
-  }
+  const id = String(sessionId);
+  const session = trainingSessions.find(item => String(item.id) === id);
+  if (!session || !['attending', 'not_attending'].includes(status) || rsvpInFlight.has(id)
+    || !canRsvpToSession(session) || session.my_status === status) return;
+  const epoch = memberEpoch;
+  rsvpInFlight.add(id);
+  delete trainingErrors[id];
   renderTrainingSessions();
-
   try {
-    const res = await api('/api/training', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'rsvp', session_id: sessionId, status }),
+    const response = await api('/api/training', {
+      method: 'POST', body: JSON.stringify({ action: 'rsvp', session_id: id, status })
     });
-    if (!res.ok) throw new Error('RSVP failed');
-    const data = await res.json();
-    // Apply server counts
-    session.my_status = data.my_status;
-    session.attending_count = data.attending_count;
-    session.not_attending_count = data.not_attending_count;
-    delete attendeeCache[sessionId];
-    renderTrainingSessions();
-  } catch (err) {
-    if (err.message === 'SESSION_EXPIRED') return;
-    // Revert on failure
-    session.my_status = oldStatus;
-    session.attending_count = oldAttending;
-    session.not_attending_count = oldNot;
-    renderTrainingSessions();
-  } finally {
-    rsvpInFlight.delete(sessionId);
-  }
-}
-
-function getAttendeesToggleText(sessionId) {
-  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Vienna' });
-  const session = trainingSessions.find(s => s.id === sessionId);
-  return (session && session.session_date < today) ? 'Show who attended' : 'Show who\u2019s coming';
-}
-
-async function toggleAttendees(btn, sessionId) {
-  const listEl = document.getElementById('attendees-' + sessionId);
-  if (!listEl) return;
-
-  if (listEl.classList.contains('open')) {
-    listEl.classList.remove('open');
-    btn.textContent = getAttendeesToggleText(sessionId);
-    return;
-  }
-
-  // Check cache first
-  if (attendeeCache[sessionId]) {
-    renderAttendeeList(listEl, btn, attendeeCache[sessionId], sessionId);
-    return;
-  }
-
-  btn.textContent = 'Loading...';
-  try {
-    const res = await api('/api/training?view=session&id=' + sessionId);
-    if (!res.ok) throw new Error('Failed');
-    const data = await res.json();
-    attendeeCache[sessionId] = data.attendees;
-    renderAttendeeList(listEl, btn, data.attendees, sessionId);
-  } catch (err) {
-    if (err.message === 'SESSION_EXPIRED') return;
-    btn.textContent = getAttendeesToggleText(sessionId);
-  }
-}
-
-function renderAttendeeList(listEl, btn, attendees, sessionId) {
-  const attending = attendees.filter(a => a.status === 'attending');
-  const notAttending = attendees.filter(a => a.status === 'not_attending');
-
-  let html = '';
-  if (attending.length > 0) {
-    html += `<div class="attendees-label att-yes">Attending (${attending.length})</div>`;
-    html += attending.map(a => escapeHtml(a.display_name)).join(', ');
-  }
-  if (notAttending.length > 0) {
-    html += `<div class="attendees-label att-no" style="margin-top:8px;">Not Attending (${notAttending.length})</div>`;
-    html += notAttending.map(a => escapeHtml(a.display_name)).join(', ');
-  }
-  if (!html) {
-    html = '<div style="color:rgba(244,247,255,0.3); font-size:0.8rem;">No responses yet.</div>';
-  }
-
-  listEl.innerHTML = html;
-  listEl.classList.add('open');
-  btn.textContent = 'Hide attendees';
-}
-
-/* Event delegation for RSVP buttons and attendee toggles */
-(function setupTrainingDelegation() {
-  const list = document.getElementById('trainingList');
-  if (!list) return;
-  list.addEventListener('click', function(e) {
-    const rsvpBtn = e.target.closest('[data-rsvp-session]');
-    if (rsvpBtn) {
-      handleRsvp(rsvpBtn.dataset.rsvpSession, rsvpBtn.dataset.rsvpStatus);
+    const data = await response.json();
+    if (epoch !== memberEpoch) return;
+    if (!response.ok) {
+      trainingErrors[id] = response.status === 409
+        ? { de: 'Die Anmeldung wurde gesperrt. Teams werden aktualisiert.', en: 'Registration is locked. Updating teams.' }
+        : response.status === 403
+          ? { de: 'Dein Konto ist nicht freigeschaltet. Bitte kontaktiere den Club.', en: 'Your account is not approved. Please contact the club.' }
+          : { de: 'Antwort nicht gespeichert. Das Training kann voll oder gesperrt sein. Bitte aktualisieren.', en: 'Response not saved. Training may be full or locked. Please refresh.' };
+      if (response.status === 409) {
+        session.rsvp_locked = true;
+        loadMemberLeague();
+      }
       return;
     }
-    const attBtn = e.target.closest('[data-attendees-session]');
-    if (attBtn) {
-      toggleAttendees(attBtn, attBtn.dataset.attendeesSession);
+    const latest = trainingSessions.find(item => String(item.id) === id);
+    if (latest) {
+      latest.my_status = data.my_status;
+      latest.attending_count = data.attending_count;
+      latest.not_attending_count = data.not_attending_count;
     }
-  });
-})();
+    delete attendeeCache[id];
+  } catch (error) {
+    if (epoch !== memberEpoch || error.message === 'SESSION_EXPIRED') return;
+    console.error('Member RSVP failed:', error);
+    trainingErrors[id] = { de: 'Antwort nicht bestätigt. Bitte aktualisieren und erneut versuchen.', en: 'Response not confirmed. Please refresh and try again.' };
+  } finally {
+    if (epoch === memberEpoch) {
+      rsvpInFlight.delete(id);
+      renderTrainingSessions();
+      const button = Array.from(byId('trainingList').querySelectorAll('[data-rsvp-session]')).find(element =>
+        element.dataset.rsvpSession === id && element.dataset.rsvpStatus === status);
+      if (button && !button.disabled) button.focus({ preventScroll: true });
+    }
+  }
+}
+
+async function toggleAttendees(button, sessionId) {
+  const list = byId('attendees-' + sessionId);
+  if (!list) return;
+  if (!list.hidden) {
+    list.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+    button.textContent = mt('Wer ist dabei?', 'Who’s going?');
+    return;
+  }
+  const epoch = memberEpoch;
+  button.disabled = true;
+  button.textContent = mt('Wird geladen …', 'Loading …');
+  try {
+    if (!attendeeCache[sessionId]) {
+      const response = await api('/api/training?view=session&id=' + encodeURIComponent(sessionId), { cache: 'no-store' });
+      if (!response.ok) throw new Error('Attendees request failed');
+      const data = await response.json();
+      if (epoch !== memberEpoch) return;
+      if (!Array.isArray(data.attendees)) throw new Error('Missing attendees');
+      attendeeCache[sessionId] = data.attendees;
+    }
+    if (epoch !== memberEpoch) return;
+    const names = attendeeCache[sessionId].filter(person => person.status === 'attending').map(person => escapeHtml(person.display_name));
+    list.innerHTML = names.length ? names.join(' · ') : mt('Noch keine Zusagen.', 'No one has RSVP’d yet.');
+    list.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    button.textContent = mt('Ausblenden', 'Hide attendees');
+  } catch (error) {
+    if (epoch !== memberEpoch || error.message === 'SESSION_EXPIRED') return;
+    console.error('Member attendees load failed:', error);
+    list.innerHTML = `<p class="member-error" role="alert">${mt('Teilnehmende konnten nicht geladen werden. Bitte erneut versuchen.', 'Attendees could not be loaded. Please try again.')}</p>`;
+    list.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    button.textContent = mt('Ausblenden', 'Hide attendees');
+  } finally { button.disabled = false; }
+}

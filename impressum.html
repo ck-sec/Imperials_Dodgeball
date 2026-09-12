@@ -10,9 +10,7 @@
   <title>Impressum — Vienna Imperials</title>
   <meta name="description" content="Impressum der Vienna Imperials — Pflichtangaben, Vereinsdaten und Haftungsausschluss. Legal notice for Vienna's premier dodgeball club." />
   <link rel="canonical" href="https://www.imperialsdodgeball.com/impressum.html" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
@@ -248,12 +246,19 @@
       .nav-back { font-size: 0.75rem; }
     }
   </style>
+  <link rel="stylesheet" href="/public-ui.css?v=20260912" />
+  <script src="/js/site-language.js?v=20260912" defer></script>
+  <script src="/js/site-lang.js?v=20260912" defer></script>
 </head>
 <body>
 
   <nav class="nav">
     <a href="/" class="nav-logo">Vienna <span>Imperials</span></a>
     <a href="/" class="nav-back">&#8592; Zurück / Back to Main Site</a>
+    <div class="site-language" role="group" aria-label="Sprache / Language">
+      <button type="button" data-site-language="de" aria-pressed="true" lang="de">DE</button>
+      <button type="button" data-site-language="en" aria-pressed="false" lang="en">EN</button>
+    </div>
   </nav>
 
   <div class="container">

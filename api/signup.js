@@ -83,7 +83,10 @@ module.exports = async (req, res) => {
   try {
     // Ensure the signups table exists (cached after first call)
     if (!_tableReady) {
-      _tableReady = ensureSignupsTable();
+      _tableReady = ensureSignupsTable().catch(error => {
+        _tableReady = null;
+        throw error;
+      });
     }
     await _tableReady;
 
@@ -105,7 +108,7 @@ module.exports = async (req, res) => {
     // Insert signup into database
     await sql`
       INSERT INTO signups (name, email, type, level, source)
-      VALUES (${safeName}, ${trimmedEmail}, ${type}, ${safeLevel || null}, ${safeSource || null})
+      VALUES (${safeName}, ${trimmedEmail}, ${'join'}, ${safeLevel || null}, ${safeSource || null})
     `;
 
     // Send confirmation email (non-blocking — failure should not break signup)
@@ -122,22 +125,27 @@ module.exports = async (req, res) => {
       });
 
       // Log the email for GDPR audit trail
-      if (!_emailLogReady) _emailLogReady = ensureEmailLogTable();
+      if (!_emailLogReady) {
+        _emailLogReady = ensureEmailLogTable().catch(error => {
+          _emailLogReady = null;
+          throw error;
+        });
+      }
       await _emailLogReady;
       await sql`
         INSERT INTO email_log (recipient_email, email_type, subject, status, resend_id)
         VALUES (${trimmedEmail}, 'signup_confirm',
                 ${template.subject}, 'sent', ${result?.data?.id || null})
       `.catch(() => {}); // Don't fail if logging fails
-    } catch (emailErr) {
-      console.error('Failed to send confirmation email:', emailErr.message);
+    } catch {
+      console.error('Failed to send confirmation email');
       // Email failure is non-critical — signup still succeeds
     }
 
     const message = "Thanks for signing up! We'll be in touch. / Danke! Wir melden uns bald.";
     return res.status(200).json({ success: true, message });
-  } catch (err) {
-    console.error('Could not save signup:', err);
+  } catch {
+    console.error('Could not save signup');
     return res.status(500).json({ error: 'Could not save signup', code: 'SERVER_ERROR' });
   }
 };

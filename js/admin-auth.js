@@ -40,6 +40,7 @@ function switchAdminDashTab(tab, btn) {
   // Load data for tab on first visit
   if (tab === 'members') loadPendingMembers();
   if (tab === 'training') loadAdminTrainingSessions();
+  if (tab === 'league') loadAdminLeague();
   if (tab === 'rankings') { loadPlayersFromAPI().then(render); }
 }
 
@@ -122,4 +123,5 @@ document.addEventListener('keydown', e => {
 });
 
 /* ── Boot ── */
-updateAdminUI();
+// Session restoration needs the dashboard modules loaded by later deferred scripts.
+document.addEventListener('DOMContentLoaded', updateAdminUI, { once: true });

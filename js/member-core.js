@@ -1,204 +1,161 @@
-/* ═══════════════════════════════════════
-   STATE
-═══════════════════════════════════════ */
 let currentUser = null;
-let rankingsData = [];
-let lbFilter = 'all';
-let lbSort = { key: 'points', asc: false };
-let activeTab = 'stats';
-let lbVisible = 25;
+let currentView = 'login';
+let activeTab = 'training';
+let memberEpoch = 0;
 let trainingSessions = [];
 let trainingLoaded = false;
+let refreshPromise = null;
 const rsvpInFlight = new Set();
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/* ═══════════════════════════════════════
-   API HELPER
-═══════════════════════════════════════ */
-async function api(url, opts = {}) {
-  const options = {
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    ...opts,
-  };
-  const res = await fetch(url, options);
-
-  // Try silent refresh on 401
-  if (res.status === 401 && !opts._retried) {
-    const refreshed = await silentRefresh();
-    if (refreshed) {
-      return api(url, { ...opts, _retried: true });
-    }
-    if (!opts._suppressExpired) showSessionExpired();
-    throw new Error('SESSION_EXPIRED');
-  }
-
-  return res;
+function memberLang() { return window.SiteLanguage.get(); }
+function mt(de, en) { return memberLang() === 'de' ? de : en; }
+function byId(id) { return document.getElementById(id); }
+function escapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
+}
+function formatTime(value) { return value ? String(value).slice(0, 5) : ''; }
+function viennaNow(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Vienna', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(now);
+  const part = name => parts.find(item => item.type === name).value;
+  return { date: `${part('year')}-${part('month')}-${part('day')}`, minutes: Number(part('hour')) * 60 + Number(part('minute')) };
+}
+function setMessage(id, de, en, error = false) {
+  const element = byId(id);
+  element.dataset.de = de;
+  element.dataset.en = en;
+  element.textContent = mt(de, en);
+  element.hidden = false;
+  element.classList.toggle('member-error', error);
+}
+function applyMemberLanguage() {
+  document.querySelectorAll('[data-de][data-en]').forEach(element => {
+    element.textContent = element.dataset[memberLang()];
+  });
+  document.title = mt('Mitglieder', 'Members') + ' — Vienna Imperials';
+  document.querySelectorAll('.password-toggle').forEach(button => {
+    const visible = byId(button.getAttribute('aria-controls')).type === 'text';
+    button.textContent = visible ? mt('Verbergen', 'Hide') : mt('Zeigen', 'Show');
+  });
 }
 
-let refreshPromise = null;
+async function api(url, opts = {}) {
+  const epoch = memberEpoch;
+  const { _retried, _suppressExpired, ...request } = opts;
+  const response = await fetch(url, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...request });
+  if (epoch !== memberEpoch) throw new Error('STALE_REQUEST');
+  if (response.status !== 401) return response;
+  const refreshed = !_retried && await silentRefresh();
+  if (epoch !== memberEpoch) throw new Error('STALE_REQUEST');
+  if (refreshed) return api(url, { ...opts, _retried: true });
+  if (!_suppressExpired && currentView === 'dashboard') showSessionExpired();
+  throw new Error('SESSION_EXPIRED');
+}
 
 async function silentRefresh() {
   if (refreshPromise) return refreshPromise;
-  refreshPromise = (async () => {
-    try {
-      const res = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) currentUser = data.user;
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
-    } finally {
-      refreshPromise = null;
-    }
+  const epoch = memberEpoch;
+  const pending = (async () => {
+    const response = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+    if (response.status === 401 || response.status === 403) return false;
+    if (!response.ok) throw new Error('REFRESH_UNAVAILABLE');
+    const data = await response.json();
+    if (epoch !== memberEpoch) return false;
+    if (data.user) currentUser = data.user;
+    return true;
   })();
-  return refreshPromise;
+  refreshPromise = pending;
+  try { return await pending; }
+  finally { if (refreshPromise === pending) refreshPromise = null; }
 }
 
-/* ═══════════════════════════════════════
-   VIEW SWITCHING
-═══════════════════════════════════════ */
 function showView(view) {
-  document.body.classList.remove('nav-open');
-  document.getElementById('loginView').style.display = view === 'login' ? '' : 'none';
-  document.getElementById('registerView').style.display = view === 'register' ? '' : 'none';
-  document.getElementById('pendingView').style.display = view === 'pending' ? '' : 'none';
-  document.getElementById('dashboardView').classList.toggle('active', view === 'dashboard');
-
-  // Nav state
-  document.querySelectorAll('.nav-guest').forEach(el => el.style.display = view === 'dashboard' ? 'none' : '');
-  document.querySelectorAll('.nav-member').forEach(el => el.style.display = view === 'dashboard' ? '' : 'none');
-
-  if (view === 'login') setTimeout(() => document.getElementById('loginEmail').focus(), 60);
-  if (view === 'register') setTimeout(() => document.getElementById('regName').focus(), 60);
-}
-
-function updateNavUser() {
-  if (currentUser) {
-    document.getElementById('navMemberName').textContent = currentUser.display_name;
+  if (currentView === 'reset' && view !== 'reset') {
+    window.MemberRecovery.clear();
+    byId('resetPassword').value = '';
+    byId('resetConfirm').value = '';
   }
+  currentView = view;
+  ['login', 'register', 'pending', 'recovery', 'reset', 'dashboard'].forEach(name => {
+    byId(name + 'View').hidden = name !== view;
+  });
+  const dialog = byId('sessionOverlay');
+  if (dialog.open) dialog.close();
+  const focus = { login: 'loginEmail', register: 'regName', pending: 'pendingHeading', recovery: 'recoveryEmail', reset: 'resetPassword' }[view];
+  if (focus) byId(focus).focus();
 }
 
-/* ═══════════════════════════════════════
-   TAB NAVIGATION
-═══════════════════════════════════════ */
-function switchTab(tab) {
+function switchTab(tab, focus = false) {
+  if (!['training', 'league', 'account'].includes(tab)) tab = 'training';
   activeTab = tab;
-  document.querySelectorAll('.dash-tab').forEach(btn => {
-    const isActive = btn.dataset.tab === tab;
-    btn.classList.toggle('active', isActive);
-    btn.setAttribute('aria-selected', isActive);
+  document.querySelectorAll('.dash-tab').forEach(button => {
+    const selected = button.dataset.tab === tab;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    if (selected && focus) button.focus();
   });
-  document.querySelectorAll('.tab-panel').forEach(panel => {
-    panel.style.display = panel.id === 'tab-' + tab ? 'block' : 'none';
-  });
-  // Lazy-load training data on first visit
-  if (tab === 'training' && !trainingLoaded) {
-    loadTrainingSessions();
-  }
+  document.querySelectorAll('.tab-panel').forEach(panel => { panel.hidden = panel.id !== 'tab-' + tab; });
+  if (tab === 'training' && !trainingLoaded && !trainingLoading) loadTrainingSessions();
 }
 
-/* ═══════════════════════════════════════
-   VALIDATION
-═══════════════════════════════════════ */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function showFieldError(id, msg) {
-  const el = document.getElementById(id);
-  el.textContent = msg;
-  el.classList.add('show');
-  const input = el.previousElementSibling;
-  if (input && (input.classList.contains('field-input') || input.classList.contains('password-wrap'))) {
-    const inp = input.classList.contains('password-wrap') ? input.querySelector('.field-input') : input;
-    inp.classList.add('error');
-  }
+function clearErrors(formId) {
+  const form = byId(formId);
+  form.querySelectorAll('.field-error').forEach(element => { element.hidden = true; });
+  form.querySelectorAll('[aria-invalid]').forEach(element => element.removeAttribute('aria-invalid'));
+}
+function fieldError(id, de, en, inputId) {
+  setMessage(id, de, en, true);
+  if (inputId) byId(inputId).setAttribute('aria-invalid', 'true');
+}
+function focusInvalid(formId) {
+  const input = byId(formId).querySelector('[aria-invalid="true"]');
+  if (input) input.focus();
+}
+function validPassword(value) {
+  return value.length >= 8 && value.length <= 128 && /[a-z]/i.test(value) && /\d/.test(value);
+}
+function setBusy(id, busy) {
+  const button = byId(id);
+  button.disabled = busy;
+  button.setAttribute('aria-busy', String(busy));
+}
+function togglePasswordVisibility(button) {
+  const input = byId(button.getAttribute('aria-controls'));
+  const visible = input.type === 'password';
+  input.type = visible ? 'text' : 'password';
+  button.setAttribute('aria-pressed', String(visible));
+  button.textContent = visible ? mt('Verbergen', 'Hide') : mt('Zeigen', 'Show');
 }
 
-function clearFieldError(id) {
-  const el = document.getElementById(id);
-  el.textContent = '';
-  el.classList.remove('show');
+function clearMemberState() {
+  memberEpoch++;
+  refreshPromise = null;
+  currentUser = null;
+  trainingLoaded = false;
+  trainingLoading = false;
+  trainingSessions = [];
+  rsvpInFlight.clear();
+  Object.keys(attendeeCache).forEach(key => delete attendeeCache[key]);
+  Object.keys(trainingErrors).forEach(key => delete trainingErrors[key]);
+  memberLeagueData = null;
+  memberCurrentLeagueData = null;
+  memberEvents = [];
+  memberLeagueRequest++;
+  trainingRequest++;
+  archiveData = null;
+  archiveLoaded = false;
+  archiveLoading = false;
+  archiveVisible = 20;
+  byId('seasonOneArchive').open = false;
+  byId('emailNotifToggle').disabled = false;
+  setBusy('savePrefsBtn', false);
+  ['accountMessage', 'settingsSaved', 'loginMessage', 'trainingLoading'].forEach(id => { byId(id).hidden = true; });
+  ['trainingList', 'otherMemberEvents', 'memberLeagueContent', 'trainingLeagueSummary', 'memberArchiveContent', 'accountName', 'accountEmail', 'dashName'].forEach(id => { byId(id).textContent = ''; });
+  document.querySelectorAll('input[type="password"]').forEach(input => { input.value = ''; });
 }
-
-function clearAllErrors(prefix) {
-  document.querySelectorAll(`[id^="${prefix}"][id$="Error"]`).forEach(el => {
-    el.textContent = '';
-    el.classList.remove('show');
-  });
-  document.querySelectorAll(`#${prefix}View .field-input`).forEach(el => el.classList.remove('error'));
-}
-
-/* ═══════════════════════════════════════
-   PASSWORD STRENGTH
-═══════════════════════════════════════ */
-document.getElementById('regPassword').addEventListener('input', function() {
-  const pw = this.value;
-  const fill = document.getElementById('strengthFill');
-  const label = document.getElementById('strengthLabel');
-  let strength = 0;
-  if (pw.length >= 8) strength++;
-  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) strength++;
-  if (/[0-9]/.test(pw) || /[^a-zA-Z0-9]/.test(pw)) strength++;
-
-  const levels = [
-    { w: '0%', bg: 'transparent', text: '', color: '' },
-    { w: '33%', bg: '#F87171', text: 'Weak', color: '#F87171' },
-    { w: '66%', bg: 'var(--gold)', text: 'Good', color: 'var(--gold-lt)' },
-    { w: '100%', bg: '#4ADE80', text: 'Strong', color: '#4ADE80' },
-  ];
-  const level = pw.length === 0 ? levels[0] : levels[Math.min(strength, 3)];
-  fill.style.width = level.w;
-  fill.style.background = level.bg;
-  label.textContent = level.text;
-  label.style.color = level.color;
-});
-
-/* ═══════════════════════════════════════
-   PASSWORD VISIBILITY TOGGLE
-═══════════════════════════════════════ */
-function togglePasswordVisibility(btn) {
-  const input = btn.previousElementSibling;
-  const isPassword = input.type === 'password';
-  input.type = isPassword ? 'text' : 'password';
-  btn.innerHTML = isPassword
-    ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
-    : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-}
-
-/* ═══════════════════════════════════════
-   SHARED HELPERS
-═══════════════════════════════════════ */
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-let _lbSearchTimer;
-function debouncedRenderLeaderboard() {
-  clearTimeout(_lbSearchTimer);
-  _lbSearchTimer = setTimeout(renderLeaderboard, 250);
-}
-
-function formatTime(timeStr) {
-  if (!timeStr) return '';
-  const [h, m] = timeStr.split(':');
-  return `${h}:${m}`;
-}
-
-/* ═══════════════════════════════════════
-   MOBILE NAV
-═══════════════════════════════════════ */
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('nav') && document.body.classList.contains('nav-open')) {
-    document.body.classList.remove('nav-open');
-  }
-});
-document.querySelectorAll('.nav-links a').forEach(link => {
-  link.addEventListener('click', () => document.body.classList.remove('nav-open'));
-});

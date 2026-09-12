@@ -48,26 +48,14 @@
     "sport": "Dodgeball",
     "address": {
       "@type": "PostalAddress",
-      "streetAddress": "Stella-Klein-Löw-Weg",
       "addressLocality": "Vienna",
       "addressRegion": "Wien",
       "addressCountry": "AT"
-    },
-    "geo": {
-      "@type": "GeoCoordinates",
-      "latitude": 48.1741,
-      "longitude": 16.3826
     },
     "areaServed": {
       "@type": "City",
       "name": "Vienna",
       "sameAs": "https://en.wikipedia.org/wiki/Vienna"
-    },
-    "openingHoursSpecification": {
-      "@type": "OpeningHoursSpecification",
-      "dayOfWeek": "Thursday",
-      "opens": "18:00",
-      "closes": "21:00"
     },
     "contactPoint": {
       "@type": "ContactPoint",
@@ -92,23 +80,13 @@
   <link rel="preload" href="/fonts/HTxwL3I-JCGChYJ8VI-L6OO_au7B47b1z3bWuQ.woff2" as="font" type="font/woff2" crossorigin />
 
   <style>body{background:#0C1B3A;color:#F4F7FF}#navbar{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;padding:.75rem 2rem;background:rgba(12,27,58,.95);backdrop-filter:blur(12px);border-bottom:1px solid rgba(53,103,192,.15);transition:transform .3s ease}.nav-logo{display:flex;align-items:center;gap:.5rem;text-decoration:none;color:#F4F7FF}.nav-logo span{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:.04em;text-transform:uppercase}.nav-links{display:flex;list-style:none;gap:1.5rem;margin-left:auto;align-items:center}.nav-links a{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(244,247,255,.7);text-decoration:none;transition:color .2s}.nav-cta{background:linear-gradient(135deg,#D4961A,#F0B830);color:#0C1B3A!important;padding:6px 16px;border-radius:4px;font-weight:700!important}.nav-toggle{display:none}#hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:6rem 2rem 4rem}.hero-content{position:relative;z-index:2;text-align:center;max-width:700px}.hero-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(4rem,12vw,9rem);letter-spacing:.04em;line-height:.95;color:#F4F7FF}.hero-title span{background:linear-gradient(135deg,#D4961A,#F0B830);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.hero-sub{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:1.1rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(244,247,255,.7);margin-top:1rem}.btn-primary{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;padding:14px 32px;border-radius:6px;background:linear-gradient(135deg,#D4961A,#F0B830);color:#0C1B3A;text-decoration:none;border:none;cursor:pointer}.btn-secondary{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;padding:14px 32px;border-radius:6px;background:transparent;color:#F0B830;border:1px solid rgba(240,184,48,.4);text-decoration:none;cursor:pointer}.reveal{opacity:0;transform:translateY(30px);transition:opacity .8s ease,transform .8s ease}.revealVisible{opacity:1;transform:translateY(0)}#progress-bar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,#D4961A,#F0B830);z-index:10001;transition:width .15s ease-out}@media(max-width:768px){.nav-links{display:none}.nav-toggle{display:flex}}</style>
-  <link rel="stylesheet" href="/site.css" />
+  <link rel="stylesheet" href="/site.css?v=20260912" />
+  <link rel="stylesheet" href="/league.css?v=20260912" />
+  <link rel="stylesheet" href="/club-content.css?v=20260912" />
+  <link rel="stylesheet" href="/public-ui.css?v=20260912" />
 </head>
 <body>
-  <a href="#main" style="position:absolute;top:-40px;left:0;background:var(--gold);color:var(--deep);padding:8px 16px;z-index:10000;font-family:'Barlow Condensed',sans-serif;font-weight:700;text-decoration:none;transition:top 0.2s ease;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content / Zum Inhalt springen</a>
-
-  <!-- ══ COOKIE CONSENT BANNER ══ -->
-  <div id="cookieBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(12,27,58,0.98);backdrop-filter:blur(16px);border-top:1px solid rgba(212,150,26,0.2);padding:1rem 2rem;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-    <p style="font-family:'Barlow Condensed',sans-serif;font-size:0.95rem;color:rgba(244,247,255,0.8);margin:0;flex:1;min-width:200px;">
-      Diese Website verwendet Google Fonts und ein CDN-Framework. /
-      This site uses Google Fonts and a CDN framework. By continuing you agree to their use.
-      <a href="/datenschutz.html" style="color:#D4961A;text-decoration:underline;margin-left:0.5rem;">Datenschutz / Privacy</a>
-    </p>
-    <div class="cookie-btns" style="display:flex;gap:0.75rem;flex-shrink:0;flex-wrap:wrap;">
-      <button id="cookieAcceptBtn" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.9rem;letter-spacing:0.08em;text-transform:uppercase;padding:8px 20px;border-radius:4px;background:linear-gradient(135deg,#D4961A,#F0B830);color:#0C1B3A;border:none;cursor:pointer;">Akzeptieren / Accept</button>
-      <button id="cookieDeclineBtn" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.9rem;letter-spacing:0.08em;text-transform:uppercase;padding:8px 20px;border-radius:4px;background:transparent;color:rgba(244,247,255,0.7);border:1px solid rgba(244,247,255,0.2);cursor:pointer;">Ablehnen / Decline</button>
-    </div>
-  </div>
+  <a href="#main" class="public-skip" data-en="Skip to content">Zum Inhalt springen</a>
 
   <!-- Progress bar -->
   <div id="progress-bar" style="width:0%"></div>
@@ -120,15 +98,19 @@
       <span>Vienna Imperials</span>
     </a>
     <ul class="nav-links">
-      <li><a href="#about">Über uns</a></li>
-      <li><a href="#how">So geht's</a></li>
-      <li><a href="#league">Angebot</a></li>
-      <li><a href="#why">Warum</a></li>
+      <li><a href="#about" data-en="About">Über uns</a></li>
+      <li><a href="#how" data-en="How to play">So geht's</a></li>
+      <li><a href="#league" data-en="Training">Angebot</a></li>
+      <li><a href="/jugendtraining-wien" data-en="Youth">Jugend</a></li>
       <li><a href="#faq">FAQ</a></li>
-      <li><a href="#rankings">Rangliste</a></li>
-      <li><a href="/member">Mitglieder</a></li>
-      <li><a href="#cta" class="nav-cta">Mitmachen</a></li>
+      <li><a href="#rankings" data-en="Standings">Rangliste</a></li>
+      <li><a href="/member" data-en="Members">Mitglieder</a></li>
+      <li><a href="#cta" class="nav-cta" data-en="Join us">Mitmachen</a></li>
     </ul>
+    <div class="site-language" role="group" aria-label="Sprache / Language">
+      <button type="button" data-site-language="de" aria-pressed="true" lang="de">DE</button>
+      <button type="button" data-site-language="en" aria-pressed="false" lang="en">EN</button>
+    </div>
     <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" id="navToggleBtn">
       <span></span><span></span><span></span>
     </button>
@@ -167,11 +149,11 @@
 
       <div class="hero-divider reveal reveal-delay-2"></div>
 
-      <p class="hero-sub reveal reveal-delay-3">Dodgeball Wien — Wiens erster Foam-Dodgeball-Verein</p>
+      <p class="hero-sub reveal reveal-delay-3" data-en="Dodgeball Vienna — Vienna's first foam dodgeball club">Dodgeball Wien — Wiens erster Foam-Dodgeball-Verein</p>
 
       <div class="hero-ctas reveal reveal-delay-4">
-        <a href="#cta" class="btn-primary">Jetzt mitmachen</a>
-        <a href="#how" class="btn-secondary">So funktioniert's</a>
+        <a href="#cta" class="btn-primary" data-en="Join us">Jetzt mitmachen</a>
+        <a href="#how" class="btn-secondary" data-en="How to play">So funktioniert's</a>
       </div>
     </div>
 
@@ -190,10 +172,6 @@
       </div>
 
       <div>
-        <div class="lang-toggle reveal" style="display:flex;gap:0.5rem;margin-bottom:1rem;">
-          <button class="lang-btn active" data-lang="de" data-section="about" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;padding:4px 12px;border-radius:4px;border:1px solid rgba(212,150,26,0.5);background:rgba(212,150,26,0.15);color:var(--gold-lt);cursor:pointer;">DE</button>
-          <button class="lang-btn" data-lang="en" data-section="about" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;padding:4px 12px;border-radius:4px;border:1px solid rgba(244,247,255,0.2);background:transparent;color:rgba(244,247,255,0.6);cursor:pointer;">EN</button>
-        </div>
         <div class="lang-content" data-section="about" data-lang="de">
           <p class="section-label reveal">Wer wir sind</p>
           <div class="gold-line reveal reveal-delay-1"></div>
@@ -224,17 +202,17 @@
         <div class="about-stat-row reveal reveal-delay-3">
           <div>
             <div class="about-stat-num">100+</div>
-            <div class="about-stat-label">Aktive Spieler</div>
+            <div class="about-stat-label" data-en="Active players">Aktive Spieler</div>
           </div>
           <div class="about-stat-divider"></div>
           <div>
             <div class="about-stat-num">1+</div>
-            <div class="about-stat-label">Saisons</div>
+            <div class="about-stat-label" data-en="Seasons">Saisons</div>
           </div>
           <div class="about-stat-divider"></div>
           <div>
             <div class="about-stat-num">1.</div>
-            <div class="about-stat-label">In Österreich</div>
+            <div class="about-stat-label" data-en="In Austria">In Österreich</div>
           </div>
         </div>
       </div>
@@ -246,15 +224,11 @@
     <div class="how-bg-radial"></div>
     <div style="max-width:1100px; margin:0 auto; position:relative; z-index:1;">
       <div style="text-align:center;">
-        <div class="lang-toggle reveal" style="display:flex;gap:0.5rem;justify-content:center;margin-bottom:1rem;">
-          <button class="lang-btn active" data-lang="de" data-section="how" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;padding:4px 12px;border-radius:4px;border:1px solid rgba(212,150,26,0.5);background:rgba(212,150,26,0.15);color:var(--gold-lt);cursor:pointer;">DE</button>
-          <button class="lang-btn" data-lang="en" data-section="how" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;padding:4px 12px;border-radius:4px;border:1px solid rgba(244,247,255,0.2);background:transparent;color:rgba(244,247,255,0.6);cursor:pointer;">EN</button>
-        </div>
-        <p class="section-label reveal">Das Spiel</p>
+        <p class="section-label reveal" data-en="The game">Das Spiel</p>
         <div class="gold-line reveal reveal-delay-1" style="margin:0 auto 1.5rem;"></div>
-        <h2 class="section-title reveal reveal-delay-1">So funktioniert Dodgeball</h2>
+        <h2 class="section-title reveal reveal-delay-1" data-en="How dodgeball works">So funktioniert Dodgeball</h2>
         <p style="font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:1rem; letter-spacing:0.1em; text-transform:uppercase; color:rgba(244,247,255,0.6); margin-top:0.75rem;" class="reveal reveal-delay-2">
-          Einfache Regeln. Endloser Spaß. <a href="/dodgeball-wien#regeln" style="color:var(--gold-lt);text-decoration:underline;font-size:.85rem;letter-spacing:.08em;">Alle Dodgeball Regeln &rarr;</a>
+          <span data-en="Simple rules. Endless fun.">Einfache Regeln. Endloser Spaß.</span> <a href="/dodgeball-wien#regeln" data-en="All dodgeball rules →" style="color:var(--gold-lt);text-decoration:underline;font-size:.85rem;letter-spacing:.08em;">Alle Dodgeball Regeln &rarr;</a>
         </p>
       </div>
 
@@ -322,26 +296,27 @@
     <div class="league-inner">
       <div class="league-header">
         <div>
-          <p class="section-label reveal">Unser Angebot</p>
+          <p class="section-label reveal" data-en="Training &amp; events">Unser Angebot</p>
           <div class="gold-line reveal reveal-delay-1"></div>
-          <h2 class="section-title reveal reveal-delay-1">Dodgeball in Wien</h2>
+          <h2 class="section-title reveal reveal-delay-1" data-en="Dodgeball in Vienna">Dodgeball in Wien</h2>
         </div>
-        <a href="#cta" class="btn-red reveal reveal-delay-2">Jetzt mitmachen!</a>
+        <a href="#cta" class="btn-red reveal reveal-delay-2" data-en="Join us!">Jetzt mitmachen!</a>
       </div>
 
+      <p class="section-body" style="margin-bottom:1.5rem;" data-en="14 September 2026–2 July 2027 inclusive. No training during Vienna school holidays or Austrian public holidays.">14.09.2026–02.07.2027. Ausgenommen: Wiener Schulferien und gesetzliche Feiertage.</p>
       <div class="league-cards">
         <!-- Card 1 -->
         <div class="league-card reveal reveal-delay-1">
           <div class="league-card-img-wrap">
             <img src="imperials-action-1.webp" srcset="imperials-action-1-400.webp 400w, imperials-action-1.webp 800w" sizes="(max-width: 960px) 100vw, 50vw" alt="Dodgeball player throwing during Thursday drop-in session" class="league-card-img img-pos-upper" loading="lazy" width="800" height="533" />
           </div>
-          <span class="league-card-tag tag-gold">Wöchentlich</span>
+          <span class="league-card-tag tag-gold" data-en="Social League">Social League</span>
           <div class="league-card-body">
-            <h3 class="league-card-title">Donnerstag Drop-In</h3>
+            <h3 class="league-card-title" data-en="Thursday Social League">Donnerstag Social League</h3>
             <div class="league-card-meta">
-              <strong>Jeden Donnerstag</strong> · 18:00 – 21:00 Uhr<br/>
-              Sporthalle Stella-Klein-Löw-Weg · Alle Levels willkommen<br/>
-              Drop-in-Gebühr
+              <strong data-en="Thursday · 18:00–21:00">Donnerstag · 18:00–21:00 Uhr</strong><br/>
+              <span data-en="Volksschule in der Krieau · All levels welcome">Volksschule in der Krieau · Alle Levels willkommen</span><br/>
+              <span data-en="€10 per session">10 € pro Einheit</span> · <a href="/member#training" data-en="Check dates &amp; register">Termine &amp; Anmeldung</a>
             </div>
           </div>
         </div>
@@ -351,13 +326,14 @@
           <div class="league-card-img-wrap">
             <img src="imperials-action-2.webp" srcset="imperials-action-2-400.webp 400w, imperials-action-2.webp 800w" sizes="(max-width: 960px) 100vw, 50vw" alt="Vienna Imperials team celebrating after a dodgeball match" class="league-card-img img-pos-upper" loading="lazy" width="800" height="533" />
           </div>
-          <span class="league-card-tag tag-red">Saison</span>
+          <span class="league-card-tag tag-red" data-en="Club training">Vereinstraining</span>
           <div class="league-card-body">
-            <h3 class="league-card-title">Saison 2026</h3>
+            <h3 class="league-card-title" data-en="Monday basic skills">Montag Grundlagentraining</h3>
             <div class="league-card-meta">
-              <strong>Jan – Juni 2026</strong> · Montag &amp; Freitag<br/>
-              Technik- und Taktiktraining<br/>
-              Fortgeschrittene Spieler
+              <strong data-en="Monday · 19:00–21:00">Montag · 19:00–21:00 Uhr</strong><br/>
+              O-MS Max Winter Platz 12<br/>
+              <span data-en="€5 per session · Build your skills together">5 € pro Einheit · Gemeinsam besser werden</span><br/>
+              <a href="/member#training" data-en="View available sessions">Verfügbare Termine ansehen</a>
             </div>
           </div>
         </div>
@@ -367,13 +343,13 @@
           <div class="league-card-img-wrap">
             <img src="imperials-action-3.webp" srcset="imperials-action-3-400.webp 400w, imperials-action-3.webp 800w" sizes="(max-width: 960px) 100vw, 50vw" alt="Vienna Imperials team members at championship event" class="league-card-img img-pos-mid" loading="lazy" width="800" height="533" />
           </div>
-          <span class="league-card-tag tag-blue">Turnier</span>
+          <span class="league-card-tag tag-blue" data-en="Competition">Wettkampf</span>
           <div class="league-card-body">
-            <h3 class="league-card-title">Meisterschaft 2026</h3>
+            <h3 class="league-card-title" data-en="Tournaments &amp; team spirit">Turniere &amp; Teamgeist</h3>
             <div class="league-card-meta">
-              <strong>Sommer 2026</strong> · Zweitägiges Event<br/>
-              Mit Teams in London<br/>
-              Weltweiter Vereinswettbewerb
+              <span data-en="Compete together as a club.">Gemeinsam als Verein antreten.</span><br/>
+              <span data-en="Ask us about upcoming competitions and participation.">Frag uns nach kommenden Wettbewerben und der Teilnahme.</span><br/>
+              <a href="mailto:imperialsdodgeball@gmail.com" data-en="Contact the club">Verein kontaktieren</a>
             </div>
           </div>
         </div>
@@ -383,17 +359,28 @@
           <div class="league-card-img-wrap">
             <img src="imperials-action-4.webp" srcset="imperials-action-4-700.webp 700w, imperials-action-4.webp 1400w" sizes="(max-width: 960px) 100vw, 50vw" alt="Vienna Imperials players ready with dodgeballs" class="league-card-img img-pos-top" loading="lazy" width="1400" height="933" />
           </div>
-          <span class="league-card-tag tag-gold">Offen</span>
+          <span class="league-card-tag tag-gold" data-en="Adults">Erwachsene</span>
           <div class="league-card-body">
-            <h3 class="league-card-title">Offene Halle</h3>
+            <h3 class="league-card-title" data-en="Friday adult training">Freitag Erwachsenentraining</h3>
             <div class="league-card-meta">
-              <strong>Pick-up Spiele</strong> · Freies Spielen<br/>
-              Würfe üben, Strategie verbessern<br/>
-              Alle Mitglieder willkommen
+              <strong data-en="Friday · 19:00–21:00">Freitag · 19:00–21:00 Uhr</strong><br/>
+              Am Kaiserm&uuml;hlendamm 2<br/>
+              <span data-en="€5 per session">5 € pro Einheit</span><br/>
+              <a href="/member#training" data-en="Check available sessions">Verfügbare Termine prüfen</a>
             </div>
           </div>
         </div>
       </div>
+      <aside class="club-callout club-youth-callout" aria-labelledby="youth-callout-heading">
+        <div class="club-copy">
+          <p class="club-eyebrow" data-en="Youth · Ages 12–18">Jugend &middot; 12&ndash;18 Jahre</p>
+          <h3 class="club-title" id="youth-callout-heading" data-en="Your start in dodgeball">Dein Einstieg ins Dodgeball</h3>
+          <p data-en="Fridays 17:00–19:00 · Am Kaisermühlendamm 2, 1220 Vienna. All levels welcome. Free trial training.">Freitags 17&ndash;19 Uhr &middot; Am Kaiserm&uuml;hlendamm 2, 1220 Wien. Alle Levels willkommen. Probetraining kostenlos.</p>
+        </div>
+        <div class="club-actions">
+          <a class="club-button" href="/jugendtraining-wien" data-en="Youth training →">Zum Jugendtraining &rarr;</a>
+        </div>
+      </aside>
     </div>
   </section>
 
@@ -402,13 +389,9 @@
     <div class="why-bg"></div>
     <div style="max-width:1100px; margin:0 auto; position:relative; z-index:1;">
       <div style="text-align:center;">
-        <div class="lang-toggle reveal" style="display:flex;gap:0.5rem;justify-content:center;margin-bottom:1rem;">
-          <button class="lang-btn active" data-lang="de" data-section="why" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;padding:4px 12px;border-radius:4px;border:1px solid rgba(212,150,26,0.5);background:rgba(212,150,26,0.15);color:var(--gold-lt);cursor:pointer;">DE</button>
-          <button class="lang-btn" data-lang="en" data-section="why" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;padding:4px 12px;border-radius:4px;border:1px solid rgba(244,247,255,0.2);background:transparent;color:rgba(244,247,255,0.6);cursor:pointer;">EN</button>
-        </div>
-        <p class="section-label reveal">Die Community</p>
+        <p class="section-label reveal" data-en="The community">Die Community</p>
         <div class="gold-line reveal reveal-delay-1" style="margin:0 auto 1.5rem;"></div>
-        <h2 class="section-title reveal reveal-delay-1">Warum Dodgeball in Wien?</h2>
+        <h2 class="section-title reveal reveal-delay-1" data-en="Why dodgeball in Vienna?">Warum Dodgeball in Wien?</h2>
       </div>
 
       <div class="lang-content" data-section="why" data-lang="de">
@@ -431,14 +414,14 @@
             <div class="why-icon" aria-hidden="true">&#127775;</div>
             <div>
               <h3 class="why-title">Sicher &amp; Energiegeladen</h3>
-              <p class="why-text">Weiche Schaumstoffbälle bedeuten keine Verletzungen bei maximaler Intensität. Schnelle Runden, große Plays und ein Sport, der wirklich sicher für alle ist.</p>
+              <p class="why-text">Wir spielen mit weichen Schaumstoffbällen statt harten Gummibällen. Fairplay und Rücksicht gehören dazu — wie bei jedem Sport sind Verletzungen trotzdem möglich.</p>
             </div>
           </div>
           <div class="why-item reveal reveal-delay-4">
             <div class="why-icon" aria-hidden="true">&#127942;</div>
             <div>
               <h3 class="why-title">Kämpfe um den Sieg</h3>
-              <p class="why-text">Saison-Ranglisten, ein Sommer-Meisterschaftsturnier und der Imperial Cup — hier gibt es echten Ruhm zu gewinnen.</p>
+              <p class="why-text">Sammle mit deinem Team Punkte in der Social League und verfolge eure Fortschritte in der Saison-Rangliste.</p>
             </div>
           </div>
         </div>
@@ -463,14 +446,14 @@
             <div class="why-icon" aria-hidden="true">&#127775;</div>
             <div>
               <h3 class="why-title">Safe &amp; High-Energy</h3>
-              <p class="why-text">Soft foam balls mean no injuries, maximum intensity. Fast-paced rounds, big plays, and a sport that's genuinely safe for everyone.</p>
+              <p class="why-text">We use soft foam balls rather than hard rubber balls. Fair play and consideration matter — as in any sport, injuries are still possible.</p>
             </div>
           </div>
           <div class="why-item">
             <div class="why-icon" aria-hidden="true">&#127942;</div>
             <div>
               <h3 class="why-title">Compete to Win</h3>
-              <p class="why-text">Season rankings, a summer championship tournament, and the Imperial Cup trophy — there's real glory to play for.</p>
+              <p class="why-text">Earn points with your team in the Social League and follow your progress in the season standings.</p>
             </div>
           </div>
         </div>
@@ -484,28 +467,24 @@
       <div style="text-align:center;margin-bottom:3rem;">
         <p class="section-label reveal">FAQ</p>
         <div class="gold-line reveal reveal-delay-1" style="margin:0 auto 1.5rem;"></div>
-        <h2 class="section-title reveal reveal-delay-1">Häufige Fragen / <span style="background:linear-gradient(135deg,var(--gold),var(--gold-lt));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Common Questions</span></h2>
-        <div style="display:flex;gap:0.75rem;justify-content:center;margin-top:1.5rem;" class="reveal reveal-delay-2">
-          <button id="faqBtnDe" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.85rem;letter-spacing:0.1em;text-transform:uppercase;padding:6px 16px;border-radius:4px;border:1px solid rgba(212,150,26,0.5);background:rgba(212,150,26,0.15);color:var(--gold-lt);cursor:pointer;">Deutsch</button>
-          <button id="faqBtnEn" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.85rem;letter-spacing:0.1em;text-transform:uppercase;padding:6px 16px;border-radius:4px;border:1px solid rgba(244,247,255,0.2);background:transparent;color:rgba(244,247,255,0.6);cursor:pointer;">English</button>
-        </div>
+        <h2 class="section-title reveal reveal-delay-1" data-en="Common questions">Häufige Fragen</h2>
       </div>
-      <div id="faqDe" lang="de" class="faq-list reveal">
+      <div id="faqDe" lang="de" data-public-language="de" class="faq-list reveal">
         <details class="faq-item">
           <summary class="faq-question">Was ist Dodgeball?</summary>
           <p class="faq-answer">Dodgeball ist ein Mannschaftssport, bei dem zwei Teams versuchen, die Spieler des gegnerischen Teams durch Treffen mit weichen Schaumstoffbällen auszuscheiden. Gefangene Bälle bringen ausgeschiedene Mitspieler zurück ins Spiel. <a href="/dodgeball-wien" style="color:var(--gold-lt);text-decoration:underline;">Mehr über Dodgeball in Wien &rarr;</a></p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Wo trainieren wir?</summary>
-          <p class="faq-answer">Wir trainieren in der Sporthalle Stella-Klein-Löw-Weg in Wien. Jeden Donnerstag von 18:00 bis 21:00 Uhr. Alle Details findest du in unserem <a href="#league" style="color:var(--gold-lt);">Angebot</a>.</p>
+          <p class="faq-answer">Montag 19:00–21:00 Uhr: Grundlagentraining, O-MS Max Winter Platz 12. Donnerstag 18:00–21:00 Uhr: Social League, Volksschule in der Krieau. Freitag: Jugend 17:00–19:00 Uhr und Erwachsene 19:00–21:00 Uhr, Am Kaisermühlendamm 2. Die Saison läuft vom 14. September 2026 bis einschließlich 2. Juli 2027, ausgenommen Wiener Schulferien und österreichische gesetzliche Feiertage. <a href="#league" style="color:var(--gold-lt);">Alle Trainings</a>.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Wie kann ich mitmachen?</summary>
-          <p class="faq-answer">Einfach beim nächsten Drop-in-Abend vorbeikommen! Keine Anmeldung erforderlich. Du kannst uns auch per E-Mail an <a href="mailto:imperialsdodgeball@gmail.com" style="color:var(--gold-lt);">imperialsdodgeball@gmail.com</a> kontaktieren oder direkt <a href="#cta" style="color:var(--gold-lt);">das Formular ausfüllen</a>.</p>
+          <p class="faq-answer">Neu dabei? Schreib an <a href="mailto:imperialsdodgeball@gmail.com" style="color:var(--gold-lt);">imperialsdodgeball@gmail.com</a> oder nutze <a href="#cta" style="color:var(--gold-lt);">unser Kontaktformular</a>. Für konkrete Trainingstermine prüfe die Verfügbarkeit und melde dich im <a href="/member#training" style="color:var(--gold-lt);">Mitgliederbereich</a> an. Das Kontaktformular reserviert keinen Trainingsplatz.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Kostet es etwas?</summary>
-          <p class="faq-answer">Für Drop-in-Abende wird eine kleine Drop-in-Gebühr erhoben. Saisonmitglieder zahlen einen ermäßigten Saisonbeitrag. Kontaktiere uns für aktuelle Preise.</p>
+          <p class="faq-answer">Social League am Donnerstag: 10 € pro Einheit. Montags- und Freitagstraining: 5 € pro Einheit. Semesterkarte: 100 €; Jahreskarte: 180 €. Das <a href="/jugendtraining-wien" style="color:var(--gold-lt);">Jugend-Probetraining (12–18 Jahre)</a> ist kostenlos. Bei Fragen zu Kartenumfang oder myClubs schreib uns.</p>
         </details>
 
         <details class="faq-item">
@@ -550,7 +529,7 @@
         <h3 class="faq-category">Mitgliedschaft &amp; Kosten</h3>
         <details class="faq-item">
           <summary class="faq-question">Welche Mitgliedschaftsmodelle gibt es?</summary>
-          <p class="faq-answer">Wir halten es flexibel: Mit dem Jahres-Abo (180 €/Jahr) oder dem Semester-Ticket (100 €/Semester) unterstützt du den Verein und genießt alle Vorteile. Wer lieber einzeln zahlt: Montags- &amp; Freitagstraining kosten 5 € pro Einheit, die Social League (Donnerstag) 10 €.</p>
+          <p class="faq-answer">Jahreskarte: 180 €/Jahr. Semesterkarte: 100 €/Semester. Einzelne Einheiten: Montags- &amp; Freitagstraining 5 €, Social League am Donnerstag 10 €. Den genauen Kartenumfang und die passende Option klärst du mit dem Verein.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Kann ich myClubs nutzen?</summary>
@@ -560,33 +539,33 @@
         <h3 class="faq-category">Punkte &amp; Ranking</h3>
         <details class="faq-item">
           <summary class="faq-question">Wie werden Punkte vergeben?</summary>
-          <p class="faq-answer">Nach der Hauptrunde erhältst du Platzierungspunkte für das Website-Ranking: 1. Platz = 3 Pkt, 2. Platz = 2,5 Pkt, 3. Platz = 2 Pkt, 4. Platz = 1,5 Pkt, 5. Platz = 1 Pkt.</p>
+          <p class="faq-answer">Die Platzierungspunkte aller bestätigten Trainings zählen zur Saison. Das jeweilige Punkteschema steht bei der <a href="#training-league" style="color:var(--gold-lt);">Saison-Rangliste</a>; Matchpunkte sind davon getrennt. Über die Saisonauswahl findest du auch das abgeschlossene Season-1-Archiv mit 125 Spielern und der Hall of Fame. Gleiche Punkte teilen sich den Rang.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Gibt es auch Punkte beim Finale?</summary>
-          <p class="faq-answer">Ja! Beim „Last WoMen Standing" sammeln die Gewinner*innen individuelle Punkte: 1. Platz (1 Dame &amp; 1 Herr) = je 1 Pkt, 2. Platz = je 0,5 Pkt.</p>
+          <p class="faq-answer">In Season 1 wurden beim „Last WoMen Standing" individuelle Punkte vergeben: 1. Platz (1 Dame &amp; 1 Herr) = je 1 Pkt, 2. Platz = je 0,5 Pkt. Das ist Teil des eingefrorenen Archivs. Für aktuelle Saisons gilt das jeweils angezeigte Punkteschema.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Wo finde ich das aktuelle Ranking?</summary>
           <p class="faq-answer">Alle Ergebnisse und die aktuelle <a href="#rankings" style="color:var(--gold-lt);">Rangliste</a> werden regelmäßig auf unserer Website aktualisiert. Als Mitglied kannst du deine Statistiken auch im <a href="/member" style="color:var(--gold-lt);">Mitgliederbereich</a> einsehen.</p>
         </details>
       </div>
-      <div id="faqEn" lang="en" class="faq-list reveal" style="display:none;">
+      <div id="faqEn" lang="en" data-public-language="en" class="faq-list reveal" hidden>
         <details class="faq-item">
           <summary class="faq-question">What is dodgeball?</summary>
           <p class="faq-answer">Dodgeball is a team sport where two teams try to eliminate opposing players by hitting them with soft foam balls. Catching a ball brings an eliminated teammate back into play.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Where do we train?</summary>
-          <p class="faq-answer">We train at Sporthalle Stella-Klein-Löw-Weg in Vienna, every Thursday from 6:00 PM to 9:00 PM. See all details in our <a href="#league" style="color:var(--gold-lt);">offerings</a>.</p>
+          <p class="faq-answer">Monday 19:00–21:00: basic skills at O-MS Max Winter Platz 12. Thursday 18:00–21:00: Social League at Volksschule in der Krieau. Friday: youth 17:00–19:00 and adults 19:00–21:00 at Am Kaisermühlendamm 2. The season runs from 14 September 2026 to 2 July 2027 inclusive, excluding Vienna school holidays and Austrian public holidays. <a href="#league" style="color:var(--gold-lt);">All training options</a>.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">How do I join?</summary>
-          <p class="faq-answer">Just show up at the next drop-in evening! No registration needed. You can also reach us at <a href="mailto:imperialsdodgeball@gmail.com" style="color:var(--gold-lt);">imperialsdodgeball@gmail.com</a> or <a href="#cta" style="color:var(--gold-lt);">fill out the form</a>.</p>
+          <p class="faq-answer">New here? Email <a href="mailto:imperialsdodgeball@gmail.com" style="color:var(--gold-lt);">imperialsdodgeball@gmail.com</a> or use our <a href="#cta" style="color:var(--gold-lt);">contact form</a>. To attend a specific training, check availability and register in the <a href="/member#training" style="color:var(--gold-lt);">member area</a>. The contact form does not reserve a training place.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Is there a cost?</summary>
-          <p class="faq-answer">Drop-in evenings have a small drop-in fee. Season members pay a reduced season contribution. Contact us for current pricing.</p>
+          <p class="faq-answer">Thursday Social League: €10 per session. Monday and Friday training: €5 per session. Semester pass: €100; annual pass: €180. The <a href="/jugendtraining-wien" style="color:var(--gold-lt);">youth trial (ages 12–18)</a> is free. Ask us about pass coverage or myClubs.</p>
         </details>
 
         <details class="faq-item">
@@ -631,7 +610,7 @@
         <h3 class="faq-category">Membership &amp; Pricing</h3>
         <details class="faq-item">
           <summary class="faq-question">What membership options are available?</summary>
-          <p class="faq-answer">We keep it flexible: with an annual pass (€180/year) or a semester ticket (€100/semester) you support the club and enjoy all the benefits. Prefer to pay per session? Monday &amp; Friday training costs €5 per session, and the Social League (Thursday) is €10.</p>
+          <p class="faq-answer">Annual pass: €180/year. Semester pass: €100/semester. Individual sessions: Monday &amp; Friday training €5, Thursday Social League €10. Ask the club what each pass covers and which option suits you.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Can I use myClubs?</summary>
@@ -641,11 +620,11 @@
         <h3 class="faq-category">Points &amp; Rankings</h3>
         <details class="faq-item">
           <summary class="faq-question">How are points awarded?</summary>
-          <p class="faq-answer">After the main round you receive placement points for the website ranking: 1st place = 3 pts, 2nd = 2.5 pts, 3rd = 2 pts, 4th = 1.5 pts, 5th = 1 pt.</p>
+          <p class="faq-answer">Placement points from all confirmed trainings count towards the season. Find the scoring rules alongside the <a href="#training-league" style="color:var(--gold-lt);">season standings</a>; match points are separate. Use the season selector to view the completed Season 1 archive with 125 players and the Hall of Fame. Equal points share a rank.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Are there points in the finals too?</summary>
-          <p class="faq-answer">Yes! In "Last WoMen Standing", winners collect individual points: 1st place (1 woman &amp; 1 man) = 1 pt each, 2nd place = 0.5 pts each.</p>
+          <p class="faq-answer">In Season 1, "Last WoMen Standing" awarded individual points: 1st place (1 woman &amp; 1 man) = 1 point each, 2nd place = 0.5 points each. These results are preserved in the frozen archive. Current seasons use the scoring rules displayed for that season.</p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Where can I find the current rankings?</summary>
@@ -660,58 +639,17 @@
     <div style="position:absolute;top:-10%;left:-5%;width:700px;height:700px;background:radial-gradient(ellipse at center,rgba(26,61,143,0.12) 0%,transparent 70%);pointer-events:none;"></div>
     <div style="max-width:1160px;margin:0 auto;position:relative;z-index:1;">
 
-      <!-- Section header -->
-      <div style="text-align:center;margin-bottom:3rem;">
-        <p class="section-label reveal">Saison 2026</p>
-        <div class="gold-line reveal reveal-delay-1" style="margin:0 auto 1.5rem;"></div>
-        <h2 class="section-title reveal reveal-delay-1">Spieler-<span style="background:linear-gradient(135deg,var(--gold),var(--gold-lt));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Rangliste</span></h2>
-        <p class="reveal reveal-delay-2" style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:1rem;letter-spacing:0.1em;text-transform:uppercase;color:rgba(244,247,255,0.6);margin-top:0.75rem;">Live-Ergebnisse &middot; nach jeder Session aktualisiert</p>
-      </div>
-
-      <!-- Stats -->
-      <div class="stats-bar" id="statsBar"></div>
-
-      <!-- Controls -->
-      <div class="controls">
-        <div class="filter-tabs">
-          <button class="filter-tab active" data-filter="all">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="17" cy="7" r="3"/><circle cx="7" cy="12" r="3"/><circle cx="17" cy="17" r="3"/></svg>
-            All
-          </button>
-          <button class="filter-tab" data-filter="male">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="14" r="5"/><path d="M21 3l-6 6M21 3h-5M21 3v5"/></svg>
-            Male
-          </button>
-          <button class="filter-tab" data-filter="female">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="5"/><line x1="12" y1="13" x2="12" y2="21"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
-            Female
-          </button>
-        </div>
-        <div class="controls-right">
-          <div class="search-wrap">
-            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input class="search-input" type="text" placeholder="Search players&hellip;" id="searchInput" aria-label="Search players" />
+      <div class="league" id="training-league">
+        <div id="publicLeague" lang="de">
+          <p class="league-kicker">Vienna Imperials</p>
+          <h2 class="league-heading">Imperials <span>Social League</span></h2>
+          <p class="league-copy" data-league-intro>Dein Team. Deine Punkte. Eure Saison.</p>
+          <div class="league-toolbar">
+            <a class="league-btn league-btn-primary" href="/member#training" data-en="Register for training">Zum Training anmelden</a>
           </div>
+          <div data-league-content><p class="league-notice" role="status">Liga wird geladen...</p></div>
+          <noscript><p class="league-notice">Bitte JavaScript aktivieren, um Teams und Ergebnisse zu sehen. Enable JavaScript to see teams and results.</p></noscript>
         </div>
-      </div>
-
-      <!-- Table -->
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:80px;">#</th>
-              <th>Player</th>
-              <th class="num sortable" data-sort="points">Points</th>
-              <th class="num">Gain</th>
-              <th class="num sortable" data-sort="played">Played</th>
-              <th class="num sortable" data-sort="streak">Streak</th>
-              <th class="num">BP</th>
-              <th class="num">Change</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody"></tbody>
-        </table>
       </div>
 
     </div>
@@ -722,13 +660,13 @@
     <div class="cta-radial-1"></div>
     <div class="cta-radial-2"></div>
     <div class="cta-inner">
-      <p class="section-label reveal" style="text-align:center;">Bereit zum Spielen?</p>
+      <p class="section-label reveal" style="text-align:center;" data-en="Ready to play?">Bereit zum Spielen?</p>
       <div class="gold-line reveal reveal-delay-1" style="margin:0 auto 1.5rem;"></div>
       <h2 class="cta-title reveal reveal-delay-1">
-        Spiel mit den<br/><em>Imperials</em>
+        <span data-en="Play with the">Spiel mit den</span><br/><em>Imperials</em>
       </h2>
-      <p class="cta-sub reveal reveal-delay-2">
-        Werde Teil von Wiens erstem Dodgeball-Verein
+      <p class="cta-sub reveal reveal-delay-2" data-en="Get in touch — this form is an enquiry, not a training reservation.">
+        Melde dich bei uns — dieses Formular ist eine Anfrage, keine Trainingsreservierung.
       </p>
       <div class="reveal reveal-delay-3" style="width:100%;max-width:600px;margin:0 auto;">
         <form id="joinForm" class="signup-form" novalidate>
@@ -755,14 +693,31 @@
               <input type="text" id="joinSource" name="source" class="signup-input" placeholder="Instagram, Friend, Google…" autocomplete="off" />
             </div>
           </div>
-          <button type="submit" class="btn-primary signup-submit" id="joinSubmitBtn">Jetzt mitmachen / Join the League</button>
-          <div id="joinSuccess" class="signup-success" style="display:none;">✓ Danke! Wir melden uns bald. / Thanks! We'll be in touch soon.</div>
+          <button type="submit" class="btn-primary signup-submit" id="joinSubmitBtn" data-en="Send enquiry">Anfrage senden</button>
         </form>
+        <div id="joinSuccess" class="signup-success" role="status" style="display:none;" data-en="Thanks for your enquiry! We'll be in touch soon.">Danke für deine Anfrage! Wir melden uns bald.</div>
       </div>
 
       <p style="margin-top:2rem; font-size:0.85rem; color:rgba(244,247,255,0.5); font-family:'Barlow Condensed',sans-serif; letter-spacing:0.08em; text-transform:uppercase;" class="reveal reveal-delay-4">
-        Keine Verpflichtung · Jederzeit vorbeikommen · Wien, Österreich
+        <span data-en="No obligation · Vienna, Austria">Keine Verpflichtung · Wien, Österreich</span>
       </p>
+    </div>
+  </section>
+
+  <section class="club-partners" id="partners" aria-labelledby="partners-heading">
+    <div class="club-partners-inner club-callout">
+      <div class="club-copy">
+        <p class="club-eyebrow" data-en="Become a partner">Partner werden</p>
+        <h2 class="club-title" id="partners-heading" data-en="More than sponsorship. A real partnership.">Ned nur Sponsoring. A echte Partnerschaft.</h2>
+        <p data-en="Support dodgeball in Vienna — from youth training to the Social League. Build visibility at events, on social media and in our community.">Unterst&uuml;tze Dodgeball in Wien &ndash; von der Jugend bis zur Social League. Gemeinsam schaffen wir Sichtbarkeit bei Events, auf Social Media und in unserer Community.</p>
+      </div>
+      <div class="club-partner-actions">
+        <div class="club-actions">
+          <a class="club-button" href="/downloads/imperials-sponsorenmappe.pdf" download data-en="Download sponsorship brochure">Sponsorenmappe herunterladen</a>
+          <a class="club-button club-button-secondary" href="mailto:imperialsdodgeball@gmail.com?subject=Partnerschaft%20mit%20den%20Vienna%20Imperials" data-en="Enquire about partnership">Partnerschaft anfragen</a>
+        </div>
+        <p class="club-file-note" data-en="PDF · 9 pages · approx. 26 MB · German">PDF &middot; 9 Seiten &middot; ca. 26 MB &middot; Deutsch</p>
+      </div>
     </div>
   </section>
 
@@ -774,15 +729,17 @@
         <img src="logo.webp" alt="Vienna Imperials" loading="lazy" width="77" height="48" />
         <div class="footer-brand-text">
           <span class="footer-brand-name">Vienna Imperials</span>
-          <span class="footer-brand-tagline">Wiens erster Foam-Dodgeball-Verein</span>
+          <span class="footer-brand-tagline" data-en="Vienna's first foam dodgeball club">Wiens erster Foam-Dodgeball-Verein</span>
         </div>
       </div>
       <ul class="footer-links">
-        <li><a href="#about">Über uns</a></li>
-        <li><a href="#league">Angebot</a></li>
+        <li><a href="#about" data-en="About">Über uns</a></li>
+        <li><a href="#league" data-en="Training">Angebot</a></li>
         <li><a href="/dodgeball-wien">Dodgeball Wien</a></li>
-        <li><a href="#cta">Kontakt</a></li>
-        <li><a href="/member">Mitglieder</a></li>
+        <li><a href="/jugendtraining-wien" data-en="Youth training">Jugendtraining</a></li>
+        <li><a href="#partners" data-en="Become a partner">Partner werden</a></li>
+        <li><a href="#cta" data-en="Contact">Kontakt</a></li>
+        <li><a href="/member" data-en="Members">Mitglieder</a></li>
       </ul>
       <div class="footer-social">
         <!-- Instagram -->
@@ -810,14 +767,14 @@
   </div>
 
   <!-- ══ SCRIPTS ══ -->
-  <script src="/js/site-utils.js" defer></script>
-  <script src="/js/site-ui.js" defer></script>
-  <script src="/js/site-lang.js" defer></script>
-  <script src="/js/site-faq.js" defer></script>
-  <script src="/js/rankings-data.js" defer></script>
-  <script src="/js/rankings-render.js" defer></script>
-  <script src="/js/site-forms.js" defer></script>
-  <script src="/js/site-cookies.js" defer></script>
-  <script src="/js/site-init.js" defer></script>
+  <script src="/js/site-language.js?v=20260912" defer></script>
+  <script src="/js/site-lang.js?v=20260912" defer></script>
+  <script src="/js/site-utils.js?v=20260912" defer></script>
+  <script src="/js/site-ui.js?v=20260912" defer></script>
+  <script src="/js/site-forms.js?v=20260912" defer></script>
+  <script src="/js/league-scoring.js?v=20260912" defer></script>
+  <script src="/js/league-ui.js?v=20260912" defer></script>
+  <script src="/js/league-archive.js?v=20260912" defer></script>
+  <script src="/js/site-league.js?v=20260912" defer></script>
 </body>
 </html>

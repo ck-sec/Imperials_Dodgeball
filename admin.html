@@ -10,12 +10,10 @@
   <title>Admin Dashboard — Vienna Imperials</title>
   <meta name="robots" content="noindex" />
 
-  <link rel="stylesheet" href="/tailwind.min.css" />
-  <link rel="stylesheet" href="/shared.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" as="style" />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/tailwind.min.css?v=20260912" />
+  <link rel="stylesheet" href="/shared.css?v=20260912" />
+  <link rel="stylesheet" href="/admin-league.css?v=20260912" />
+  <link rel="stylesheet" href="/fonts/fonts.css?v=20260912" />
 
   <style>
     body { min-height: 100vh; }
@@ -508,9 +506,10 @@
 
     <div class="dash-content">
       <!-- Tab Navigation -->
-      <div class="dash-tabs" role="tablist">
+      <div class="dash-tabs al-dashboard-tabs" role="tablist">
         <button class="dash-tab active" data-tab="members" role="tab" aria-selected="true">Members</button>
         <button class="dash-tab" data-tab="training" role="tab" aria-selected="false">Training</button>
+        <button class="dash-tab" id="al-tab-button" data-tab="league" role="tab" aria-controls="tab-league" aria-selected="false">Imperials Social League</button>
         <button class="dash-tab" data-tab="rankings" role="tab" aria-selected="false">Rankings</button>
       </div>
 
@@ -544,6 +543,26 @@
         <div id="atMatrixView" style="display:none;">
           <div id="atMatrixContent"></div>
         </div>
+      </div>
+
+      <!-- ── Imperials Social League Tab ── -->
+      <div class="tab-panel" id="tab-league" role="tabpanel" aria-labelledby="al-tab-button">
+        <header class="al-header">
+          <div>
+            <p class="al-eyebrow">Training together. Every session counts.</p>
+            <h2>Imperials Social League</h2>
+            <p class="al-muted">Private skill ratings help balance teams. Only names, teams and season points are public.</p>
+          </div>
+          <div class="al-actions">
+            <a class="al-button al-secondary" href="/#training-league" target="_blank" rel="noopener">View public league <span class="al-sr-only">(opens a new tab)</span></a>
+            <a class="al-button al-secondary" href="/#hall-of-fame" target="_blank" rel="noopener">Season 1 Hall of Fame <span class="al-sr-only">(opens a new tab)</span></a>
+            <button class="al-button al-secondary" type="button" id="al-refresh">Refresh league</button>
+          </div>
+        </header>
+        <p class="al-small">Season 1 is a separate, frozen archive. Legacy Rankings edits do not change that archive; old points are not imported into Season 2 points or private skill ratings.</p>
+        <div id="al-notice" class="al-notice" role="alert" tabindex="-1" hidden></div>
+        <p id="al-progress" class="al-muted" role="status" aria-live="polite"></p>
+        <div id="al-app"><p class="al-empty">Open this tab to load seasons, training RSVPs and teams.</p></div>
       </div>
 
       <!-- ── Rankings Tab ── -->
@@ -862,13 +881,15 @@
   </div>
 
   <!-- ══ SCRIPTS ══ -->
-  <script src="/js/admin-auth.js?v=2" defer></script>
-  <script src="/js/rankings-data.js?v=2" defer></script>
-  <script src="/js/rankings-render.js?v=2" defer></script>
-  <script src="/js/rankings-modals.js?v=2" defer></script>
-  <script src="/js/rankings-import.js?v=2" defer></script>
-  <script src="/js/admin-members.js?v=2" defer></script>
-  <script src="/js/admin-training.js?v=3" defer></script>
-  <script src="/js/admin-events.js?v=2" defer></script>
+  <script src="/js/admin-auth.js?v=20260912" defer></script>
+  <script src="/js/rankings-data.js?v=20260912" defer></script>
+  <script src="/js/rankings-render.js?v=20260912" defer></script>
+  <script src="/js/rankings-modals.js?v=20260912" defer></script>
+  <script src="/js/rankings-import.js?v=20260912" defer></script>
+  <script src="/js/admin-members.js?v=20260912" defer></script>
+  <script src="/js/admin-training.js?v=20260912" defer></script>
+  <script src="/js/league-scoring.js?v=20260912" defer></script>
+  <script src="/js/admin-league.js?v=20260912" defer></script>
+  <script src="/js/admin-events.js?v=20260912" defer></script>
 </body>
 </html>

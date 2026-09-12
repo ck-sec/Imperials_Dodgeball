@@ -1,0 +1,136 @@
+.club-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.75rem;
+  border: 1px solid rgba(212, 150, 26, 0.25);
+  border-radius: 12px;
+  background: radial-gradient(ellipse at top left, rgba(212, 150, 26, 0.08), transparent 65%), var(--navy);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+.club-youth-callout { margin-top: 1.5rem; }
+.club-copy { max-width: 40rem; }
+.club-eyebrow {
+  margin-bottom: 0.5rem;
+  color: var(--gold-lt);
+  font: 700 0.85rem 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.club-title {
+  margin-bottom: 0.65rem;
+  color: var(--cloud);
+  font: 800 1.8rem/1.15 'Barlow Condensed', sans-serif;
+}
+.club-copy p:not(.club-eyebrow), .club-prose {
+  color: rgba(244, 247, 255, 0.78);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+.club-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.club-callout > .club-actions { flex-shrink: 0; }
+.club-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.8rem 1.25rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: linear-gradient(135deg, var(--gold), var(--gold-lt));
+  color: var(--deep);
+  font: 800 1rem 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.club-button:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(212, 150, 26, 0.25); }
+.club-button:active { transform: translateY(0); }
+.club-button:focus-visible, .club-link:focus-visible { outline: 2px solid var(--gold-lt); outline-offset: 4px; }
+.club-button-secondary { background: transparent; border-color: rgba(240, 184, 48, 0.5); color: var(--gold-lt); }
+.club-link { color: var(--gold-lt); text-underline-offset: 0.2em; }
+.club-link:hover { color: var(--cloud); }
+.club-link:active { color: var(--gold); }
+.club-file-note { margin-top: 0.65rem; font-size: 0.8rem; color: rgba(244, 247, 255, 0.65); }
+.club-partners { padding: 0 2rem 4rem; scroll-margin-top: 6rem; }
+.club-partners-inner { max-width: 1100px; margin: 0 auto; }
+.club-partner-actions { min-width: 17rem; }
+.club-partner-actions .club-actions { flex-direction: column; }
+
+.club-page .club-header { border-bottom: 1px solid var(--border); background: rgba(12, 27, 58, 0.97); }
+.club-nav {
+  max-width: 1100px;
+  min-height: 76px;
+  margin: 0 auto;
+  padding: 0.75rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.club-brand { display: flex; align-items: center; gap: 0.75rem; color: var(--gold-lt); text-decoration: none; }
+.club-brand span { font: 400 1.5rem 'Bebas Neue', sans-serif; letter-spacing: 0.04em; }
+.club-brand img { display: block; width: 70px; height: 44px; }
+.club-nav-links { display: flex; gap: 1.25rem; }
+.club-nav-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font: 700 1rem 'Barlow Condensed', sans-serif;
+  text-decoration: none;
+}
+.club-skip { position: absolute; top: -5rem; left: 1rem; z-index: 10; }
+.club-skip:focus { top: 0.75rem; }
+.club-page-main { max-width: 1040px; margin: 0 auto; padding: 3rem 2rem 4rem; }
+.club-youth-hero {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 2.25rem;
+  background: radial-gradient(ellipse at top right, rgba(212, 150, 26, 0.07), transparent 65%);
+}
+.club-youth-hero h1 {
+  margin: 0.75rem 0 1rem;
+  color: var(--cloud);
+  font: 400 clamp(2.75rem, 7vw, 4.75rem)/1 'Bebas Neue', sans-serif;
+  letter-spacing: 0.03em;
+}
+.club-youth-hero h1 span { color: var(--gold-lt); }
+.club-youth-intro { max-width: 42rem; }
+.club-facts { display: grid; grid-template-columns: 1fr 1.35fr 1fr; gap: 1rem; margin: 1.75rem 0; }
+.club-facts > div { padding: 1.15rem; border: 1px solid var(--border); border-radius: 8px; background: var(--navy); }
+.club-facts dt { color: var(--gold-lt); font: 700 0.85rem 'Barlow Condensed', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
+.club-facts dd { margin-top: 0.5rem; font-size: 0.95rem; line-height: 1.6; }
+.club-facts .club-link { display: inline-flex; align-items: center; min-height: 44px; }
+.club-youth-details { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; padding: 2rem 0; }
+.club-youth-details h2 { margin-bottom: 0.75rem; font: 800 1.5rem 'Barlow Condensed', sans-serif; }
+.club-benefits { padding-left: 1.15rem; }
+.club-benefits li + li { margin-top: 0.5rem; }
+.club-youth-contact { border-top: 1px solid var(--border); padding-top: 1.5rem; }
+.club-youth-contact p { margin-top: 0.5rem; }
+.club-youth-contact .club-link { overflow-wrap: anywhere; }
+.club-page-footer { border-top: 1px solid var(--border); padding: 1.5rem 2rem; }
+.club-page-footer > div { max-width: 976px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+.club-page-footer a { display: inline-flex; align-items: center; min-height: 44px; font-size: 0.85rem; }
+
+@media (max-width: 760px) {
+  .club-callout { align-items: stretch; flex-direction: column; padding: 1.35rem; }
+  .club-callout > .club-actions { flex-shrink: 1; }
+  .club-partner-actions { min-width: 0; }
+  .club-facts { grid-template-columns: 1fr; gap: 0.65rem; }
+  .club-facts > div { display: grid; grid-template-columns: 5rem 1fr; gap: 0.75rem; padding: 0.9rem 1rem; align-items: baseline; }
+  .club-facts dd { margin: 0; }
+  .club-youth-details { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+@media (max-width: 480px) {
+  .club-brand span { display: none; }
+  .club-nav, .club-page-footer { padding-left: 1rem; padding-right: 1rem; }
+  .club-page-main { padding: 2rem 1rem 3rem; }
+  .club-partners { padding: 0 1rem 3rem; }
+  .club-actions .club-button { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .club-button { transition: none; }
+  .club-button:hover { transform: none; }
+}

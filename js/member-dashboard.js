@@ -1,222 +1,101 @@
-/* ═══════════════════════════════════════
-   DASHBOARD
-═══════════════════════════════════════ */
-async function enterDashboard(prefetchedData) {
+let archiveData = null;
+let archiveLoaded = false;
+let archiveLoading = false;
+let archiveVisible = 20;
+
+function renderAccount(user) {
+  currentUser = { ...currentUser, ...user };
+  byId('dashName').textContent = currentUser.display_name;
+  byId('accountName').textContent = currentUser.display_name;
+  byId('accountEmail').textContent = currentUser.email;
+  byId('emailNotifToggle').checked = currentUser.email_notifications !== false;
+}
+
+function enterDashboard(prefetchedData) {
   showView('dashboard');
-  updateNavUser();
-  trainingLoaded = false; // Reset so training tab reloads fresh data
-  document.getElementById('dashName').textContent = currentUser.display_name;
-  document.getElementById('statsName').textContent = currentUser.display_name;
+  renderAccount(prefetchedData ? prefetchedData.user : currentUser);
+  switchTab('training');
+  loadMemberLeague();
+  if (!prefetchedData) loadAccount();
+}
 
-  // If we already have data (from init), use it directly
-  if (prefetchedData) {
-    renderDashboardData(prefetchedData);
-    return;
-  }
-
-  // Otherwise fetch fresh
-  showStatsSkeletons();
-
+async function loadAccount() {
+  const epoch = memberEpoch;
   try {
-    const res = await api('/api/member/stats');
-    if (!res.ok) throw new Error('Failed to load stats');
-    const data = await res.json();
-    renderDashboardData(data);
-  } catch (err) {
-    if (err.message === 'SESSION_EXPIRED') return;
-    document.querySelectorAll('.stat-value').forEach(el => el.textContent = '\u2014');
-    document.getElementById('statsRank').textContent = '\u2014';
+    const response = await api('/api/member/stats?view=account', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Account request failed');
+    const data = await response.json();
+    if (epoch !== memberEpoch) return;
+    renderAccount(data.user);
+    byId('accountMessage').hidden = true;
+  } catch (error) {
+    if (epoch !== memberEpoch || error.message === 'SESSION_EXPIRED') return;
+    console.error('Member account load failed:', error);
+    setMessage('accountMessage', 'Kontodaten konnten nicht geladen werden.', 'Account details could not be loaded.', true);
   }
 }
 
-function showStatsSkeletons() {
-  document.querySelectorAll('.stat-value').forEach(el => {
-    el.dataset.original = el.textContent;
-    el.innerHTML = '<span class="skeleton" style="display:inline-block;width:40px;height:16px;">&nbsp;</span>';
-  });
-  document.getElementById('statsRank').innerHTML = '<span class="skeleton" style="display:inline-block;width:32px;height:24px;">&nbsp;</span>';
-}
-
-function renderDashboardData(data) {
-  if (data.user) {
-    currentUser = { ...currentUser, ...data.user };
-    updateNavUser();
-    document.getElementById('dashName').textContent = currentUser.display_name;
-    document.getElementById('statsName').textContent = currentUser.display_name;
-    // Sync email notification toggle
-    const emailToggle = document.getElementById('emailNotifToggle');
-    if (emailToggle) emailToggle.checked = data.user.email_notifications !== false;
-  }
-
-  if (data.stats) {
-    document.getElementById('statsRank').textContent = '#' + data.stats.rank;
-    document.getElementById('statPoints').textContent = data.stats.points;
-    document.getElementById('statStreak').textContent = data.stats.streak;
-    document.getElementById('statPlayed').textContent = data.stats.played;
-    document.getElementById('statRef').textContent = data.stats.bp;
-
-    const gainEl = document.getElementById('statGain');
-    if (data.stats.gain !== null && data.stats.gain !== undefined) {
-      gainEl.textContent = (data.stats.gain > 0 ? '+' : '') + data.stats.gain;
-      gainEl.className = 'stat-value ' + (data.stats.gain > 0 ? 'gain-pos' : data.stats.gain < 0 ? 'gain-neg' : '');
-    } else {
-      gainEl.textContent = '\u2014';
-    }
-
-    // Tier badge
-    if (data.stats.tier) {
-      const validTiers = ['bronze', 'silver', 'gold', 'platinum'];
-      const tier = validTiers.includes(data.stats.tier) ? data.stats.tier : 'bronze';
-      const tierEl = document.getElementById('statsTier');
-      tierEl.textContent = data.stats.tier;
-      tierEl.className = 'tier-badge tier-' + tier;
-      tierEl.style.display = '';
-    }
-
-    document.getElementById('statsEmpty').style.display = 'none';
-  } else {
-    // No linked ranking
-    document.querySelectorAll('.stat-value').forEach(el => el.textContent = '\u2014');
-    document.getElementById('statsRank').textContent = '\u2014';
-    document.getElementById('statsEmpty').style.display = '';
-  }
-
-  // Leaderboard
-  rankingsData = data.rankings || [];
-  renderLeaderboard();
-}
-
-/* ═══════════════════════════════════════
-   LEADERBOARD
-═══════════════════════════════════════ */
-function filterLeaderboard(filter, btn) {
-  lbFilter = filter;
-  lbVisible = 25;
-  document.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  renderLeaderboard();
-}
-
-function sortLeaderboard(key) {
-  if (lbSort.key === key) {
-    lbSort.asc = !lbSort.asc;
-  } else {
-    lbSort.key = key;
-    lbSort.asc = key === 'name';
-  }
-  renderLeaderboard();
-}
-
-function renderLeaderboard() {
-  const search = (document.getElementById('lbSearch').value || '').toLowerCase();
-  let players = [...rankingsData];
-
-  // Sort by points first to determine ranks
-  players.sort((a, b) => (b.points || 0) - (a.points || 0));
-  players.forEach((p, i) => p._rank = i + 1);
-
-  // Filter
-  if (lbFilter !== 'all') {
-    players = players.filter(p => p.gender === lbFilter);
-  }
-  if (search) {
-    players = players.filter(p => (p.name || '').toLowerCase().includes(search));
-  }
-
-  // Sort
-  const { key, asc } = lbSort;
-  if (key === 'rank') {
-    players.sort((a, b) => asc ? a._rank - b._rank : b._rank - a._rank);
-  } else if (key === 'name') {
-    players.sort((a, b) => asc ? (a.name || '').localeCompare(b.name || '') : (b.name || '').localeCompare(a.name || ''));
-  } else {
-    players.sort((a, b) => asc ? (a[key] || 0) - (b[key] || 0) : (b[key] || 0) - (a[key] || 0));
-  }
-
-  const tbody = document.getElementById('lbBody');
-  const empty = document.getElementById('lbEmpty');
-
-  if (players.length === 0) {
-    tbody.innerHTML = '';
-    empty.style.display = '';
-    return;
-  }
-  empty.style.display = 'none';
-
-  const totalCount = players.length;
-  const visible = players.slice(0, lbVisible);
-
-  const selfName = currentUser && currentUser.ranking_player_name
-    ? currentUser.ranking_player_name.toLowerCase()
-    : null;
-
-  const medals = ['', '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'];
-  let selfRow = null;
-  let selfInView = false;
-
-  tbody.innerHTML = visible.map(p => {
-    const isSelf = selfName && (p.name || '').toLowerCase() === selfName;
-    if (isSelf) { selfRow = p._rank; selfInView = true; }
-    const rankDisplay = p._rank <= 3
-      ? `<span class="rank-medal">${medals[p._rank]}</span>`
-      : `<span class="rank-num">${p._rank}</span>`;
-    const gainClass = (p.gain > 0) ? 'gain-pos' : (p.gain < 0) ? 'gain-neg' : 'gain-neu';
-    const gainText = p.gain > 0 ? '+' + p.gain : (p.gain === null || p.gain === undefined ? '\u2014' : p.gain);
-    const tierHtml = p.tier ? `<span class="tier-badge tier-${escapeHtml(p.tier)}">${escapeHtml(p.tier)}</span>` : '';
-    const youBadge = isSelf ? '<span class="you-badge">YOU</span>' : '';
-
-    return `<tr class="${isSelf ? 'row-self' : ''}" ${isSelf ? 'aria-current="true"' : ''}>
-      <td>${rankDisplay}</td>
-      <td><span class="player-name">${escapeHtml(p.name || '')}</span>${tierHtml}${youBadge}</td>
-      <td><span class="points-val">${p.points}</span></td>
-      <td><span class="${gainClass}">${gainText}</span></td>
-      <td>${p.played}</td>
-      <td><span class="streak-val">${p.streak}</span></td>
-      <td><span class="ref-val">${p.bp}</span></td>
-      <td>${p.change > 0 ? '<span class="rank-change up">&#9650;' + p.change + '</span>' : p.change < 0 ? '<span class="rank-change down">&#9660;' + Math.abs(p.change) + '</span>' : '<span class="rank-change neu">—</span>'}</td>
-    </tr>`;
-  }).join('');
-
-  // Load More button
-  const existing = document.getElementById('lbLoadMore');
-  if (existing) existing.remove();
-  if (totalCount > lbVisible) {
-    const btn = document.createElement('button');
-    btn.id = 'lbLoadMore';
-    btn.className = 'lb-load-more';
-    btn.textContent = `Load More (${lbVisible} of ${totalCount})`;
-    btn.onclick = () => { lbVisible += 25; renderLeaderboard(); };
-    tbody.closest('.lb-table-wrap').after(btn);
-  }
-
-  // Auto-scroll to user's row
-  if (selfInView && selfRow) {
-    setTimeout(() => {
-      const row = tbody.querySelector('.row-self');
-      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
-  }
-}
-
-/* ═══════════════════════════════════════
-   EMAIL PREFERENCES
-═══════════════════════════════════════ */
 async function saveEmailPrefs() {
-  const toggle = document.getElementById('emailNotifToggle');
-  const savedEl = document.getElementById('settingsSaved');
-  if (!toggle) return;
-
+  if (byId('savePrefsBtn').disabled) return;
+  const epoch = memberEpoch;
+  const enabled = byId('emailNotifToggle').checked;
+  setBusy('savePrefsBtn', true);
+  byId('emailNotifToggle').disabled = true;
+  byId('settingsSaved').hidden = true;
   try {
-    const res = await api('/api/member/stats', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email_notifications: toggle.checked })
+    const response = await api('/api/member/stats', {
+      method: 'PATCH', body: JSON.stringify({ email_notifications: enabled })
     });
-    if (!res.ok) throw new Error('Failed');
-    savedEl.style.display = 'inline';
-    setTimeout(() => { savedEl.style.display = 'none'; }, 2500);
-  } catch (err) {
-    if (err.message === 'SESSION_EXPIRED') return;
-    alert('Could not save preferences. Please try again.');
+    if (!response.ok) throw new Error('Preferences request failed');
+    if (epoch !== memberEpoch) return;
+    currentUser.email_notifications = enabled;
+    setMessage('settingsSaved', 'Gespeichert.', 'Saved.');
+  } catch (error) {
+    if (epoch !== memberEpoch || error.message === 'SESSION_EXPIRED') return;
+    console.error('Member preferences save failed:', error);
+    setMessage('settingsSaved', 'Nicht gespeichert. Bitte erneut versuchen.', 'Not saved. Please try again.', true);
+  } finally {
+    if (epoch === memberEpoch) {
+      setBusy('savePrefsBtn', false);
+      byId('emailNotifToggle').disabled = false;
+    }
   }
+}
+
+async function loadMemberArchive() {
+  if (archiveLoaded || archiveLoading) return;
+  archiveLoading = true;
+  const epoch = memberEpoch;
+  byId('memberArchiveContent').innerHTML = `<p class="league-notice" role="status">${mt('Archiv wird geladen …', 'Loading archive …')}</p>`;
+  try {
+    const response = await api('/api/member/stats', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Archive request failed');
+    const data = await response.json();
+    if (epoch !== memberEpoch) return;
+    archiveData = data;
+    archiveLoaded = true;
+    renderMemberArchive();
+  } catch (error) {
+    if (epoch !== memberEpoch || error.message === 'SESSION_EXPIRED') return;
+    console.error('Member archive load failed:', error);
+    byId('memberArchiveContent').innerHTML = `<p class="league-error" role="alert">${mt('Archiv nicht erreichbar.', 'Archive unavailable.')}</p><button type="button" class="league-btn" data-archive-retry>${mt('Erneut versuchen', 'Try again')}</button>`;
+  } finally {
+    if (epoch === memberEpoch) archiveLoading = false;
+  }
+}
+
+function renderMemberArchive() {
+  if (!archiveData) return;
+  const stats = archiveData.stats;
+  const players = archiveData.rankings || [];
+  byId('memberArchiveContent').innerHTML = `
+    <p class="league-copy">${mt('Abgeschlossene Saison. Nicht Teil der aktuellen Liga.', 'Completed season. Separate from the current league.')}</p>
+    <p class="league-notice">${stats
+      ? `${mt('Dein Archiv-Ergebnis', 'Your archived result')}: #${escapeHtml(stats.rank)} · ${escapeHtml(stats.points)} ${mt('Punkte', 'points')}`
+      : mt('Kein Season-1-Ergebnis mit deinem Konto verknüpft.', 'No Season 1 result is linked to your account.')}</p>
+    ${stats ? `<p class="league-copy">${escapeHtml(stats.played)} ${mt('gespielt', 'played')} · ${mt('Serie', 'Streak')}: ${escapeHtml(stats.streak)} · ${mt('Bonuspunkte', 'Bonus points')}: ${escapeHtml(stats.bp)}${stats.tier ? ' · ' + escapeHtml(stats.tier) : ''}</p>` : ''}
+    ${window.LeagueUI.standings(players.slice(0, archiveVisible).map(player => ({
+      rank: player.rank, display_name: player.name, points: player.points, played: player.played
+    })), memberLang())}
+    ${players.length > archiveVisible ? `<button type="button" class="league-btn" data-archive-more>${mt('Mehr anzeigen', 'Show more')}</button>` : ''}`;
 }
