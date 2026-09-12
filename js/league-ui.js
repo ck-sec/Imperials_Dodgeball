@@ -27,7 +27,7 @@ window.LeagueUI = (function() {
       provisional: 'Vorl\u00e4ufig, bis alle Ergebnisse best\u00e4tigt sind.',
       noBuffer: 'Keine Zeitreserve f\u00fcr Aufw\u00e4rmen oder Verz\u00f6gerungen eingeplant.',
       substitutes: 'rotierende Ersatzspieler', published: 'Teams freigegeben', finalized: 'Ergebnis best\u00e4tigt',
-      place: 'Platz', rules: 'Punkte pro Platzierung', rest: 'Weitere Pl\u00e4tze',
+      place: 'Platz', rules: 'Punkte & Rangstufen', rest: 'Weitere Pl\u00e4tze',
       total: 'Alle Trainings z\u00e4hlen zur Saison. Gleiche Punktzahl = gleicher Rang.',
       rotated: 'Alle spielen mit. Gr\u00f6\u00dfere Kader wechseln durch; auf dem Feld bleibt es bei',
       noTeams: 'Noch keine freigegebenen Teams in dieser Saison.',
@@ -58,7 +58,7 @@ window.LeagueUI = (function() {
       provisional: 'Provisional until all results are confirmed.',
       noBuffer: 'No time buffer for warm-up or delays is included.',
       substitutes: 'rotating substitutes', published: 'Teams published', finalized: 'Result confirmed',
-      place: 'Place', rules: 'Points by placement', rest: 'Further places',
+      place: 'Place', rules: 'Points & tiers', rest: 'Further places',
       total: 'Every training counts towards the season. Equal points share the same rank.',
       rotated: 'Everyone plays. Larger squads rotate substitutes; on court it stays',
       noTeams: 'No published teams in this season.',
@@ -101,7 +101,29 @@ window.LeagueUI = (function() {
         <p class="league-copy">${bonusMax === 0 ? escape(t.bonusOff) : escape(lang === 'de'
           ? `Zus\u00e4tzlich bis zu ${format(bonusMax)} BP pro Spieler und Training, in ${format(bonusStep)}er-Schritten. ${t.bonusIncluded}`
           : `Up to ${format(bonusMax)} BP per player and training, in steps of ${format(bonusStep)}. ${t.bonusIncluded}`)}</p>
+        <p class="league-copy">${lang === 'de'
+          ? 'Rangstufen nach Gesamtpunkten inklusive BP. Jede Saison beginnt neu.'
+          : 'Tiers use total season points including BP. Each season starts fresh.'}</p>
+        <ul class="league-tier-list" aria-label="${lang === 'de' ? 'Rangstufen' : 'Season tiers'}">${window.LeagueScoring.seasonTiers.map(tier =>
+          `<li>${tierBadge({ points: tier.minimum }, lang)}<span>${lang === 'de' ? 'ab' : 'from'} ${format(tier.minimum)} ${escape(t.points)}</span></li>`
+        ).join('')}</ul>
       </details>`;
+  }
+
+  function tierBadge(entry, lang = 'en') {
+    const scoring = window.LeagueScoring;
+    const tier = entry.legacy
+      ? scoring.seasonTiers.find(item => item.id === entry.legacy.tier)
+      : scoring.seasonTier(entry.points);
+    if (!tier) {
+      if (!entry.legacy.tier) return '';
+      console.error('Unknown archived rank tier; displaying its label without a tier colour.');
+      return `<span class="league-table-tier">${escape(entry.legacy.tier)}</span>`;
+    }
+    const description = entry.legacy
+      ? (lang === 'de' ? 'Season 1: archivierte Rangstufe' : 'Season 1: archived tier')
+      : (lang === 'de' ? `Ab ${tier.minimum} Gesamtpunkten inklusive BP` : `From ${tier.minimum} total points including BP`);
+    return `<span class="league-table-tier league-tier-${tier.id}" title="${escape(description)}">${escape(tier.label)}</span>`;
   }
 
   function bonus(entry, lang = 'en', compact = false) {
@@ -190,7 +212,7 @@ window.LeagueUI = (function() {
           + (recordValue === undefined ? '' : ' &middot; ' + escape(recordValue) + ' ' + escape(record));
         return `<tr>
           <td class="league-table-rank${rankColor}"><span class="league-rank">#${escape(p.rank)}</span><span class="league-table-mobile">${tableChange(changes, 'rank')}</span></td>
-          <th scope="row" class="league-table-player"><span class="league-player-name">${escape(p.display_name)}</span>${p.legacy && p.legacy.tier ? `<span class="league-table-tier">${escape(p.legacy.tier)}</span>` : ''}<small class="league-table-mobile league-player-meta" title="${escape(meta)}">${shortMeta}</small></th>
+          <th scope="row" class="league-table-player"><span class="league-player-name">${escape(p.display_name)}</span>${tierBadge(p, lang)}<small class="league-table-mobile league-player-meta" title="${escape(meta)}">${shortMeta}</small></th>
           <td class="league-table-number"><span class="league-table-points">${escape(format(p.points))}</span><span class="league-table-mobile">${tableChange(changes, 'points')}</span></td>
           <td class="league-table-number league-table-secondary">${tableChange(changes, 'points')}</td>
           <td class="league-table-number league-table-secondary">${escape(format(p.played))}</td>
@@ -283,5 +305,5 @@ window.LeagueUI = (function() {
       ${matchTable(eventData, lang)}`;
   }
 
-  return { escape, text, date, seasonOptions, rules, bonus, standings, movement, matchdayLink, event, matchTable, schedule };
+  return { escape, text, date, seasonOptions, rules, tierBadge, bonus, standings, movement, matchdayLink, event, matchTable, schedule };
 })();

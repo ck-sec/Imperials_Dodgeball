@@ -149,8 +149,9 @@ test('member page is German-first, training-first and versions every local style
   assert.match(html, /data-tab="training" role="tab"[^>]+aria-selected="true"/);
   assert.doesNotMatch(html, /href="\/#training-league"|data-tab="stats"|data-tab="settings"/);
   assert.match(html, /<details[^>]+id="seasonOneArchive"/);
-  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=20260912[bc]?$/);
-  for (const asset of ['/league.css', '/js/league-ui.js', '/js/member-core.js', '/js/member-dashboard.js', '/js/member-init.js']) assert.ok(html.includes(asset + '?v=20260912c'));
+  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=20260912[b-d]?$/);
+  for (const asset of ['/league.css', '/js/league-ui.js', '/js/league-scoring.js']) assert.ok(html.includes(asset + '?v=20260912d'));
+  for (const asset of ['/js/member-core.js', '/js/member-dashboard.js', '/js/member-init.js']) assert.ok(html.includes(asset + '?v=20260912c'));
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
   assert.ok(html.indexOf('member-recovery-token.js') < html.indexOf('<link'));
   assert.doesNotMatch(source('member-auth') + source('member-init') + source('member-recovery-token'), /localStorage|sessionStorage/);

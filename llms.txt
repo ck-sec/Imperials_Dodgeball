@@ -1,8 +1,8 @@
 # Vienna Imperials
-> Austria's first and premier foam dodgeball club, based in Vienna. Dodgeball Wien — Völkerball neu gedacht.
+> Foam dodgeball club in Vienna, Austria. Training, Imperials Social League and youth dodgeball.
 
 ## About
-The Vienna Imperials are Vienna's leading foam dodgeball club (Dodgeball Wien). Known internationally as dodgeball and in German-speaking countries as Völkerball, we play the modern foam variant under official World Dodgeball Federation rules. We run weekly social leagues, competitive seasons, and tournaments in Vienna, Austria.
+The Vienna Imperials are a foam dodgeball club in Vienna, Austria. Dodgeball is related to Völkerball, with its own rules. We play the modern foam variant under World Dodgeball Federation rules and offer weekly training, the Imperials Social League and youth training.
 
 ## Key Pages
 - [Homepage](https://www.imperialsdodgeball.com/): Dodgeball Wien — Vereinsinfo, Angebot, FAQ, Rangliste und Anmeldung
@@ -28,6 +28,4 @@ The Vienna Imperials are Vienna's leading foam dodgeball club (Dodgeball Wien). 
 - Semester pass: €100; annual pass: €180. Ask the club about pass coverage. myClubs check-in is available.
 - The public league uses one season selector for current results and the frozen Season 1 archive (125 players), including tied Hall of Fame places.
 - Current movement compares totals with the latest chronologically scored training; archived results are not given new movement calculations.
-
-## Keywords
-Dodgeball Wien, Völkerball Wien, Dodgeball Verein Wien, foam dodgeball Austria, Vienna Imperials
+- Season 2 tiers use total season points including bonus points: Bronze from 0, Silver from 10, Gold from 25, Platinum from 45 and Diamond from 70. Private skill ratings are used for team balancing, not public tiers. Season 1 retains its archived tiers.

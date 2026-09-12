@@ -247,8 +247,46 @@ test('archive table preserves original BP, gain, streak and rank change without 
   assert.match(html, /Archived movement: \+2 Points/);
   assert.match(html, /1 place down/);
   assert.match(html, /league-table-points">70</);
+  assert.match(html, /league-tier-platinum" title="Season 1: archived tier">Platinum/);
+  assert.doesNotMatch(html, /league-tier-diamond|From 45 total/);
   assert.doesNotMatch(html, /BP are included|BP 0|From the last scored training/);
   assert.equal(JSON.stringify(player), before);
+});
+
+test('live tier badges use total points including BP exactly once, never private skill or table position', () => {
+  const player = { rank: 1, display_name: 'Player', points: 24.5, base_points: 24, bonus_points: 0.5,
+    played: 10, wins: 3, rating: 2000 };
+  const before = JSON.stringify(player);
+  assert.match(ui.standings([player], 'en'), /league-tier-silver/);
+  assert.doesNotMatch(ui.standings([player], 'en'), /league-tier-gold|2000/);
+  assert.match(ui.standings([{ ...player, points: 25, base_points: 24.5 }], 'en'), /league-tier-gold/);
+  assert.match(ui.tierBadge({ points: 70 }, 'de'), /league-tier-diamond" title="Ab 70 Gesamtpunkten inklusive BP">Diamond/);
+  assert.equal(JSON.stringify(player), before);
+});
+
+test('unknown archived labels are escaped and cannot inject a badge class', () => {
+  const html = ui.tierBadge({ legacy: { tier: '"><img src=x>' } }, 'en');
+  assert.match(html, /&quot;&gt;&lt;img src=x&gt;/);
+  assert.doesNotMatch(html, /<img|league-tier-/);
+});
+
+test('points rules expose the five tier thresholds without expanding the compact rankings', () => {
+  const config = { placement_points: [3, 2.5, 2, 1, 0.5] };
+  const html = ui.rules(config, 'de');
+  assert.match(html, /Punkte &amp; Rangstufen/);
+  assert.match(html, /Gesamtpunkten inklusive BP/);
+  assert.equal((html.match(/<li>/g) || []).length, 5);
+  for (const minimum of [0, 10, 25, 45, 70]) assert.match(html, new RegExp('ab ' + minimum + ' Punkte'));
+  assert.match(ui.rules(config, 'en'), /Each season starts fresh/);
+});
+
+test('all ranking surfaces load the same refreshed tier logic, markup and styles', () => {
+  for (const file of ['index.html', 'admin.html', 'member.html', 'spieltag.html']) {
+    const html = fs.readFileSync(path.join(root, file), 'utf8');
+    for (const asset of ['/js/league-scoring.js', '/js/league-ui.js', '/league.css']) {
+      assert.ok(html.includes(asset + '?v=20260912d'), file + ' must refresh ' + asset);
+    }
+  }
 });
 
 test('bonus rules explain configurable limits and the disabled state', () => {

@@ -224,11 +224,11 @@ test('standalone page uses versioned local assets, external scripts, rewrite, an
   assert.ok(config.rewrites.some(rule => rule.source === '/spieltag' && rule.destination === '/spieltag.html'));
   assert.match(html, /viewport/);
   assert.match(html, /fonts\/fonts.css\?v=20260912c/);
-  assert.match(html, /league.css\?v=20260912c/);
+  assert.match(html, /league.css\?v=20260912d/);
   assert.match(html, /matchday.css\?v=20260912c/);
   assert.doesNotMatch(html, /publicsite.css|admin-auth.js|member-auth.js|\son[a-z]+=/);
   for (const script of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
-    assert.match(script[1], /src="\/js\/[^"]+\?v=20260912c"/);
+    assert.match(script[1], /src="\/js\/[^"]+\?v=20260912[cd]"/);
     assert.equal(script[2].trim(), '');
   }
   assert.match(html, /id="matchdayLoginLink" href="\/member\?return_to=/);

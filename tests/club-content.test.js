@@ -56,3 +56,57 @@ test('new youth-page assets and internal destinations all exist in the release',
   assert.doesNotMatch(youth, /fonts\.googleapis\.com/);
   assert.match(youth, /src="\/js\/site-language\.js\?v=20260912"/);
 });
+
+test('the sitemap lists only canonical indexable content, not authentication or operational URLs', () => {
+  const origin = 'https://www.imperialsdodgeball.com';
+  const pages = [
+    ['/', 'index.html'], ['/dodgeball-wien', 'dodgeball-wien.html'],
+    ['/jugendtraining-wien', 'jugendtraining-wien.html'],
+    ['/impressum.html', 'impressum.html'], ['/datenschutz.html', 'datenschutz.html']
+  ];
+  const sitemap = read('sitemap.xml');
+  const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
+  assert.deepEqual(locations, pages.map(([url]) => origin + url));
+  assert.equal((sitemap.match(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/g) || []).length, pages.length);
+  for (const [url, file] of pages) {
+    const html = read(file);
+    assert.ok(html.includes(`rel="canonical" href="${origin + url}"`), file);
+    assert.doesNotMatch(html, /<meta[^>]+name="robots"[^>]+content="[^"]*noindex/i, file);
+  }
+  for (const file of ['member.html', 'admin.html']) assert.match(read(file), /name="robots" content="[^"]*noindex/);
+  assert.match(read('robots.txt'), /Sitemap: https:\/\/www\.imperialsdodgeball\.com\/sitemap\.xml/);
+  assert.doesNotMatch(read('robots.txt'), /Disallow:\s*\/(?:js|fonts|league)/);
+});
+
+test('content pages have distinct search descriptions and do not advertise nonexistent language URLs', () => {
+  const titles = new Set();
+  const descriptions = new Set();
+  for (const file of ['index.html', 'dodgeball-wien.html', 'jugendtraining-wien.html', 'impressum.html', 'datenschutz.html']) {
+    const html = read(file);
+    const title = html.match(/<title>([^<]+)<\/title>/)[1];
+    const description = html.match(/name="description" content="([^"]+)"/)[1];
+    assert.ok(!titles.has(title), file);
+    assert.ok(!descriptions.has(description), file);
+    titles.add(title);
+    descriptions.add(description);
+    assert.doesNotMatch(html, /hreflang=/, file);
+  }
+});
+
+test('public marketing pages have complete social previews and consistent club identity', async () => {
+  const clubId = 'https://www.imperialsdodgeball.com/#club';
+  for (const file of ['index.html', 'dodgeball-wien.html', 'jugendtraining-wien.html']) {
+    const html = read(file);
+    for (const field of ['title', 'description', 'image', 'image:alt']) {
+      assert.match(html, new RegExp(`property="og:${field}" content="[^"]+"`), file);
+      assert.match(html, new RegExp(`name="twitter:${field}" content="[^"]+"`), file);
+    }
+    const data = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+    const club = data['@type'] === 'SportsClub' ? data : data.about;
+    assert.equal(club['@id'], clubId, file);
+    assert.equal(club.sport, 'Dodgeball', file);
+    assert.equal(club.url, 'https://www.imperialsdodgeball.com/', file);
+  }
+  const image = await require('sharp')(path.join(root, 'og-image.jpg')).metadata();
+  assert.deepEqual([image.width, image.height], [1200, 630]);
+});

@@ -3,6 +3,25 @@
   if (typeof module === 'object' && module.exports) module.exports = scoring;
   else root.LeagueScoring = scoring;
 })(typeof window === 'undefined' ? globalThis : window, function() {
+  const seasonTiers = Object.freeze([
+    { id: 'bronze', label: 'Bronze', minimum: 0 },
+    { id: 'silver', label: 'Silver', minimum: 10 },
+    { id: 'gold', label: 'Gold', minimum: 25 },
+    { id: 'platinum', label: 'Platinum', minimum: 45 },
+    { id: 'diamond', label: 'Diamond', minimum: 70 }
+  ].map(tier => Object.freeze(tier)));
+
+  function seasonTier(totalPoints) {
+    if (!Number.isFinite(totalPoints) || totalPoints < 0) {
+      throw new RangeError('Season tiers require a finite, nonnegative total.');
+    }
+    let tier = seasonTiers[0];
+    for (const candidate of seasonTiers) {
+      if (totalPoints >= candidate.minimum) tier = candidate;
+    }
+    return tier;
+  }
+
   function placementPoints(settings, teamCount) {
     if (!Number.isInteger(teamCount) || teamCount < 2) throw new RangeError('At least two teams are required.');
     const points = settings.placement_points;
@@ -25,5 +44,5 @@
       return Number((Math.round(scaled + tolerance) * step).toFixed(4));
     });
   }
-  return { placementPoints };
+  return { placementPoints, seasonTiers, seasonTier };
 });

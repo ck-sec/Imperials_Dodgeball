@@ -221,6 +221,29 @@ relativ angepasst und auf halbe Punkte gerundet:
   Training der ausgewaehlten Saison**, mit Datum und Bezeichnung als Bezug.
   Sie zeigen nicht die Aenderung seit deinem letzten Besuch oder Browser-Refresh.
 
+### Farbige Rangstufen bis Diamond
+
+Die kompakten Ranglisten zeigen wieder farbig hinterlegte Badges im bisherigen
+Stil. Fuer Season 2 zaehlen die **Gesamtpunkte inklusive BP**, nicht das private
+Elo und nicht die aktuelle Tabellenposition:
+
+| Rangstufe | Ab Gesamtpunkten | Teilnahmen bei durchschnittlich 2,5 Punkten |
+|---|---:|---:|
+| Bronze | 0 | Saisonstart |
+| Silver | 10 | 4 |
+| Gold | 25 | 10 |
+| Platinum | 45 | 18 |
+| Diamond | 70 | 28 |
+
+Es sind **35 Donnerstagstermine** eingeplant. Diamond ist beispielsweise mit
+28 Teilnahmen und durchschnittlich 2,5 Punkten erreichbar; dabei bleiben sieben
+Termine frei. Auch ohne BP geht es: 35 dritte Plaetze bei jeweils fuenf Teams
+ergeben 70 Punkte. Das sind Rechenbeispiele zur aktuellen Punktekurve, keine
+Erfolgsgarantie; zusaetzliche Absagen oder geaenderte Punkte beeinflussen den Weg.
+Die Schwellen stehen unter **Punkte & Rangstufen**. Pro Saison wird neu gezaehlt.
+**Season 1 behaelt seine archivierten Rangstufen**, auch wenn die damaligen
+Punkte nach den neuen Regeln eine andere Stufe ergeben wuerden.
+
 ## 8. Head Ref freischalten
 
 Bei **Player profiles, private skill & Head Ref** ein bestehendes,
@@ -280,6 +303,21 @@ Zuschauer brauchen auf der Spieltagsseite keinen Login.
   die neue Paarung uebertragen. Erst die aktualisierte Paarung anzeigen lassen
   und das Ergebnis dafuer neu pruefen. Ungespeicherte Formulare sind kein Ersatz
   fuer Speichern und keine Zusage, dass Eingaben ein Schliessen der Seite ueberleben.
+
+## 10. Technische SEO-Grundlagen
+
+- Die Sitemap enthaelt nur kanonische, indexierbare Inhaltsseiten. Der
+  Mitglieder-Login mit bestehendem `noindex` wurde daraus entfernt; die
+  Aenderungsdaten entsprechen den aktuellen Seiten.
+- Such- und Linkvorschauen sind auf Deutsch klarer formuliert. Vereinsstartseite,
+  Trainings-/Regelseite und Jugendangebot haben unterschiedliche Schwerpunkte.
+- Die Jugendseite hat vollstaendige Social-Preview-Angaben. Die Vereinsdaten in
+  den strukturierten Daten verwenden eine gemeinsame, stabile Club-Kennung.
+- Irrefuehrende Sprachverweise auf dieselbe URL wurden entfernt. DE/EN bleibt
+  bedienbar; echte separat indexierbare englische URLs sind damit nicht umgesetzt.
+- Keine neue Ligaseite, keine geaenderten Loginablaeufe und keine neuen Tracker.
+  Suchmaschinen entscheiden selbst ueber Indexierung und Rankings; ein
+  Rankinganstieg oder neue Rich Results sind nicht garantiert.
 
 ## Direkte Einstiege
 
