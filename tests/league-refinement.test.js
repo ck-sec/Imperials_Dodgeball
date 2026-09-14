@@ -53,6 +53,13 @@ function recorder(readRows = [], simulate) {
 const request = (action, event, extra = {}) => validateAction({ action, event_id: event.id, version: event.version, ...extra });
 const placement = event => event.teams.map(t => ({ team_number: t.number, placement: t.number }));
 const inputTeams = event => event.teams.map(t => ({ number: t.number, name: t.name, player_ids: t.players.map(p => p.id) }));
+const legacyTwoTeamSchedule = () => ({
+  courts: 1, match_minutes: 20, break_minutes: 0, available_minutes: 120, duration_minutes: 20,
+  rounds: [{
+    number: 1, start_minute: 0, end_minute: 20, bye_teams: [],
+    matches: [{ number: 1, team_a: 1, team_b: 2, court: 1, score_a: null, score_b: null }],
+  }],
+});
 const finalized = (world, event) => {
   const result = scoreEvent(event, placement(event));
   event.teams = result.teams;
@@ -60,7 +67,7 @@ const finalized = (world, event) => {
   world.results = world.results.filter(r => r.event_id !== event.id).concat(result.ledger.map(r => ({ ...r, event_id: event.id })));
 };
 
-test('2/3-a-side and auto support four players while preserving every larger-roster player', () => {
+test('legacy balancing supports two squads while new generation requires a third referee squad', () => {
   const people = playerView(fixture());
   for (const size of [2, 3]) {
     const result = balanceTeams(people.slice(0, size * 2), size);
@@ -69,8 +76,10 @@ test('2/3-a-side and auto support four players while preserving every larger-ros
   assert.equal(balanceTeams(people.slice(0, 4), 'auto').team_size, 2);
   assert.equal(balanceTeams(people, 'auto').team_size, 3);
   assert.throws(() => balanceTeams(people.slice(0, 3), 'auto'));
+  assert.throws(() => validateAction({ action: 'generate', season_id: id(300), session_id: id(200), team_size: 2,
+    player_ids: people.slice(0, 4).map(p => p.id) }), /6–500/);
   assert.equal(validateAction({ action: 'generate', season_id: id(300), session_id: id(200), team_size: 2,
-    player_ids: people.slice(0, 4).map(p => p.id) }).team_size, 2);
+    player_ids: people.map(p => p.id), max_teams: 3 }).team_size, 2);
 });
 
 test('bonus settings/awards use strict numeric range, frozen step and unique actual participants', () => {
@@ -243,7 +252,7 @@ test('draft and scorekeeper guards fail safely under concurrent RSVP edits and r
   await assert.rejects(applyAction(raced, request('save_draft', event, { teams: inputTeams(event), team_size: 2 }), world),
     error => dbError(error).status === 409);
   event.status = 'published';
-  event.schedule = buildSchedule(2);
+  event.schedule = legacyTwoTeamSchedule();
   const revoked = recorder([], queries => {
     const lock = queries.findIndex(q => /FROM users WHERE id = .* FOR SHARE/.test(q.text));
     const guard = queries.findIndex(q => /league_scorekeeper = true/.test(q.text));
@@ -258,7 +267,7 @@ test('draft and scorekeeper guards fail safely under concurrent RSVP edits and r
 test('only approved active assigned members may score; permanent role cannot change rosters/BP/settings', async () => {
   const world = fixture(), event = world.events[0], actor = { is_admin: false, user_id: id(100) };
   event.status = 'published';
-  event.schedule = buildSchedule(2);
+  event.schedule = legacyTwoTeamSchedule();
   const input = request('save_match', event, { match_number: 1, score_a: 0, score_b: 0 });
   const sql = recorder();
   await applyAction(sql, input, world, actor);
@@ -292,7 +301,7 @@ test('scorekeeper assignment is admin-only, row-locked, strict boolean and limit
 test('scoring GET excludes unpublished/cancelled/non-Thursday events and all private player fields', () => {
   const world = fixture(), event = world.events[0];
   event.status = 'published';
-  event.schedule = buildSchedule(2);
+  event.schedule = legacyTwoTeamSchedule();
   for (const [offset, date, status, cancelled] of [
     [1, '2026-09-17', 'draft', false], [2, '2026-09-17', 'published', true],
     [3, '2026-09-11', 'published', false], [4, '2026-09-17', 'published', false],
@@ -320,7 +329,7 @@ test('scoring GET excludes unpublished/cancelled/non-Thursday events and all pri
 test('scoring default selects today, otherwise nearest future, otherwise most recent past, including readonly unscheduled events', () => {
   const world = fixture(), event = world.events[0];
   event.status = 'published';
-  event.schedule = buildSchedule(2);
+  event.schedule = legacyTwoTeamSchedule();
   for (const [offset, date] of [[1, '2026-09-17'], [2, '2026-09-24']]) {
     world.sessions.push({ ...world.sessions[0], id: id(200 + offset), session_date: date });
     world.events.push({ ...structuredClone(event), id: id(400 + offset), session_id: id(200 + offset), session_date: date });

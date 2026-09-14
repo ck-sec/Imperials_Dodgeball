@@ -17,7 +17,8 @@ window.LeagueUI = (function() {
       rankUp: 'Pl\u00e4tze gestiegen', rankUpOne: 'Platz gestiegen',
       rankDown: 'Pl\u00e4tze gefallen', rankDownOne: 'Platz gefallen',
       teams: 'Teams', training: 'Training ausw\u00e4hlen', members: 'Spieler',
-      schedule: 'Spielplan', round: 'Runde', court: 'Feld', bye: 'Pause',
+      schedule: 'Spielplan', round: 'Runde', court: 'Feld', bye: 'Pause', refTeam: 'Ref-Team',
+      program: '18:00 Treffpunkt & Aufwärmen · 18:15 Ligaspiele · 20:00 Last Man / Last Woman Standing (max. 10 Min.)',
       noSchedule: 'Noch kein Spielplan freigegeben.', pendingMatch: 'Ausstehend',
       matchTable: 'Spieltagstabelle', matchPoints: 'Matchpunkte',
       matchRules: 'Sieg 2 / Unentschieden 1 / Niederlage 0. Danach z\u00e4hlen Punktedifferenz und erzielte Punkte. Diese Matchpunkte sind keine Saisonpunkte.',
@@ -48,7 +49,8 @@ window.LeagueUI = (function() {
       rankUp: 'places up', rankUpOne: 'place up',
       rankDown: 'places down', rankDownOne: 'place down',
       teams: 'Teams', training: 'Choose training', members: 'players',
-      schedule: 'Schedule', round: 'Round', court: 'Court', bye: 'Rest',
+      schedule: 'Schedule', round: 'Round', court: 'Court', bye: 'Rest', refTeam: 'Ref team',
+      program: '18:00 meet & warm-up · 18:15 league games · 20:00 Last Man / Last Woman Standing (10 min max)',
       noSchedule: 'No published match schedule yet.', pendingMatch: 'Pending',
       matchTable: 'Match standings', matchPoints: 'Match points',
       matchRules: 'Win 2 / Draw 1 / Loss 0, then score difference and points scored. These match-table points are not season points.',
@@ -281,8 +283,9 @@ window.LeagueUI = (function() {
     const schedule = eventData.schedule;
     const names = new Map(eventData.teams.map(team => [team.number, team.name]));
     function clock(offset) {
-      if (!eventData.start_time) return '+' + offset + ' min';
-      const [hours, minutes] = eventData.start_time.split(':').map(Number);
+      const start = schedule.meetup_time || eventData.start_time;
+      if (!start) return '+' + offset + ' min';
+      const [hours, minutes] = start.split(':').map(Number);
       const total = hours * 60 + minutes + offset;
       const day = Math.floor(total / 1440);
       return String(Math.floor(total / 60) % 24).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0') + (day ? ` (+${day}d)` : '');
@@ -290,6 +293,7 @@ window.LeagueUI = (function() {
     const firstPending = schedule.rounds.findIndex(round => round.matches.some(match => match.score_a === null));
     const buffer = schedule.available_minutes - schedule.duration_minutes;
     return `<div class="league-event-title">${escape(eventData.title)}</div>
+      ${schedule.referee_policy ? `<p class="league-copy"><strong>${escape(t.program)}</strong></p>` : ''}
       <p class="league-copy">${schedule.duration_minutes} min &middot; ${schedule.match_minutes} min ${lang === 'de' ? 'Spielzeit' : 'games'} &middot; ${schedule.break_minutes} min ${lang === 'de' ? 'Wechselpause' : 'changeovers'}</p>
       <p class="league-copy">${buffer === 0 ? escape(t.noBuffer) : buffer + ' min ' + (lang === 'de' ? 'Zeitreserve' : 'buffer')}</p>
       <div class="league-rounds">${schedule.rounds.map((round, index) => `<details class="league-round"${index === Math.max(0, firstPending) ? ' open' : ''}>
@@ -300,7 +304,8 @@ window.LeagueUI = (function() {
             <strong>${Number.isInteger(match.score_a) && Number.isInteger(match.score_b) ? match.score_a + ' : ' + match.score_b : escape(t.pendingMatch)}</strong>
             <span>${escape(names.get(match.team_b))}</span></div>
         </div>`).join('')}
-        ${round.bye_teams.length ? `<p class="league-copy">${escape(t.bye)}: ${round.bye_teams.map(team => escape(names.get(team))).join(', ')}</p>` : ''}
+        ${round.referee_team ? `<p class="league-copy"><strong>${escape(t.refTeam)}: ${escape(names.get(round.referee_team))}</strong></p>` : ''}
+        ${round.rest_teams?.length ? `<p class="league-copy">${escape(t.bye)}: ${round.rest_teams.map(team => escape(names.get(team))).join(', ')}</p>` : ''}
       </details>`).join('')}</div>
       ${matchTable(eventData, lang)}`;
   }

@@ -85,7 +85,7 @@ test('manual generation includes non-RSVP members and guests, while separately f
   const selected = [id(1), id(2), id(3), id(4), id(5), id(6), id(9), id(50)];
   const sql = recorder();
   await applyAction(sql, validateAction({ action: 'generate', season_id: id(100), session_id: id(201),
-    team_size: 4, player_ids: selected }), world);
+    team_size: 2, player_ids: selected }), world);
   const queries = sql.transactions[0].queries;
   const fingerprint = queries.find(q => q.text.includes('Attendees or player ratings changed'));
   const snapshot = JSON.parse(fingerprint.values[2]);
@@ -101,7 +101,7 @@ test('manual generation includes non-RSVP members and guests, while separately f
   assert(teams.flatMap(t => t.players).every(p => !Object.hasOwn(p, 'user_id')));
   assert(!snapshot.some(p => p.id === id(7)), 'Intentional RSVP removals are respected');
   await assert.rejects(applyAction(recorder(), { action: 'generate', season_id: id(100), session_id: id(201),
-    team_size: 4, player_ids: selected.map(p => p === id(50) ? id(999) : p) }, world), error => error.status === 400);
+    team_size: 2, player_ids: selected.map(p => p === id(50) ? id(999) : p) }, world), error => error.status === 400);
 });
 
 test('manual publication compares RSVP source, not selected roster; later RSVPs are visibly stale', async () => {
@@ -215,12 +215,13 @@ test('unpublish/rebalance/republish remains explicit; finalized rosters cannot b
   const world = worldFixture();
   const published = event(world, playerView(world).slice(0, 8), 0, 'published');
   world.events = [published];
-  const input = { action: 'generate', season_id: id(100), session_id: id(201), team_size: 4,
+  const input = { action: 'generate', season_id: id(100), session_id: id(201), team_size: 2,
     version: 1, player_ids: [...published.roster_ids.slice(0, 7), id(50)] };
   await assert.rejects(applyAction(recorder(), input, world), error => error.status === 409);
   const unpublish = recorder();
   await applyAction(unpublish, { action: 'unpublish', event_id: published.id, version: 1 }, world);
   assert(unpublish.transactions[0].queries.some(q => q.text.includes("SET status = 'draft'")));
+  assert(unpublish.transactions[0].queries.some(q => q.text.includes('DELETE FROM league_match_timers')));
   published.status = 'draft'; published.version = 2;
   const regenerate = recorder();
   await applyAction(regenerate, { ...input, version: 2 }, world);

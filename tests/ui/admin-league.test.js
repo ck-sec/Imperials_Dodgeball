@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { buildSchedule, matchStandings } = require('../../lib/league-matches');
 
 const rootPath = path.resolve(__dirname, '..', '..');
 const source = fs.readFileSync(path.join(rootPath, 'js', 'admin-league.js'), 'utf8');
@@ -194,6 +195,7 @@ test('fixed exact Season 2, Vienna civil Thursdays, chronological upcoming and n
   assert.equal(a.api.dateOnly('2026-09-16T22:15:00Z'), '2026-09-17');
   assert.match(a.html(), /★ Next · Thu 2026-09-17/);
   assert.match(a.html(), /Upcoming Thursdays/);
+  assert.match(a.html(), /needed for three 2-a-side teams/);
   assert.doesNotMatch(a.html(), /al-season-select|new-season|Create another season|value="monday"|value="outside"/);
   assert.match(a.html(), /\/spieltag\?event=event-1/);
   for (const size of [2, 3, 4, 5, 6]) assert.match(a.html(), new RegExp(`value="${size}"[^>]*>${size} on court`));
@@ -241,7 +243,7 @@ test('remove changes this draft only, keeps roster filters and other squads cons
   assert.equal(a.store.players.length, 6);
   assert.equal(a.store.events[0].teams[0].players.length, 2);
   assert.equal(a.requests.filter(r => r.body).length, 0);
-  assert.match(a.api.publishWarning(), /at least 4/);
+  assert.match(a.api.publishWarning(), /at least 6/);
   assert.equal(a.get('al-save-teams').disabled, false);
   assert.equal(a.get('al-publish-button').disabled, true);
   await a.action('undo-draft');
@@ -269,7 +271,7 @@ test('save_draft persists an understrength lineup with version; no rebalance or 
   });
   assert.equal(a.api.state.dirtyTeams, false);
   assert.equal(a.api.state.sessionId, 'next');
-  await assert.rejects(a.action('publish'), /at least 4/);
+  await assert.rejects(a.action('publish'), /at least 6/);
   assert.equal(a.requests.filter(r => r.body).length, 1);
 });
 
@@ -315,7 +317,7 @@ test('tap/keyboard selection swaps and moves without reshuffling; unassigned add
   await a.action('pick-player:p2');
   await a.action('place-player:2');
   assert.deepEqual(ids(a.api.state), [['p3'], ['p1', 'p4', 'p2']]);
-  assert.match(a.api.publishWarning(), /Gold has 1/);
+  assert.match(a.api.publishWarning(), /at least 6/);
   const added = node('al-roster-p5', { alPlayer: 'p5' });
   added.checked = true;
   a.emit('change', added);
@@ -436,6 +438,44 @@ test('the admin BP replacement request satisfies the real offline backend action
   assert.deepEqual(validated.awards, payload.awards);
 });
 
+test('Last Man and Last Woman selectors save the exact +1/+0.5 awards before finalization', async () => {
+  const data = dataFixture();
+  data.players.forEach((player, index) => {
+    player.gender = index < 2 ? 'male' : index < 4 ? 'female' : 'unspecified';
+  });
+  const event = data.events[0];
+  event.status = 'published';
+  event.teams = [
+    { number: 1, name: 'Gold', players: [data.players[0], data.players[2]] },
+    { number: 2, name: 'Navy', players: [data.players[1], data.players[3]] },
+    { number: 3, name: 'White', players: [data.players[4], data.players[5]] },
+  ];
+  event.schedule = buildSchedule(3);
+  for (const match of event.schedule.rounds.flatMap(round => round.matches)) {
+    match.score_a = match.team_a < match.team_b ? 2 : 1;
+    match.score_b = match.team_a < match.team_b ? 1 : 2;
+  }
+  event.match_standings = matchStandings(3, event.schedule);
+  const a = await app({ data });
+  const results = a.form('results', { placement_1: '1', placement_2: '2', placement_3: '3' });
+  await assert.rejects(a.api.submit(results), /Last Man Standing: save one \+1 BP winner and one \+0.5 BP runner-up/);
+  for (const [gender, points, playerId] of [
+    ['male', '1', 'p1'], ['male', '0.5', 'p2'], ['female', '1', 'p3'], ['female', '0.5', 'p4'],
+  ]) {
+    a.input(`al-finale-${gender}-${points.replace('.', '-')}`, playerId, { alFinale: `${gender}:${points}` });
+  }
+  assert.deepEqual(clone(a.api.state.bonusAwards), { p1: 1, p2: 0.5, p3: 1, p4: 0.5 });
+  await a.api.submit(a.form('bonus'));
+  assert.deepEqual(a.requests.find(request => request.body?.action === 'save_bonus_points').body.awards
+    .sort((left, right) => left.player_id.localeCompare(right.player_id)), [
+    { player_id: 'p1', points: 1 }, { player_id: 'p2', points: 0.5 },
+    { player_id: 'p3', points: 1 }, { player_id: 'p4', points: 0.5 },
+    { player_id: 'p5', points: 0 }, { player_id: 'p6', points: 0 },
+  ]);
+  await a.api.submit(results);
+  assert.ok(a.requests.some(request => request.body?.action === 'results'));
+});
+
 test('invalid BP and finalized BP are rejected, conflicts freeze edits and do not automatically retry', async () => {
   const a = await app({ rejectAction: 'save_bonus_points' });
   a.input('al-bonus-p1', '2', { alBonus: 'p1' });
@@ -478,7 +518,10 @@ test('permanent Head Ref role only lists eligible members, never guest profiles,
   data.members.push({ id: 'pending', display_name: 'Pending', status: 'pending', is_active: true });
   data.members.push({ id: 'inactive', display_name: 'Inactive', status: 'approved', is_active: false });
   const a = await app({ data });
-  assert.match(a.html(), /Permanent Head Ref role/);
+  assert.match(a.html(), /Account access · Head Refs/);
+  assert.match(a.html(), /same normal website login/);
+  assert.match(a.html(), /operate the live timer/);
+  assert.ok(a.html().indexOf('Account access · Head Refs') < a.html().indexOf('Confirm everyone playing'));
   assert.doesNotMatch(a.html(), /Spielleiter/);
   assert.match(a.html(), /data-al-scorekeeper="u1"/);
   assert.doesNotMatch(a.html(), /data-al-scorekeeper="(?:pending|inactive|p6)"/);
@@ -495,13 +538,19 @@ test('permanent Head Ref role only lists eligible members, never guest profiles,
 test('admin assets cache-busted, role management title preserved, touch targets avoid HTML5-only dragging', () => {
   const html = fs.readFileSync(path.join(rootPath, 'admin.html'), 'utf8');
   const css = fs.readFileSync(path.join(rootPath, 'admin-league.css'), 'utf8');
-  assert.match(html, /admin-league\.js\?v=20260912c/);
+  assert.match(html, /admin-league\.js\?v=20260914d/);
   assert.match(html, /admin-league\.css\?v=20260912b/);
   assert.match(html, /\/league\.css\?v=20260912d/);
-  assert.match(html, /\/js\/league-ui\.js\?v=20260912d/);
+  assert.match(html, /\/js\/league-ui\.js\?v=20260914d/);
   assert.ok(html.indexOf('admin-auth.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-scoring.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-ui.js') < html.indexOf('admin-league.js'));
+  assert.match(source, /href="\/timer\?event=/);
+  assert.match(source, /data-al-pdf="itinerary" href="\/spieltag\?event=.*&export=itinerary"/);
+  assert.match(source, /data-al-pdf="results" href="\/spieltag\?event=.*&export=results"/);
+  assert.match(source, /data-al-finale="\$\{gender\}:\$\{points\}"/);
+  assert.match(source, /one assigned ref team/);
+  assert.match(source, /Last Man \/ Last Woman Standing · max 10 minutes/);
   assert.match(html, /data-tab="members"[^>]+>Members<\/button>/);
   assert.match(css, /touch-action: none/);
   assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 96px/);

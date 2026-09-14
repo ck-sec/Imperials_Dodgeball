@@ -12,14 +12,16 @@ let memberReturnTo = '';
 
 function safeMemberReturn(value) {
   if (typeof value !== 'string' || /[\s\\#]/.test(value)) return '';
-  const match = /^\/spieltag(?:\?event=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))?$/i.exec(value);
-  return match ? '/spieltag' + (match[1] ? '?event=' + match[1].toLowerCase() : '') : '';
+  const matchday = /^\/spieltag(?:\?event=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))?$/i.exec(value);
+  if (matchday) return '/spieltag' + (matchday[1] ? '?event=' + matchday[1].toLowerCase() : '');
+  const timer = /^\/timer\?event=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})&match=([1-9]|10)$/i.exec(value);
+  return timer ? `/timer?event=${timer[1].toLowerCase()}&match=${Number(timer[2])}` : '';
 }
 
 function initMemberReturn() {
   const values = new URLSearchParams(window.location.search).getAll('return_to');
   memberReturnTo = values.length === 1 ? safeMemberReturn(values[0]) : '';
-  if (values.length && !memberReturnTo) console.error('Ignored invalid matchday return target.');
+  if (values.length && !memberReturnTo) console.error('Ignored invalid match return target.');
   try {
     if (values.length) {
       if (memberReturnTo) sessionStorage.setItem(MEMBER_RETURN_KEY, JSON.stringify({ target: memberReturnTo, expires: Date.now() + 30 * 60 * 1000 }));

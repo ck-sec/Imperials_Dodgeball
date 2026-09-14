@@ -86,6 +86,7 @@ function fixtureApp(data = fixture(), options = {}) {
       classList: { toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); }, contains: name => classes.has(name) },
       addEventListener(type, listener) { this.listeners[type] = listener; },
       attributes: {}, setAttribute(name, value) { this.attributes[name] = String(value); },
+      removeAttribute(name) { delete this.attributes[name]; },
       querySelectorAll() { return []; }, contains() { return false; }
     };
   }
@@ -225,10 +226,14 @@ test('standalone page uses versioned local assets, external scripts, rewrite, an
   assert.match(html, /viewport/);
   assert.match(html, /fonts\/fonts.css\?v=20260912c/);
   assert.match(html, /league.css\?v=20260912d/);
-  assert.match(html, /matchday.css\?v=20260912c/);
+  assert.match(html, /matchday.css\?v=20260914d/);
+  assert.match(html, /league-pdf\.js\?v=20260914d/);
+  assert.match(html, /matchday\.js\?v=20260914d/);
+  assert.match(html, /id="matchdayPdf"/);
+  assert.match(html, /id="matchdayResultsPdf"/);
   assert.doesNotMatch(html, /publicsite.css|admin-auth.js|member-auth.js|\son[a-z]+=/);
   for (const script of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
-    assert.match(script[1], /src="\/js\/[^"]+\?v=20260912[cd]"/);
+    assert.match(script[1], /src="\/js\/[^"]+\?v=202609(?:12[cd]|14d)"/);
     assert.equal(script[2].trim(), '');
   }
   assert.match(html, /id="matchdayLoginLink" href="\/member\?return_to=/);
@@ -239,6 +244,7 @@ test('standalone page uses versioned local assets, external scripts, rewrite, an
   assert.match(html, /data-site-language="en"/);
   assert.match(css, /min-height: 62px/);
   assert.match(css, /min-height: 50px/);
+  assert.match(css, /matchday-pdf/);
   assert.match(source, /15000/);
   assert.match(source, /document.hidden/);
   assert.match(source, /beforeunload/);
@@ -264,6 +270,33 @@ test('selector admits only published/finalized Thursday events', () => {
   assert.equal(ui.publishedThursday({ ...event, id: '<bad>' }), false);
 });
 
+test('public itinerary shows meetup, game window, finale awards and safely projected winners', () => {
+  const event = fixture().event;
+  assert.equal(ui.scheduleClock(event, 15), '18:15');
+  const copy = {
+    program: 'Itinerary', meetWarmup: 'Meet & warm-up', gamesWindow: 'League games',
+    finale: 'Last Man / Last Woman Standing', finaleAwards: 'Winner +1 BP · runner-up +0.5 BP',
+    finaleResults: 'Finale results', winner: 'Winner', runnerUp: 'Runner-up',
+    men: 'Last Man Standing', women: 'Last Woman Standing',
+  };
+  const itinerary = ui.programMarkup(event, copy);
+  assert.match(itinerary, /18:00/);
+  assert.match(itinerary, /18:15/);
+  assert.match(itinerary, /20:00/);
+  assert.match(itinerary, /20:10/);
+  assert.match(itinerary, /\+1 BP/);
+  event.finale_results = {
+    men: {
+      winner: { display_name: '<Winner>', bonus_points: 1 },
+      runner_up: { display_name: 'Runner', bonus_points: 0.5 },
+    },
+    women: null,
+  };
+  const finale = ui.finaleMarkup(event, copy);
+  assert.match(finale, /&lt;Winner&gt;/);
+  assert.doesNotMatch(finale, /<Winner>/);
+});
+
 test('real schedule match numbers map to two labeled numeric controls, escaped team names, and explicit submit', () => {
   const event = fixture().event;
   event.teams[0].name = '<img src=x onerror="bad()">';
@@ -278,6 +311,10 @@ test('real schedule match numbers map to two labeled numeric controls, escaped t
   assert.match(markup, /&lt;img src=x onerror=&quot;bad\(\)&quot;&gt;/);
   assert.doesNotMatch(markup, /<img/);
   assert.match(markup, /19:00/);
+  assert.equal((markup.match(/class="league-btn matchday-timer-link"/g) || []).length, 3);
+  assert.match(markup, new RegExp('/timer\\?event=' + A + '&amp;match=1'));
+  assert.equal(ui.timerPath(A, 1), '/timer?event=' + A + '&match=1');
+  assert.equal(ui.timerPath('bad', 1), '');
   assert.match(ui.fixtures(event, 'de'), /Runde 1/);
 });
 

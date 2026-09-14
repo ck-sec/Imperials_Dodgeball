@@ -77,7 +77,7 @@ test('public scripts comply with self-only CSP without executable inline handler
     for (const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
       if (/type="application\/ld\+json"/.test(script[1])) JSON.parse(script[2]);
       else {
-        assert.match(script[1], /src="\/js\/[^"]+\?v=20260912[b-d]?"/, file);
+        assert.match(script[1], /src="\/js\/[^"]+\?v=202609(?:12[b-d]?|14d)"/, file);
         assert.equal(script[2].trim(), '', file);
       }
     }
@@ -164,7 +164,7 @@ test('homepage keeps focused offers, progressive FAQ detail and one permanent Ha
   assert.equal((home.match(/id="publicLeague"/g) || []).length, 1);
   assert.match(home, /href="#hall-of-fame" data-league-hof/);
   assert.ok(home.indexOf('data-league-hof') < home.indexOf('data-league-content'));
-  assert.match(home, /league-ui\.js\?v=20260912d"/);
+  assert.match(home, /league-ui\.js\?v=20260914d"/);
   assert.match(home, /site-league\.js\?v=20260912c"/);
 });
 

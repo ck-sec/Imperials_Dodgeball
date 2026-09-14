@@ -10,25 +10,37 @@ function finish(schedule, score) {
   return completed;
 }
 
-test('five teams fit ten 20-minute games and four changeovers into exactly two hours', () => {
+test('five teams fit ten referee-covered games after warm-up and finish at 20:00', () => {
   const schedule = buildSchedule(5);
   assert.equal(schedule.duration_minutes, 120);
   assert.equal(schedule.rounds.length, 5);
-  assert.deepEqual(schedule.rounds.map(round => [round.start_minute, round.end_minute]), [[0, 20], [25, 45], [50, 70], [75, 95], [100, 120]]);
+  assert.deepEqual(schedule.rounds.map(round => [round.start_minute, round.end_minute]), [[15, 32], [37, 54], [59, 76], [81, 98], [103, 120]]);
   assert.equal(schedule.rounds.flatMap(round => round.matches).length, 10);
   assert.deepEqual(schedule.rounds.map(round => round.bye_teams[0]).sort(), [1, 2, 3, 4, 5]);
+  assert.deepEqual(schedule.rounds.map(round => round.referee_team).sort(), [1, 2, 3, 4, 5]);
+  assert(schedule.rounds.every(round => round.rest_teams.length === 0));
+  assert.equal(schedule.meetup_time, '18:00');
+  assert.equal(schedule.warmup_minutes, 15);
+  assert.equal(schedule.finale_start_minute, 120);
+  assert.equal(schedule.finale_minutes, 10);
+  assert.equal(schedule.total_duration_minutes, 130);
 });
 
-test('all allowed team/court counts cover every pair once without double bookings', () => {
-  for (let count = 2; count <= 5; count++) {
+test('all referee-safe team/court counts cover every pair once and rotate one non-playing referee team', () => {
+  for (let count = 3; count <= 5; count++) {
     for (let courts = 1; courts <= 2; courts++) {
       const schedule = buildSchedule(count, { courts, available_minutes: 480 });
       const appearances = new Map();
+      const refereeCounts = new Map(Array.from({ length: count }, (_, index) => [index + 1, 0]));
       const pairs = new Set();
       for (const round of schedule.rounds) {
         const playing = round.matches.flatMap(match => [match.team_a, match.team_b]);
         assert.equal(new Set(playing).size, playing.length);
         assert.ok(round.matches.length <= courts);
+        assert.ok(!playing.includes(round.referee_team));
+        assert.ok(round.bye_teams.includes(round.referee_team));
+        assert.deepEqual(round.rest_teams, round.bye_teams.filter(team => team !== round.referee_team));
+        refereeCounts.set(round.referee_team, refereeCounts.get(round.referee_team) + 1);
         for (const match of round.matches) {
           const pair = [match.team_a, match.team_b].sort().join(':');
           assert.ok(!pairs.has(pair));
@@ -38,16 +50,23 @@ test('all allowed team/court counts cover every pair once without double booking
       }
       assert.equal(pairs.size, count * (count - 1) / 2);
       assert.deepEqual([...appearances.values()], Array(count).fill(count - 1));
+      assert.ok(Math.max(...refereeCounts.values()) - Math.min(...refereeCounts.values()) <= 1);
       assert.equal(matchStandings(count, schedule).complete, false);
+      if (count === 4) {
+        assert.equal(schedule.active_courts, 1);
+        assert.equal(schedule.rounds.length, 6);
+        assert.ok(schedule.rounds.every(round => round.matches.length === 1 && round.rest_teams.length === 1));
+      }
     }
   }
 });
 
 test('infeasible budgets are rejected instead of silently shortening games', () => {
-  assert.throws(() => buildSchedule(5, { courts: 1 }), /needs 245 minutes/);
+  assert.throws(() => buildSchedule(2), /At least three teams/);
+  assert.throws(() => buildSchedule(5, { courts: 1 }), /needs 230 minutes/);
   assert.throws(() => buildSchedule(5, { available_minutes: 119 }), /needs 120 minutes/);
   assert.throws(() => buildSchedule(6), /between 2 and 5/);
-  assert.equal(buildSchedule(5, { match_minutes: 18 }).duration_minutes, 110);
+  assert.equal(buildSchedule(5, { match_minutes: 16 }).duration_minutes, 115);
 });
 
 test('wins, draws and losses produce 2/1/0 table points and an automatic winner', () => {
@@ -84,7 +103,7 @@ test('exact ties require explicit resolution without fabricating a winner', () =
 });
 
 test('admins may only reorder exact tie groups, not override stronger results', () => {
-  const schedule = finish(buildSchedule(4), match => {
+  const schedule = finish(buildSchedule(4, { match_minutes: 15, break_minutes: 3 }), match => {
     if (match.team_a === 1 && match.team_b === 2) return [2, 1];
     if (match.team_a === 2 && match.team_b === 1) return [1, 2];
     return [1, 1];

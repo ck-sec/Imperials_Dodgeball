@@ -9,6 +9,7 @@
   ],
   "rewrites": [
     { "source": "/spieltag", "destination": "/spieltag.html" },
+    { "source": "/timer", "destination": "/timer.html" },
     { "source": "/member", "destination": "/member.html" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/dodgeball-wien", "destination": "/dodgeball-wien.html" },

@@ -16,7 +16,11 @@
       publicReadOnly: 'Öffentliche Ansicht · Head Refs melden sich mit ihrem normalen Konto an.',
       scoring: 'Ergebnisse pro Spiel speichern. Korrekturen sind bis zum Abschluss möglich.',
       noSchedule: 'Noch kein Spielplan freigegeben.', round: 'Runde', court: 'Feld', game: 'Spiel',
-      bye: 'Pause', score: 'Punkte', save: 'Speichern', saving: 'Wird gespeichert …', saved: 'Gespeichert',
+      bye: 'Pause', refTeam: 'Ref-Team', score: 'Punkte', save: 'Speichern', saving: 'Wird gespeichert …', saved: 'Gespeichert',
+      program: 'Ablauf', meetWarmup: 'Treffpunkt & Aufwärmen', gamesWindow: 'Ligaspiele',
+      finale: 'Last Man / Last Woman Standing', finaleAwards: 'Sieger +1 BP · Zweite +0,5 BP',
+      finaleResults: 'Finale-Ergebnisse', winner: 'Sieger', runnerUp: 'Zweiter Platz',
+      men: 'Last Man Standing', women: 'Last Woman Standing',
       unsaved: 'Nicht gespeichert', invalidScore: 'Beide Ergebnisse als ganze Zahlen von 0 bis 999 eingeben.',
       conflict: 'Inzwischen geändert. Deine Eingaben bleiben erhalten. Bitte aktuelle Ergebnisse prüfen.',
       unknownSave: 'Keine Speicherbestätigung. Bitte aktuelle Ergebnisse prüfen, bevor du erneut speicherst.',
@@ -36,7 +40,15 @@
       retry: 'Bitte erneut versuchen in', seconds: 'Sekunden.', noStandings: 'Noch keine Saisonpunkte.',
       noResults: 'Keine Spieler gefunden.', copied: 'Spieltag-Link kopiert.',
       saveFailed: 'Nicht gespeichert. Bitte Eingaben prüfen und erneut versuchen.',
-      otherDrafts: 'Ungespeicherte Eingaben auf einem anderen Spieltag bleiben in diesem Tab erhalten.'
+      otherDrafts: 'Ungespeicherte Eingaben auf einem anderen Spieltag bleiben in diesem Tab erhalten.',
+      viewTimer: 'Live-Timer ansehen', startTimer: 'Spiel starten · Timer',
+      itineraryPdfCreate: 'Spielplan-PDF', itineraryPdfShare: 'Spielplan teilen',
+      resultsPdfCreate: 'Ergebnis-PDF', resultsPdfShare: 'Ergebnisse teilen', pdfCreating: 'PDF wird gestaltet …',
+      pdfReady: 'PDF heruntergeladen und zum Teilen bereit. Tippe erneut auf „PDF teilen“.',
+      pdfDownloaded: 'PDF heruntergeladen.', pdfShared: 'PDF zum Teilen geöffnet.',
+      pdfFailed: 'PDF konnte nicht erstellt werden. Bitte erneut versuchen.',
+      pdfChanged: 'Der Spieltag wurde während des Exports aktualisiert. Bitte PDF erneut erstellen.',
+      pdfResultsUnavailable: 'Das Ergebnis-PDF ist nach dem Abschluss des Spieltags verfügbar.'
     },
     en: {
       title: 'Matchday', choose: 'Choose matchday', empty: 'No published Thursday matchday yet.',
@@ -50,7 +62,11 @@
       publicReadOnly: 'Public view · Head Refs sign in with their normal account.',
       scoring: 'Save each game separately. Scores can be corrected until finalization.',
       noSchedule: 'No published schedule yet.', round: 'Round', court: 'Court', game: 'Game',
-      bye: 'Rest', score: 'Score', save: 'Save', saving: 'Saving …', saved: 'Saved',
+      bye: 'Rest', refTeam: 'Ref team', score: 'Score', save: 'Save', saving: 'Saving …', saved: 'Saved',
+      program: 'Itinerary', meetWarmup: 'Meet & warm-up', gamesWindow: 'League games',
+      finale: 'Last Man / Last Woman Standing', finaleAwards: 'Winner +1 BP · runner-up +0.5 BP',
+      finaleResults: 'Finale results', winner: 'Winner', runnerUp: 'Runner-up',
+      men: 'Last Man Standing', women: 'Last Woman Standing',
       unsaved: 'Unsaved', invalidScore: 'Enter both scores as whole numbers from 0 to 999.',
       conflict: 'Changed elsewhere. Your entries are safe. Please review the current scores.',
       unknownSave: 'No save confirmation. Check the current scores before saving again.',
@@ -70,7 +86,15 @@
       retry: 'Please try again in', seconds: 'seconds.', noStandings: 'No season points yet.',
       noResults: 'No players found.', copied: 'Matchday link copied.',
       saveFailed: 'Not saved. Please check your entries and try again.',
-      otherDrafts: 'Unsaved entries on another matchday are kept in this tab.'
+      otherDrafts: 'Unsaved entries on another matchday are kept in this tab.',
+      viewTimer: 'View live timer', startTimer: 'Start game · timer',
+      itineraryPdfCreate: 'Fixtures PDF', itineraryPdfShare: 'Share fixtures',
+      resultsPdfCreate: 'Results PDF', resultsPdfShare: 'Share results', pdfCreating: 'Designing PDF …',
+      pdfReady: 'PDF downloaded and ready to share. Tap “Share PDF” again.',
+      pdfDownloaded: 'PDF downloaded.', pdfShared: 'PDF sharing opened.',
+      pdfFailed: 'The PDF could not be created. Please try again.',
+      pdfChanged: 'The matchday changed during export. Please create the PDF again.',
+      pdfResultsUnavailable: 'The results PDF is available after the matchday is finalized.'
     }
   };
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
@@ -82,6 +106,37 @@
   const pair = match => match ? JSON.stringify([match.team_a, match.team_b]) : '';
   const keyFor = (id, number) => id + ':' + number;
   const validScore = value => /^\d{1,3}$/.test(value) && Number(value) <= 999;
+
+  function scheduleClock(event, offset) {
+    const start = String(event?.schedule?.meetup_time || event?.start_time || '');
+    if (!/^([01]\d|2[0-3]):[0-5]\d/.test(start)) return '+' + offset + ' min';
+    const [hours, minutes] = start.split(':').map(Number);
+    const total = hours * 60 + minutes + offset;
+    return String(Math.floor(total / 60) % 24).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+  }
+
+  function programMarkup(event, copy) {
+    const schedule = event && event.schedule;
+    if (!schedule || !schedule.referee_policy) return '';
+    const finaleStart = schedule.finale_start_minute;
+    return `<h3>${esc(copy.program)}</h3><div class="matchday-program-grid">
+      <div><strong>${esc(scheduleClock(event, 0))}</strong><span>${esc(copy.meetWarmup)}</span><small>${esc(scheduleClock(event, schedule.warmup_minutes))}</small></div>
+      <div><strong>${esc(scheduleClock(event, schedule.warmup_minutes))}</strong><span>${esc(copy.gamesWindow)}</span><small>${esc(scheduleClock(event, finaleStart))}</small></div>
+      <div><strong>${esc(scheduleClock(event, finaleStart))}</strong><span>${esc(copy.finale)}</span><small>${esc(scheduleClock(event, schedule.total_duration_minutes))} · ${esc(copy.finaleAwards)}</small></div>
+    </div>`;
+  }
+
+  function finaleMarkup(event, copy) {
+    const results = event && event.finale_results;
+    if (!results) return '';
+    const category = (key, label) => {
+      const result = results[key];
+      if (!result) return '';
+      return `<article><h4>${esc(label)}</h4><p><strong>${esc(copy.winner)}:</strong> ${esc(result.winner.display_name)} · +${esc(result.winner.bonus_points)} BP</p>
+        <p><strong>${esc(copy.runnerUp)}:</strong> ${esc(result.runner_up.display_name)} · +${esc(result.runner_up.bonus_points)} BP</p></article>`;
+    };
+    return `<h3>${esc(copy.finaleResults)}</h3><div class="matchday-finale-grid">${category('men', copy.men)}${category('women', copy.women)}</div>`;
+  }
 
   function teamNames(event, match) {
     return ['a', 'b'].map(side => {
@@ -106,6 +161,12 @@
   function memberLoginHref(id) {
     const target = '/spieltag' + (UUID.test(id || '') ? '?event=' + id.toLowerCase() : '');
     return '/member?return_to=' + encodeURIComponent(target);
+  }
+
+  function timerPath(id, number) {
+    return UUID.test(id || '') && Number.isInteger(Number(number)) && Number(number) >= 1 && Number(number) <= 10
+      ? '/timer?event=' + encodeURIComponent(id.toLowerCase()) + '&match=' + encodeURIComponent(Number(number))
+      : '';
   }
 
   function draftSnapshot(state) {
@@ -499,7 +560,9 @@
       <div class="matchday-round-games">${round.matches.map(match => `<form class="matchday-game" data-match-number="${esc(match.number)}" data-fixture-identity="${esc(fixtureIdentity(event, match))}" novalidate>
         <div class="matchday-game-meta"><span class="matchday-game-label" data-court="${esc(match.court)}">${esc(t.game)} ${esc(match.number)} · ${esc(t.court)} ${esc(match.court)}</span><span class="matchday-game-status"></span></div>
         <div class="matchday-read-scores">
-          <span class="matchday-team-name">${esc(names.get(match.team_a))}</span><strong></strong><span class="matchday-team-name">${esc(names.get(match.team_b))}</span>
+          <span class="matchday-team-name">${esc(names.get(match.team_a))}</span>
+          <span class="matchday-score-center"><small aria-hidden="true">VS</small><strong></strong></span>
+          <span class="matchday-team-name">${esc(names.get(match.team_b))}</span>
         </div>
         <div class="matchday-edit-scores" hidden>
           <div class="matchday-score-grid">${['a', 'b'].map(side => `<label for="matchday-score-${esc(match.number)}-${side}">
@@ -519,8 +582,12 @@
             <button class="league-btn" type="button" data-review="keep">${esc(t.keepDraft)}</button>
           </div>
         </div>
+        <div class="matchday-game-actions">
+          <a class="league-btn matchday-timer-link" href="${esc(timerPath(event.id, match.number))}">${esc(t.viewTimer)}</a>
+        </div>
       </form>`).join('')}</div>
-      ${round.bye_teams && round.bye_teams.length ? `<p class="league-copy"><span class="matchday-bye-label">${esc(t.bye)}</span>: ${round.bye_teams.map(number => esc(names.get(number))).join(', ')}</p>` : ''}
+      ${round.referee_team ? `<p class="matchday-ref-team"><strong>${esc(t.refTeam)}:</strong> ${esc(names.get(round.referee_team))}</p>` : ''}
+      ${round.rest_teams && round.rest_teams.length ? `<p class="league-copy"><span class="matchday-bye-label">${esc(t.bye)}</span>: ${round.rest_teams.map(number => esc(names.get(number))).join(', ')}</p>` : ''}
     </section>`).join('');
   }
 
@@ -536,10 +603,17 @@
     let pollTimer;
     let leavingForLogin = false;
     const initial = readEvent(window.location.search);
+    const initialParams = new URLSearchParams(window.location.search);
+    const requestedExport = initialParams.getAll('export').length === 1 ? initialParams.get('export') : '';
+    let autoPdf = ['pdf', 'itinerary', 'results'].includes(requestedExport) ? requestedExport : '';
     let invalidLink = initial.invalid;
     let token = '';
     let storedDrafts = '';
     let draftStorageWarning = false;
+    const pdfStates = {
+      itinerary: { key: '', result: null, file: null, busy: false },
+      results: { key: '', result: null, file: null, busy: false }
+    };
     try { token = sessionStorage.getItem('vi_admin_token') || ''; } catch { /* Existing admin sessions are optional. */ }
     try { storedDrafts = sessionStorage.getItem(DRAFT_KEY) || ''; } catch (error) {
       console.error('Stored matchday drafts could not be read:', error.name);
@@ -548,6 +622,9 @@
     function urlFor(id) { return '/spieltag' + (id ? '?event=' + encodeURIComponent(id) : ''); }
     function historyEvent(id, replace) {
       window.history[replace ? 'replaceState' : 'pushState'](null, '', urlFor(id));
+    }
+    function pdfKey(event, mode) {
+      return event ? [event.id, event.version, lang(), mode].join(':') : '';
     }
     const controller = createController({
       fetch: window.fetch.bind(window), eventId: initial.id, token, drafts: storedDrafts,
@@ -674,16 +751,45 @@
         form.querySelector('[data-review="reload"]').disabled = state.loading || !!state.saving;
         form.querySelector('[data-review="current"]').disabled = !draft.reviewReady || state.loading || !!state.saving;
         form.querySelector('[data-review="keep"]').disabled = !draft.reviewReady || !canEdit || pair(match) !== draft.pair || state.loading || !!state.saving;
+        const timerLink = form.querySelector('.matchday-timer-link');
+        if (stale) timerLink.removeAttribute('href');
+        else timerLink.setAttribute('href', timerPath(event.id, number));
+        timerLink.tabIndex = stale ? -1 : 0;
+        timerLink.textContent = canEdit ? t().startTimer : t().viewTimer;
+        timerLink.setAttribute('aria-disabled', String(stale));
+        timerLink.classList.toggle('league-btn-primary', canEdit);
       });
     }
     function render() {
       const data = state.data;
       const event = data && data.event;
       const permissions = data && data.permissions || {};
+      for (const mode of ['itinerary', 'results']) {
+        const pdfState = pdfStates[mode];
+        const nextPdfKey = pdfKey(event, mode);
+        if (pdfState.key && pdfState.key !== nextPdfKey) {
+          pdfState.key = '';
+          pdfState.result = null;
+          pdfState.file = null;
+        }
+      }
+      const pdfBusy = pdfStates.itinerary.busy || pdfStates.results.busy;
       $('matchdayRefresh').disabled = state.loading || !!state.saving || Date.now() < state.retryUntil;
       $('matchdayRefresh').setAttribute('aria-busy', String(state.loading));
       $('matchdaySelect').disabled = !data || !data.events.length || !!state.saving;
       $('matchdayShare').disabled = !event;
+      const itineraryState = pdfStates.itinerary;
+      $('matchdayPdf').disabled = !event || !event.schedule || pdfBusy;
+      $('matchdayPdf').setAttribute('aria-busy', String(itineraryState.busy));
+      $('matchdayPdf').textContent = itineraryState.busy ? t().pdfCreating
+        : itineraryState.file && window.LeaguePDF && window.LeaguePDF.canShare(itineraryState.file)
+          ? t().itineraryPdfShare : t().itineraryPdfCreate;
+      const resultsState = pdfStates.results;
+      $('matchdayResultsPdf').disabled = !event || !event.schedule || event.status !== 'finalized' || pdfBusy;
+      $('matchdayResultsPdf').setAttribute('aria-busy', String(resultsState.busy));
+      $('matchdayResultsPdf').textContent = resultsState.busy ? t().pdfCreating
+        : resultsState.file && window.LeaguePDF && window.LeaguePDF.canShare(resultsState.file)
+          ? t().resultsPdfShare : t().resultsPdfCreate;
       if (data) setHTML($('matchdaySelect'), '<option value="">' + esc(t().choose) + '</option>' + data.events.filter(publishedThursday).map(item =>
         '<option value="' + esc(item.id) + '">' + esc(window.LeagueUI.date(item.session_date, lang()) + ' · ' + item.title) + '</option>').join(''));
       $('matchdaySelect').value = state.requested;
@@ -703,8 +809,22 @@
         $('matchdayMeta').textContent = [window.LeagueUI.date(event.session_date, lang()),
           event.start_time ? event.start_time.slice(0, 5) + (event.end_time ? ' – ' + event.end_time.slice(0, 5) : '') : '', event.location].filter(Boolean).join(' · ');
         $('matchdayReadOnly').textContent = permissionNotice();
+        setHTML($('matchdayProgram'), programMarkup(event, t()));
+        $('matchdayProgram').hidden = !event.schedule?.referee_policy;
         renderGames(event);
         setHTML($('matchdayTable'), window.LeagueUI.matchTable(event, lang()));
+        const finale = finaleMarkup(event, t());
+        setHTML($('matchdayFinale'), finale);
+        $('matchdayFinale').hidden = !finale;
+        if (autoPdf && !pdfBusy) {
+          const mode = autoPdf === 'pdf' ? (event.status === 'finalized' ? 'results' : 'itinerary') : autoPdf;
+          autoPdf = '';
+          if (mode === 'results' && event.status !== 'finalized') {
+            transientMessage = t().pdfResultsUnavailable;
+            setTimeout(render, 0);
+          }
+          else setTimeout(() => { void exportPdf(mode, true); }, 0);
+        }
       }
       const role = permissions.is_admin ? 'admin' : permissions.is_scorekeeper ? 'scorekeeper' : state.memberKnown ? 'member' : 'signIn';
       $('matchdayAuthSummary').textContent = t()[role];
@@ -751,6 +871,66 @@
       controller.select(selected.id);
     });
     $('matchdayRefresh').addEventListener('click', () => { transientMessage = ''; void controller.load(true); });
+    async function exportPdf(mode, forceDownload = false) {
+      const data = state.data;
+      const event = data && data.event;
+      if (!['itinerary', 'results'].includes(mode) || !event || !event.schedule || !window.LeaguePDF) return;
+      if (mode === 'results' && event.status !== 'finalized') {
+        transientMessage = t().pdfResultsUnavailable;
+        render();
+        return;
+      }
+      if (pdfStates.itinerary.busy || pdfStates.results.busy) return;
+      const pdfState = pdfStates[mode];
+      const key = pdfKey(event, mode);
+      if (pdfState.result && pdfState.key === key) {
+        if (!forceDownload && pdfState.file && window.LeaguePDF.canShare(pdfState.file)) {
+          try {
+            await window.LeaguePDF.share(pdfState.file, event.title);
+            transientMessage = t().pdfShared;
+          } catch (error) {
+            if (error.name !== 'AbortError') {
+              console.error('League PDF sharing failed:', error.name);
+              transientMessage = t().pdfFailed;
+            }
+          }
+        } else {
+          window.LeaguePDF.save(pdfState.result);
+          transientMessage = t().pdfDownloaded;
+        }
+        render();
+        return;
+      }
+      pdfState.busy = true;
+      transientMessage = t().pdfCreating;
+      render();
+      try {
+        const result = await window.LeaguePDF.create(event, {
+          lang: lang(),
+          mode,
+          standings: data.standings,
+          publicUrl: new URL(urlFor(event.id), window.location.origin).href,
+        });
+        if (!state.data || pdfKey(state.data.event, mode) !== key) {
+          transientMessage = t().pdfChanged;
+          return;
+        }
+        pdfState.key = key;
+        pdfState.result = result;
+        pdfState.file = window.LeaguePDF.asFile(result);
+        window.LeaguePDF.save(result);
+        transientMessage = !forceDownload && pdfState.file && window.LeaguePDF.canShare(pdfState.file)
+          ? t().pdfReady : t().pdfDownloaded;
+      } catch (error) {
+        console.error('League PDF export failed:', error.name);
+        transientMessage = t().pdfFailed;
+      } finally {
+        pdfState.busy = false;
+        render();
+      }
+    }
+    $('matchdayPdf').addEventListener('click', () => { void exportPdf('itinerary', false); });
+    $('matchdayResultsPdf').addEventListener('click', () => { void exportPdf('results', false); });
     $('matchdaySearch').addEventListener('input', renderStandings);
     $('matchdayMatches').addEventListener('input', event => {
       const input = event.target.closest('input[data-side]');
@@ -859,8 +1039,8 @@
     });
   }
 
-  window.Matchday = { createController, readEvent, memberLoginHref, draftSnapshot, restoreDrafts,
-    publishedThursday, validScore, fixtureIdentity, fixtures, retrySeconds, start };
+  window.Matchday = { createController, readEvent, memberLoginHref, timerPath, draftSnapshot, restoreDrafts,
+    publishedThursday, validScore, fixtureIdentity, fixtures, retrySeconds, scheduleClock, programMarkup, finaleMarkup, start };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();
 })();

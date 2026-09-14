@@ -6,6 +6,13 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const dateNow = '2026-09-12';
 const memberId = id(1001);
 const canonicalId = id(50);
+const legacyTwoTeamSchedule = () => ({
+  courts: 1, match_minutes: 20, break_minutes: 0, available_minutes: 120, duration_minutes: 20,
+  rounds: [{
+    number: 1, start_minute: 0, end_minute: 20, bye_teams: [],
+    matches: [{ number: 1, team_a: 1, team_b: 2, court: 1, score_a: null, score_b: null }],
+  }],
+});
 function fixture() {
   const canonical = { id: canonicalId, user_id: memberId, merged_into: null, display_name: 'Former guest name',
     gender: 'female', is_rookie: true, initial_rating: 800, rating: 812 };
@@ -23,7 +30,7 @@ function fixture() {
     world.sessions.push({ id: id(200 + n), title: `Training ${n}`, session_date: date,
       start_time: '19:00:00', location: 'Vienna', is_cancelled: n === 5 });
     world.events.push({ id: id(300 + n), session_id: id(200 + n), season_id: seasonId,
-      session_date: date, status, team_size: 4, settings: { ...DEFAULTS }, schedule: buildSchedule(2),
+      session_date: date, status, team_size: 4, settings: { ...DEFAULTS }, schedule: legacyTwoTeamSchedule(),
       teams: [
         { number: 1, name: 'Others', placement: 1, players: [{ ...other, id: id(3) }] },
         { number: 2, name: 'My squad', placement: 2, players: [structuredClone(player)] },

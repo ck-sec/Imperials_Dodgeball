@@ -7,6 +7,13 @@ const league = require('../lib/league');
 const db = require('../lib/league-db');
 
 const userId = '00000000-0000-4000-8000-000000000001';
+const legacyTwoTeamSchedule = () => ({
+  courts: 1, match_minutes: 20, break_minutes: 0, available_minutes: 120, duration_minutes: 20,
+  rounds: [{
+    number: 1, start_minute: 0, end_minute: 20, bye_teams: [],
+    matches: [{ number: 1, team_a: 1, team_b: 2, court: 1, score_a: null, score_b: null }],
+  }],
+});
 const emptyWorld = () => ({ users: [], profiles: [], results: [], seasons: [], sessions: [], events: [], attendance: [] });
 function harness(world = emptyWorld(), options = {}) {
   const calls = { admin: 0, member: 0, db: 0, transactions: [] };
@@ -199,7 +206,7 @@ test('authenticated me exposes safe cross-season fixtures and the same movement 
     world.sessions.push(session);
     world.events.push({ id: id(300 + n), season_id: id(n === 3 ? 101 : 100), session_id: session.id,
       session_date: session.session_date, status: n === 1 ? 'finalized' : n === 4 ? 'draft' : 'published',
-      settings: { ...league.DEFAULTS }, team_size: 4, schedule: league.buildSchedule(2),
+      settings: { ...league.DEFAULTS }, team_size: 4, schedule: legacyTwoTeamSchedule(),
       teams: [
         { number: 1, name: 'Opponent', placement: 2, players: [world.profiles[1]] },
         { number: 2, name: 'Own squad', placement: 1, players: [world.profiles[0]] },
@@ -238,7 +245,7 @@ function scoringFixture() {
   const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
   const world = emptyWorld();
   world.users = [{ id: userId, display_name: 'Designated Member', status: 'approved', is_active: true, league_scorekeeper: true }];
-  world.profiles = Array.from({ length: 4 }, (_, i) => ({
+  world.profiles = Array.from({ length: 6 }, (_, i) => ({
     id: id(10 + i), user_id: i ? null : userId, display_name: `Participant ${i}`,
     gender: 'unspecified', is_rookie: false, initial_rating: 1000, rating: 1000, merged_into: null,
   }));
@@ -246,7 +253,7 @@ function scoringFixture() {
   world.sessions = [{ id: id(200), title: 'Thursday', session_date: '2026-01-01', start_time: '19:00:00', is_cancelled: false }];
   world.events = [{ id: id(300), season_id: id(100), session_id: id(200), session_date: '2026-01-01',
     version: 1, status: 'published', settings: { ...league.DEFAULTS },
-    ...league.balanceTeams(world.profiles, 2), schedule: league.buildSchedule(2), bonus_points: [],
+    ...league.balanceTeams(world.profiles, 2, 3, true), schedule: league.buildSchedule(3), bonus_points: [],
     roster_ids: world.profiles.map(p => p.id), rsvp_user_ids: [], roster_source: 'manual' }];
   return world;
 }

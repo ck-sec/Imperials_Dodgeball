@@ -34,7 +34,7 @@ function recorder(transaction) {
 }
 
 function eventFixture(world, status = 'published') {
-  const generated = balanceTeams(playerView(world), 6);
+  const generated = balanceTeams(playerView(world), 4);
   const event = { id: id(300), season_id: id(100), session_id: id(200), session_date: '2026-01-01',
     status, version: 1, settings: structuredClone(DEFAULTS), ...generated,
     roster_ids: world.profiles.map(p => p.id).sort(), rsvp_user_ids: world.users.map(u => u.id).sort(), roster_source: 'rsvp' };
@@ -42,7 +42,7 @@ function eventFixture(world, status = 'published') {
   return event;
 }
 
-test('stored training end survives the database/public/member projections beyond the match budget', async () => {
+test('referee-safe program times override the generic training end while unscheduled events retain it', async () => {
   const world = worldFixture();
   world.profiles = Array.from({ length: 30 }, (_, i) => ({
     ...world.profiles[0], id: id(i + 1), user_id: id(i + 1001), display_name: `Player ${i + 1}`,
@@ -64,11 +64,11 @@ test('stored training end survives the database/public/member projections beyond
   const loaded = await readWorld(sql);
   assert.equal(reads, 1);
   const project = userId => publicView(loaded, id(100), userId, '2026-01-01');
-  assert.equal(project().events[0].end_time, '21:00:00');
-  assert.equal(project(id(1001)).my_events[0].end_time, '21:00:00');
+  assert.equal(project().events[0].end_time, '20:10:00');
+  assert.equal(project(id(1001)).my_events[0].end_time, '20:10:00');
   loaded.sessions[0].end_time = null;
-  assert.equal(project(id(1001)).my_events[0].end_time, '20:00:00',
-    'Schedule timing is only a fallback when the actual training end is unavailable');
+  assert.equal(project(id(1001)).my_events[0].end_time, '20:10:00',
+    'The published league program includes the ten-minute finale');
   loaded.sessions[0].end_time = '21:00:00';
   event.schedule = null;
   assert.equal(project(id(1001)).my_events[0].end_time, '21:00:00',
@@ -100,6 +100,7 @@ test('generation snapshots server players and settings, locks session, and check
   assert(queries.some(q => q.text.includes('UPDATE league_players p SET initial_rating')));
   assert.match(queries[insertIndex].text, /roster_ids, session_date/);
   const teamNames = JSON.parse(queries[insertIndex].values[4]).map(t => t.name);
+  assert.equal(teamNames.length, 5, 'The real generation path should prefer five referee-safe teams');
   assert.equal(new Set(teamNames).size, teamNames.length);
   assert(teamNames.every(name => typeof name === 'string' && name.length > 0 && !/^Team \d+$/.test(name)));
 });
@@ -107,7 +108,7 @@ test('generation snapshots server players and settings, locks session, and check
 test('generated names persist through reads/publication/scoring and remain manually editable', async () => {
   const world = worldFixture();
   const sql = recorder();
-  await applyAction(sql, validateAction({ action: 'generate', season_id: id(100), session_id: id(200), team_size: 6 }), world);
+  await applyAction(sql, validateAction({ action: 'generate', season_id: id(100), session_id: id(200), team_size: 4 }), world);
   const insert = sql.transactions[0].queries.find(q => q.text.includes('INSERT INTO league_events'));
   const teams = JSON.parse(insert.values[4]);
   const names = teams.map(t => t.name);
@@ -125,14 +126,14 @@ test('generated names persist through reads/publication/scoring and remain manua
   await applyAction(sql, validateAction({ action: 'save_teams', event_id: event.id, version: 1, teams: custom }), world);
   const update = sql.transactions[2].queries.find(q => q.text.includes('UPDATE league_events SET teams'));
   assert.deepEqual(JSON.parse(update.values[0]).map(t => t.name), custom.map(t => t.name));
-  assert.deepEqual(balanceTeams(playerView(world), 6).teams.map(t => t.name), ['Team 1', 'Team 2'],
+  assert.deepEqual(balanceTeams(playerView(world), 4).teams.map(t => t.name), ['Team 1', 'Team 2', 'Team 3'],
     'Pure balancing must stay deterministic and independent of the random name generator');
 });
 
 test('published reads, match-score saves and final result writes retain generated team names exactly', async () => {
   const world = worldFixture();
   const sql = recorder();
-  await applyAction(sql, validateAction({ action: 'generate', season_id: id(100), session_id: id(200), team_size: 6 }), world);
+  await applyAction(sql, validateAction({ action: 'generate', season_id: id(100), session_id: id(200), team_size: 4 }), world);
   const generated = sql.transactions[0].queries.find(q => q.text.includes('INSERT INTO league_events'));
   const event = eventFixture(world, 'draft');
   event.teams = JSON.parse(generated.values[4]);
@@ -147,6 +148,9 @@ test('published reads, match-score saves and final result writes retain generate
   const scoreQueries = sql.transactions[2].queries;
   assert(!scoreQueries.some(q => q.text.includes('SET teams')));
   event.schedule = JSON.parse(scoreQueries.find(q => q.text.includes('UPDATE league_events SET schedule')).values[0]);
+  event.schedule.rounds.flatMap(round => round.matches).forEach(match => {
+    if (match.score_a === null) { match.score_a = 2; match.score_b = 1; }
+  });
   event.roster_locked = true;
   event.version++;
   assert.deepEqual(adminView(world).events[0].teams.map(t => t.name), names);
@@ -161,7 +165,7 @@ test('published reads, match-score saves and final result writes retain generate
 test('regeneration requires existing draft version and may not move event to another season', async () => {
   const world = worldFixture();
   const event = eventFixture(world, 'draft');
-  const input = { action: 'generate', season_id: event.season_id, session_id: event.session_id, team_size: 6 };
+  const input = { action: 'generate', season_id: event.season_id, session_id: event.session_id, team_size: 4 };
   await assert.rejects(applyAction(recorder(), input, world), error => error.status === 409);
   event.status = 'published';
   await assert.rejects(applyAction(recorder(), { ...input, version: 1 }, world), error => error.status === 409);
@@ -192,7 +196,7 @@ test('result write is one guarded transaction replacing the ledger, never increm
   const event = eventFixture(world);
   const sql = recorder();
   const input = { action: 'results', event_id: event.id, version: 1,
-    placements: [{ team_number: 1, placement: 1 }, { team_number: 2, placement: 2 }] };
+    placements: [{ team_number: 1, placement: 1 }, { team_number: 2, placement: 2 }, { team_number: 3, placement: 3 }] };
   await applyAction(sql, input, world);
   const { queries, options } = sql.transactions[0];
   assert.equal(options.isolationLevel, 'ReadCommitted');
@@ -204,7 +208,7 @@ test('result write is one guarded transaction replacing the ledger, never increm
   assert(queries.some(q => q.text.includes("AT TIME ZONE 'Europe/Vienna'")));
   const ledger = JSON.parse(queries[insertion].values[1]);
   assert.equal(ledger.length, 12);
-  assert(ledger.every(r => r.points === 3 || r.points === 0.5));
+  assert(ledger.every(r => [3, 2, 0.5].includes(r.points)));
   assert(!queries.some(q => /UPDATE league_players|rating_delta\s*=\s*rating_delta\s*\+/.test(q.text)));
   await assert.rejects(applyAction(recorder(), { ...input, version: 0 }, world), error => error.status === 409);
   event.session_date = '2099-01-01';
@@ -231,7 +235,7 @@ test('concurrent duplicate result requests reach the database version guard befo
     return operation;
   });
   const input = { action: 'results', event_id: event.id, version: 1,
-    placements: [{ team_number: 1, placement: 1 }, { team_number: 2, placement: 2 }] };
+    placements: [{ team_number: 1, placement: 1 }, { team_number: 2, placement: 2 }, { team_number: 3, placement: 3 }] };
   const outcomes = await Promise.allSettled([applyAction(sql, input, world), applyAction(sql, input, world)]);
   assert.equal(outcomes.filter(o => o.status === 'fulfilled').length, 1);
   assert.equal(dbError(outcomes.find(o => o.status === 'rejected').reason).status, 409);

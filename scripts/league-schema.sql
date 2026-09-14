@@ -74,6 +74,21 @@ CREATE TABLE IF NOT EXISTS league_events (
   CHECK (jsonb_typeof(rsvp_user_ids) = 'array')
 );
 -- statement-breakpoint
+CREATE TABLE IF NOT EXISTS league_match_timers (
+  event_id UUID NOT NULL REFERENCES league_events(id) ON DELETE CASCADE,
+  match_number INTEGER NOT NULL CHECK (match_number BETWEEN 1 AND 10),
+  revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+  phase VARCHAR(7) NOT NULL DEFAULT 'ready' CHECK (phase IN ('ready', 'running', 'paused')),
+  match_default_seconds INTEGER NOT NULL CHECK (match_default_seconds BETWEEN 0 AND 5999),
+  set_default_seconds INTEGER NOT NULL CHECK (set_default_seconds BETWEEN 0 AND 5999),
+  match_remaining_ms INTEGER NOT NULL CHECK (match_remaining_ms BETWEEN 0 AND 5999000),
+  set_remaining_ms INTEGER NOT NULL CHECK (set_remaining_ms BETWEEN 0 AND 5999000),
+  started_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (event_id, match_number),
+  CHECK ((phase = 'running') = (started_at IS NOT NULL))
+);
+-- statement-breakpoint
 ALTER TABLE league_events ADD COLUMN IF NOT EXISTS max_teams INTEGER NOT NULL DEFAULT 5 CHECK (max_teams BETWEEN 2 AND 5);
 -- statement-breakpoint
 ALTER TABLE league_events ADD COLUMN IF NOT EXISTS schedule JSONB CHECK (schedule IS NULL OR jsonb_typeof(schedule) = 'object');

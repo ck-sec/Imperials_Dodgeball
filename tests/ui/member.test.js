@@ -149,9 +149,11 @@ test('member page is German-first, training-first and versions every local style
   assert.match(html, /data-tab="training" role="tab"[^>]+aria-selected="true"/);
   assert.doesNotMatch(html, /href="\/#training-league"|data-tab="stats"|data-tab="settings"/);
   assert.match(html, /<details[^>]+id="seasonOneArchive"/);
-  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=20260912[b-d]?$/);
-  for (const asset of ['/league.css', '/js/league-ui.js', '/js/league-scoring.js']) assert.ok(html.includes(asset + '?v=20260912d'));
-  for (const asset of ['/js/member-core.js', '/js/member-dashboard.js', '/js/member-init.js']) assert.ok(html.includes(asset + '?v=20260912c'));
+  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=202609(?:12[b-d]?|14d?)$/);
+  for (const asset of ['/league.css', '/js/league-scoring.js']) assert.ok(html.includes(asset + '?v=20260912d'));
+  assert.ok(html.includes('/js/league-ui.js?v=20260914d'));
+  assert.ok(html.includes('/js/member-core.js?v=20260914'));
+  for (const asset of ['/js/member-dashboard.js', '/js/member-init.js']) assert.ok(html.includes(asset + '?v=20260912c'));
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
   assert.ok(html.indexOf('member-recovery-token.js') < html.indexOf('<link'));
   assert.doesNotMatch(source('member-auth') + source('member-init') + source('member-recovery-token'), /localStorage|sessionStorage/);
@@ -160,22 +162,30 @@ test('member page is German-first, training-first and versions every local style
 
 const returnEvent = '11111111-1111-4111-8111-111111111111';
 const returnPath = '/spieltag?event=' + returnEvent;
+const timerReturnPath = '/timer?event=' + returnEvent + '&match=1';
 const returnQuery = '?return_to=' + encodeURIComponent(returnPath);
 function loginFields(app) {
   app.node('loginEmail').value = 'member@example.test';
   app.node('loginPassword').value = 'normalPassword123';
 }
 
-test('central login allowlists only local matchday targets and rejects redirect tricks', () => {
+test('central login allowlists only local matchday and timer targets and rejects redirect tricks', () => {
   const app = fixtureApp();
   assert.equal(app.context.safeMemberReturn(returnPath), returnPath);
   assert.equal(app.context.safeMemberReturn('/spieltag'), '/spieltag');
+  assert.equal(app.context.safeMemberReturn(timerReturnPath), timerReturnPath);
+  assert.equal(app.context.safeMemberReturn('/timer?event=' + returnEvent.toUpperCase() + '&match=10'),
+    '/timer?event=' + returnEvent + '&match=10');
   for (const target of [
     '//evil.example', 'https://evil.example/spieltag', 'https://vienna-imperials.at/spieltag',
     '/\\evil.example', '/member', '/admin', '/spieltag/../admin', '/spieltag#token=x',
     '/spieltag?event=' + returnEvent + '&next=https://evil.example',
     '/spieltag?event=' + returnEvent + '&event=' + returnEvent,
-    '/spieltag?event=bad', '/spieltag\n', '%2Fspieltag', null, {}
+    '/spieltag?event=bad', '/timer?match=1&event=' + returnEvent,
+    '/timer?event=' + returnEvent + '&match=11',
+    '/timer?event=' + returnEvent + '&match=1&next=https://evil.example',
+    '/timer?event=' + returnEvent + '&match=1#token=x',
+    '/spieltag\n', '%2Fspieltag', null, {}
   ]) assert.equal(app.context.safeMemberReturn(target), '');
 });
 

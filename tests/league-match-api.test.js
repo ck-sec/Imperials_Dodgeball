@@ -11,14 +11,14 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 function fixture(teamCount = 5) {
   const players = Array.from({ length: teamCount * 6 }, (_, i) => ({
     id: id(i + 1), user_id: id(i + 1001), display_name: `Player ${i + 1}`,
-    gender: 'unspecified', is_rookie: false, rating: 1000, initial_rating: 1000, merged_into: null,
+    gender: i % 2 ? 'female' : 'male', is_rookie: false, rating: 1000, initial_rating: 1000, merged_into: null,
   }));
   const session = { id: id(3000), title: 'Training', session_date: '2026-01-01',
     start_time: '19:00:00', location: 'Vienna', is_cancelled: false };
   const event = {
     id: id(2000), season_id: id(4000), session_id: session.id, session_date: session.session_date,
     status: 'draft', version: 1, settings: structuredClone(DEFAULTS), roster_locked: false, schedule: null,
-    ...balanceTeams(players.map(({ user_id, ...p }) => p), 6, teamCount),
+    ...balanceTeams(players.map(({ user_id, ...p }) => p), 6, teamCount, true),
     roster_ids: players.map(p => p.id).sort(), rsvp_user_ids: players.map(p => p.user_id).sort(), roster_source: 'rsvp',
   };
   return {
@@ -56,23 +56,29 @@ function scheduled(world, score) {
 }
 const decisive = match => match.team_a < match.team_b ? [5, 1] : [1, 5];
 const request = (action, event, extra = {}) => validateAction({ action, event_id: event.id, version: event.version, ...extra });
+const awardFinale = event => {
+  event.bonus_points = [
+    { player_id: id(1), points: 1 }, { player_id: id(3), points: 0.5 },
+    { player_id: id(2), points: 1 }, { player_id: id(4), points: 0.5 },
+  ];
+};
 
-test('generation caps at two through five rotating squads and never excludes selected players', () => {
+test('generation prefers five or three referee-safe squads and never excludes selected players', () => {
   const players = fixture(5).profiles.concat(Array.from({ length: 6 }, (_, i) =>
-    ({ ...fixture(2).profiles[0], id: id(31 + i) })));
-  const result = balanceTeams(players, 6);
+    ({ ...fixture(3).profiles[0], id: id(31 + i) })));
+  const result = balanceTeams(players, 6, 5, true);
   assert.deepEqual(result.teams.map(t => t.players.length), [8, 7, 7, 7, 7]);
   assert.equal(result.max_teams, 5);
-  for (const max of [2, 3, 4, 5]) {
-    const squads = balanceTeams(players, 6, max);
-    assert.equal(squads.teams.length, max);
+  for (const max of [3, 4, 5]) {
+    const squads = balanceTeams(players, 6, max, true);
+    assert.equal(squads.teams.length, max === 5 ? 5 : 3);
     const ids = squads.teams.flatMap(t => t.players.map(p => p.id));
     assert.deepEqual([...ids].sort(), players.map(p => p.id).sort());
     assert.equal(new Set(ids).size, 36);
   }
   const valid = { action: 'generate', season_id: id(1), session_id: id(2), team_size: 6 };
   assert.equal(validateAction(valid).max_teams, 5);
-  for (const max of [1, 6, '5', 2.5, null]) assert.throws(() => validateAction({ ...valid, max_teams: max }), /max_teams/);
+  for (const max of [1, 2, 6, '5', 2.5, null]) assert.throws(() => validateAction({ ...valid, max_teams: max }), /max_teams/);
 });
 
 test('schedule creation is versioned and draft-only; five teams fit ten matches in 120 minutes', async () => {
@@ -80,7 +86,11 @@ test('schedule creation is versioned and draft-only; five teams fit ten matches 
   const event = world.events[0];
   const sql = recorder();
   const input = request('generate_schedule', event);
-  assert.deepEqual([input.courts, input.match_minutes, input.break_minutes, input.available_minutes], [2, 20, 5, 120]);
+  assert.deepEqual(
+    [input.courts, input.match_minutes, input.break_minutes, input.meetup_time,
+      input.warmup_minutes, input.available_minutes, input.finale_minutes],
+    [2, undefined, undefined, '18:00', 15, 120, 10]
+  );
   await applyAction(sql, input, world);
   const queries = sql.transactions[0];
   const mutation = queries.find(q => q.text.includes('UPDATE league_events SET schedule'));
@@ -94,7 +104,7 @@ test('schedule creation is versioned and draft-only; five teams fit ten matches 
   event.status = 'published';
   await assert.rejects(applyAction(recorder(), input, world), error => error.status === 409);
   event.status = 'draft';
-  await assert.rejects(applyAction(recorder(), { ...input, courts: 1 }, world), /needs 245 minutes/);
+  await assert.rejects(applyAction(recorder(), { ...input, courts: 1 }, world), /needs 230 minutes/);
 });
 
 test('unscored draft squad changes and regeneration clear the schedule for explicit regeneration', async () => {
@@ -160,13 +170,18 @@ test('scheduled results require all scores and automatically use the match table
   event.status = 'published';
   await assert.rejects(applyAction(recorder(), request('results', event), world), /every match/);
   scheduled(world, decisive);
+  await assert.rejects(applyAction(recorder(), request('results', event), world),
+    /Last Man Standing: save exactly one \+1 BP winner and one \+0.5 BP runner-up/);
+  awardFinale(event);
   const sql = recorder();
   await applyAction(sql, request('results', event, { placements: event.teams.map(t =>
     ({ team_number: t.number, placement: 6 - t.number })) }), world);
   const queries = sql.transactions[0];
   const ledger = JSON.parse(queries.find(q => q.text.includes('INSERT INTO league_results')).values[1]);
-  assert(ledger.filter(r => r.team_number === 1).every(r => r.placement === 1 && r.points === 3));
-  assert(ledger.filter(r => r.team_number === 5).every(r => r.placement === 5 && r.points === 0.5));
+  assert(ledger.filter(r => r.team_number === 1).every(r =>
+    r.placement === 1 && r.points === 3 + r.bonus_points));
+  assert(ledger.filter(r => r.team_number === 5).every(r =>
+    r.placement === 5 && r.points === 0.5 + r.bonus_points));
   assert(queries.some(q => q.text.includes("status = 'finalized', roster_locked = true")));
   assert.equal(matchStandings(5, event.schedule).standings[0].table_points, 8, 'Match-table points are separate from season points');
 });
@@ -209,6 +224,26 @@ test('public match data is safe, drafts remain hidden, and scores alone never cr
   assert.deepEqual(publicView(world).events, []);
 });
 
+test('finalized Last Man and Last Woman awards expose only winner names and fixed public BP', () => {
+  const world = fixture();
+  const event = scheduled(world);
+  event.status = 'finalized';
+  event.teams.forEach(team => { team.placement = team.number; });
+  awardFinale(event);
+  const visible = publicView(world, event.season_id).events[0];
+  assert.deepEqual(visible.finale_results, {
+    men: {
+      winner: { display_name: 'Player 1', bonus_points: 1 },
+      runner_up: { display_name: 'Player 3', bonus_points: 0.5 },
+    },
+    women: {
+      winner: { display_name: 'Player 2', bonus_points: 1 },
+      runner_up: { display_name: 'Player 4', bonus_points: 0.5 },
+    },
+  });
+  assert.doesNotMatch(JSON.stringify(visible.finale_results), /gender|player_id|user_id/);
+});
+
 test('persisted scores and schedule timing are revalidated rather than trusted on read/finalization', () => {
   const world = fixture();
   const event = scheduled(world);
@@ -224,8 +259,9 @@ test('persisted scores and schedule timing are revalidated rather than trusted o
 });
 
 test('reopening removes previous awards, retains scores, and a corrected match replaces points and rating deltas', async () => {
-  const world = fixture(2);
+  const world = fixture(3);
   const event = scheduled(world, decisive);
+  awardFinale(event);
   const initial = scoreEvent(event, eventPlacements(event));
   event.teams = initial.teams;
   event.status = 'finalized';
@@ -261,14 +297,18 @@ test('reopening removes previous awards, retains scores, and a corrected match r
   await assert.rejects(applyAction(recorder(), request('unpublish', event), world), /Teams are locked/);
   const match = event.schedule.rounds[0].matches[0];
   await applyAction(sql, request('save_match', event, {
-    match_number: match.number, score_a: match.team_a === 2 ? 2 : 0, score_b: match.team_b === 2 ? 2 : 0,
+    match_number: match.number, score_a: match.team_a === 3 ? 2 : 0, score_b: match.team_b === 3 ? 2 : 0,
   }), world);
   assert.equal(world.results.length, 0, 'Editing the reopened score must not award season points early');
   await applyAction(sql, request('results', event), world);
   assert.notDeepEqual(world.results, originalAwards);
-  assert(world.results.filter(r => r.team_number === 1).every(r => r.points === 0.5 && r.rating_delta === -12));
-  assert(world.results.filter(r => r.team_number === 2).every(r => r.points === 3 && r.rating_delta === 12));
-  assert.equal(world.results.length, 12);
+  assert(world.results.filter(r => r.team_number === 1).every(r =>
+    r.points === 3 + r.bonus_points && r.rating_delta === 12));
+  assert(world.results.filter(r => r.team_number === 3).every(r =>
+    r.points === 2 + r.bonus_points && r.rating_delta === 0));
+  assert(world.results.filter(r => r.team_number === 2).every(r =>
+    r.points === 0.5 + r.bonus_points && r.rating_delta === -12));
+  assert.equal(world.results.length, 18);
   assert.equal(event.status, 'finalized');
   assert.equal(event.version, 4);
 });

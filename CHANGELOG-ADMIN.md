@@ -6,6 +6,67 @@ Hier steht das ganze Paket: das neue Season-2-System, der mobile Mitgliederberei
 die Website-Ueberarbeitung und die anschliessenden Verbesserungen fuer deinen
 Donnerstagsbetrieb. Also nicht nur die letzten Komfort-Aenderungen.
 
+## Update 14. September 2026: Live-Match-Timer
+
+- Jeder veroeffentlichte Spielplan verlinkt jetzt pro Begegnung eine eigene
+  oeffentliche Live-Spieluhr mit Vienna-Imperials-Branding.
+- Die Bedienung entspricht dem WDBF-Timer: gemeinsame Start-/Pause-Steuerung
+  fuer Match Clock und Set Clock, Zeitkorrekturen, Reset, Standardzeiten und
+  Vollbild.
+- Alle Bedienelemente bleiben wie beim Referenz-Timer sichtbar. Fuer Zuschauer
+  sind sie gesperrt; Head Refs und Admins sehen sie am Spieltag aktiv. Match-
+  und Set-Standardzeit koennen jeweils separat uebernommen werden.
+- Zuschauen kann jeder. Starten, pausieren und anpassen duerfen nur Admins und
+  dauerhaft ernannte Head Refs, und nur am jeweiligen veroeffentlichten
+  Donnerstag.
+- Im ersten Admin-Schritt koennen bestehende, freigeschaltete Mitgliedskonten
+  als permanente Head Refs markiert werden. Dasselbe normale Mitglieder-Login
+  erlaubt dann Ergebniseingabe und Timer-Steuerung; ein separates Timer-Konto
+  gibt es nicht. Entfernen der Rolle sperrt beide Rechte sofort.
+- Der Timer wird serverseitig synchronisiert. Ein zweites Handy oder ein
+  Hallendisplay sieht daher denselben Stand. Gleichzeitige Aenderungen werden
+  ueber eine eigene Timer-Version abgefangen und ueberschreiben keine
+  Ergebniseingaben.
+- Vor dem Deployment einmalig die additive Migration ausfuehren:
+  `node scripts\migrate-match-timer.js --apply --expected-host DEIN_DB_HOST`.
+  Ohne `--apply` laeuft das Skript nur als sicherer Offline-Dry-Run.
+
+## Update 14. September 2026: WhatsApp-PDF
+
+- Jeder veroeffentlichte oder abgeschlossene Spieltag kann im Match Center als
+  einseitiges, querformatiges WhatsApp-Poster exportiert werden. Das
+  **Spielplan-PDF** ist schon direkt nach der Veroeffentlichung verfuegbar und
+  zeigt ohne Ergebnis-Spoiler die Teams, Aufstellungen, Rundenzeiten, Felder,
+  Begegnungen und Pausen als Match Tree.
+- Nach dem Abschluss steht zusaetzlich ein separates **Ergebnis-PDF** im selben
+  Design bereit. Es zeigt alle Endresultate im Match Tree und die Tagestabelle.
+- Der Export entsteht direkt im Browser aus denselben oeffentlichen Daten wie
+  der Spieltag. Private Ratings, Geschlecht, Rookie-Markierungen, Konto-IDs und
+  Rollen werden weder gelesen noch in das PDF geschrieben.
+- Auf Geraeten mit Datei-Freigabe kann das bereits erstellte PDF ueber
+  **PDF teilen** direkt an WhatsApp uebergeben werden. Andernfalls wird die
+  Datei mit einem WhatsApp-tauglichen Namen heruntergeladen.
+
+## Update 14. September 2026: Ref-Team und fixer Abendablauf
+
+- Neue Aufstellungen bevorzugen fuenf Teams fuer zwei kleine Felder oder drei
+  Teams fuer ein grosses Feld. Damit bleibt in jeder Spielrunde mindestens ein
+  nicht spielendes Team als klar zugewiesenes Ref-Team frei.
+- Falls eine bestehende Vierer-Aufstellung verwendet wird, laeuft bewusst nur
+  eine Begegnung gleichzeitig: zwei Teams spielen, eines pfeift und eines hat
+  Pause. Die Ref-Einsaetze werden ueber den ganzen Abend moeglichst gleichmaessig
+  und ohne vermeidbare direkte Wiederholungen verteilt.
+- Der gemeinsame Ablauf steht jetzt im Admin, im oeffentlichen Match Center und
+  im Spielplan-PDF: **18:00 Treffpunkt und Warm-up**, **18:15 Spielbeginn**,
+  **20:00 Spielende** und danach maximal zehn Minuten **Last Man / Last Woman
+  Standing** bis **20:10**.
+- Die Last-Standing-Auszeichnungen werden vor dem Ergebnisabschluss strukturiert
+  ausgewaehlt: Sieger und Siegerin erhalten jeweils **+1 BP**, die beiden
+  Zweitplatzierten jeweils **+0,5 BP**. Diese BP fliessen wie alle anderen BP in
+  Tages- und Saison-Gesamtpunkte ein.
+- Spielplan, Timer und beide WhatsApp-PDFs zeigen das je Runde eingeteilte
+  Ref-Team; separate Pausenteams werden eindeutig davon unterschieden.
+
 ## 1. Social League: von der Aufstellung bis zur Saisonwertung
 
 ### Mit der ersten Umsetzung dazugekommen
@@ -40,9 +101,10 @@ Donnerstagsbetrieb. Also nicht nur die letzten Komfort-Aenderungen.
 
 - **Klarer Admin-Einstieg:** fest auf **Season 2** ausgerichtet, nur
   Donnerstagstermine; der naechste nicht abgesagte Donnerstag ist hervorgehoben.
-- **Auch kleine Runden:** jetzt **2 bis 6 Spieler auf dem Feld pro Team** oder
+- **Flexible Feldbesetzung:** **2 bis 6 Spieler auf dem Feld pro Team** oder
   automatische Auswahl. Das ist die Feldbesetzung, nicht die Zahl der Spielfelder.
-  Es gibt hoechstens 5 Teams; kleinere Runden gehen ab 4 Teilnehmern.
+  Neue Liga-Aufstellungen beginnen ab 6 Teilnehmern und bilden bevorzugt 3 oder
+  5 Teams, damit immer ein Ref-Team verfuegbar bleibt. Es gibt hoechstens 5 Teams.
 - **Gezielt statt immer neu mischen:** Spieler verschieben, tauschen, entfernen
   und nachtraeglich zuordnen, per Drag-and-drop, Antippen oder Tastatur.
   **Undo last draft change** nimmt die letzte lokale Aufstellungsaenderung
@@ -246,16 +308,17 @@ Punkte nach den neuen Regeln eine andere Stufe ergeben wuerden.
 
 ## 8. Head Ref freischalten
 
-Bei **Player profiles, private skill & Head Ref** ein bestehendes,
-freigegebenes und aktives Mitglied als **Head Ref** markieren.
+Im ersten Admin-Schritt unter **Account access · Head Refs** ein bestehendes,
+freigegebenes und aktives Mitgliedskonto als **Head Ref** markieren.
 Die Rolle gilt **dauerhaft fuer alle Donnerstagsspieltage**, bis du sie entziehst;
 sie muss nicht jede Woche neu vergeben werden. Gaeste ohne Mitgliedskonto koennen
 diese Rolle nicht erhalten.
 
 Head Refs nutzen ihren normalen Mitglieder-Login und duerfen Match-Ergebnisse
-speichern beziehungsweise korrigieren, solange die Ergebnisse offen sind.
-Der Login fuehrt direkt zum zuvor ausgewaehlten Spieltag zurueck. Wer bereits
-angemeldet ist, braucht keine weitere Anmeldung auf der Spieltagsseite.
+speichern beziehungsweise korrigieren, solange die Ergebnisse offen sind. Am
+veroeffentlichten Spieltag duerfen sie mit demselben Login auch die jeweilige
+Live-Spieluhr bedienen. Der Login fuehrt direkt zum zuvor ausgewaehlten Spieltag
+oder Timer zurueck. Wer bereits angemeldet ist, braucht keine weitere Anmeldung.
 Sie duerfen **keine Teams, Teilnehmer, BP, Saisonregeln oder Rollen bearbeiten**
 und **weder Trainings abschliessen noch abgeschlossene Ergebnisse wieder oeffnen**.
 Zuschauer brauchen auf der Spieltagsseite keinen Login.

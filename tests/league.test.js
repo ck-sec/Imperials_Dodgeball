@@ -324,8 +324,9 @@ test('admin results preview exposes frozen event points and K despite later seas
 test('migration is additive, idempotent and preserves PL/pgSQL statement bodies', () => {
   const schema = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'league-schema.sql'), 'utf8');
   const statements = migrationStatements(schema);
-  assert.equal(statements.length, 14);
+  assert.equal(statements.length, 15);
   assert(statements.every(s => /CREATE (TABLE IF NOT EXISTS|INDEX IF NOT EXISTS|OR REPLACE FUNCTION)|ALTER TABLE (league_(seasons|events)|users)/.test(s)));
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS league_match_timers/);
   assert(!/UPDATE\s+users|DROP\s|TRUNCATE\s/i.test(schema));
   assert(!/UPDATE\s+league_(events|results)/i.test(schema));
   assert(statements.at(-1).includes("DETAIL = 'LEAGUE_'"));

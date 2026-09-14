@@ -9,12 +9,13 @@
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/fonts/fonts.css?v=20260912c">
   <link rel="stylesheet" href="/league.css?v=20260912d">
-  <link rel="stylesheet" href="/matchday.css?v=20260912c">
+  <link rel="stylesheet" href="/matchday.css?v=20260914d">
   <script src="/js/site-language.js?v=20260912c" defer></script>
   <script src="/js/site-utils.js?v=20260912c" defer></script>
   <script src="/js/league-scoring.js?v=20260912d" defer></script>
-  <script src="/js/league-ui.js?v=20260912d" defer></script>
-  <script src="/js/matchday.js?v=20260912c" defer></script>
+  <script src="/js/league-ui.js?v=20260914d" defer></script>
+  <script src="/js/league-pdf.js?v=20260914d" defer></script>
+  <script src="/js/matchday.js?v=20260914d" defer></script>
 </head>
 <body class="matchday-page league" id="matchdayPage">
   <a class="matchday-skip" href="#main" data-de="Zum Spieltag" data-en="Skip to matchday">Zum Spieltag</a>
@@ -39,6 +40,8 @@
       <div class="matchday-actions">
         <button class="league-btn" type="button" id="matchdayRefresh" data-de="Aktualisieren" data-en="Refresh">Aktualisieren</button>
         <button class="league-btn" type="button" id="matchdayShare" disabled data-de="Link teilen" data-en="Share link">Link teilen</button>
+        <button class="league-btn league-btn-primary matchday-pdf" type="button" id="matchdayPdf" disabled data-de="Spielplan-PDF" data-en="Fixtures PDF">Spielplan-PDF</button>
+        <button class="league-btn matchday-pdf" type="button" id="matchdayResultsPdf" disabled data-de="Ergebnis-PDF" data-en="Results PDF" title="Nach Spieltag-Abschluss / After matchday finalization">Ergebnis-PDF</button>
       </div>
     </div>
     <p class="matchday-sync" id="matchdaySync" role="status" aria-live="polite"></p>
@@ -64,17 +67,20 @@
       </div>
       <p class="league-copy" id="matchdayMeta"></p>
       <p class="league-copy" id="matchdayReadOnly"></p>
+      <section class="matchday-program" id="matchdayProgram" aria-label="Ablauf / Itinerary" hidden></section>
       <nav class="matchday-jumps" aria-label="Spieltag / Matchday">
         <a class="league-btn" href="#matchdayFixtures" data-de="Spiele" data-en="Matches">Spiele</a>
         <a class="league-btn" href="#matchdayTable" data-de="Tagestabelle" data-en="Match table">Tagestabelle</a>
         <a class="league-btn" href="#matchdaySeason" data-de="Saison" data-en="Season">Saison</a>
       </nav>
       <section id="matchdayFixtures" aria-labelledby="matchdayFixturesTitle">
-        <h2 id="matchdayFixturesTitle" data-de="Spielplan & Ergebnisse" data-en="Fixtures & scores">Spielplan &amp; Ergebnisse</h2>
+        <h2 id="matchdayFixturesTitle" data-de="Match Center" data-en="Match center">Match Center</h2>
+        <p class="league-copy" data-de="Alle Begegnungen auf einen Blick. Öffne die Live-Spieluhr für jedes einzelne Spiel." data-en="Every fixture at a glance. Open the live clock for any individual match.">Alle Begegnungen auf einen Blick. Öffne die Live-Spieluhr für jedes einzelne Spiel.</p>
         <p class="league-notice" id="matchdayScheduleNotice" hidden></p>
         <div id="matchdayMatches"></div>
       </section>
       <section id="matchdayTable" aria-label="Spieltagstabelle / Match standings"></section>
+      <section class="matchday-finale" id="matchdayFinale" aria-label="Finale-Ergebnisse / Finale results" hidden></section>
     </section>
     <p class="league-notice" id="matchdayEmpty" hidden></p>
     <section class="matchday-season" id="matchdaySeason" aria-labelledby="matchdaySeasonTitle">

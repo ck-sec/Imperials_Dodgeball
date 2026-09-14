@@ -174,17 +174,18 @@ test('season selectors escape names and select the requested season', () => {
   assert.match(html, /value="two" selected/);
 });
 
-test('public fixtures show two-hour timing, rests and separate match-table points', () => {
+test('public fixtures show the ref-safe program, ref teams and separate match-table points', () => {
   const event = fixture();
   event.schedule = buildSchedule(5);
   event.match_standings = matchStandings(5, event.schedule);
   const html = ui.schedule(event, 'en');
-  assert.match(html, /19:00 &ndash; 19:20/);
-  assert.match(html, /20:40 &ndash; 21:00/);
+  assert.match(html, /18:15 &ndash; 18:32/);
+  assert.match(html, /19:43 &ndash; 20:00/);
   assert.match(html, /No time buffer/);
   assert.match(html, /not season points/);
   assert.equal((html.match(/class="league-match"/g) || []).length, 10);
-  assert.match(html, /Rest: Team 1/);
+  assert.match(html, /Ref team: Team 1/);
+  assert.match(html, /Last Man \/ Last Woman Standing/);
   assert.doesNotMatch(html, /1234|rookie|private-user-id/);
 });
 
@@ -283,9 +284,10 @@ test('points rules expose the five tier thresholds without expanding the compact
 test('all ranking surfaces load the same refreshed tier logic, markup and styles', () => {
   for (const file of ['index.html', 'admin.html', 'member.html', 'spieltag.html']) {
     const html = fs.readFileSync(path.join(root, file), 'utf8');
-    for (const asset of ['/js/league-scoring.js', '/js/league-ui.js', '/league.css']) {
+    for (const asset of ['/js/league-scoring.js', '/league.css']) {
       assert.ok(html.includes(asset + '?v=20260912d'), file + ' must refresh ' + asset);
     }
+    assert.ok(html.includes('/js/league-ui.js?v=20260914d'), file + ' must refresh league UI');
   }
 });
 

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07152d">
+  <meta name="robots" content="noindex">
+  <meta name="description" content="Live-Spieluhr der Vienna Imperials Trainingsliga.">
+  <title>Match Timer — Vienna Imperials</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/fonts/fonts.css?v=20260912c">
+  <link rel="stylesheet" href="/timer.css?v=20260914b">
+  <script src="/js/site-language.js?v=20260912c" defer></script>
+  <script src="/js/timer.js?v=20260914d" defer></script>
+</head>
+<body class="timer-page" id="timerPage">
+  <a class="timer-skip" href="#timerMain" data-de="Zur Spieluhr" data-en="Skip to match timer">Zur Spieluhr</a>
+  <header class="timer-header">
+    <a class="timer-brand" href="/" aria-label="Vienna Imperials — Home">
+      <img src="/logo.webp" alt="" width="52" height="52">
+      <span>Vienna Imperials</span>
+    </a>
+    <div class="timer-header-actions">
+      <div class="timer-language" role="group" aria-label="Sprache / Language">
+        <button type="button" data-site-language="de" aria-pressed="true" lang="de">DE</button>
+        <button type="button" data-site-language="en" aria-pressed="false" lang="en">EN</button>
+      </div>
+      <button class="timer-utility" id="timerFullscreen" type="button" data-de="Vollbild" data-en="Fullscreen">Vollbild</button>
+    </div>
+  </header>
+
+  <main class="timer-main" id="timerMain">
+    <div class="timer-toolbar">
+      <a class="timer-back" id="timerBack" href="/spieltag" data-de="← Zum Spieltag" data-en="← Back to matchday">← Zum Spieltag</a>
+      <div class="timer-toolbar-actions">
+        <button class="timer-utility" id="timerRefresh" type="button" data-de="Aktualisieren" data-en="Refresh">Aktualisieren</button>
+        <button class="timer-utility" id="timerShare" type="button" disabled data-de="Timer teilen" data-en="Share timer">Timer teilen</button>
+      </div>
+    </div>
+    <p class="timer-sync" id="timerSync" role="status" aria-live="polite"></p>
+    <div class="timer-error" id="timerError" role="alert" hidden></div>
+
+    <section class="timer-board" id="timerShell" aria-labelledby="timerEvent" hidden>
+      <div class="timer-event-bar">
+        <div>
+          <p class="timer-eyebrow" id="timerMatchMeta"></p>
+          <h1 id="timerEvent"></h1>
+        </div>
+        <span class="timer-role" id="timerRole"></span>
+      </div>
+
+      <section class="timer-matchup" aria-label="Match">
+        <article class="timer-team timer-team-a">
+          <span class="timer-team-tag" data-de="Team A" data-en="Team A">Team A</span>
+          <h2 id="timerTeamA"></h2>
+          <ul id="timerPlayersA"></ul>
+        </article>
+        <div class="timer-versus" aria-hidden="true">
+          <span>VS</span>
+          <strong id="timerScore">– : –</strong>
+        </div>
+        <article class="timer-team timer-team-b">
+          <span class="timer-team-tag" data-de="Team B" data-en="Team B">Team B</span>
+          <h2 id="timerTeamB"></h2>
+          <ul id="timerPlayersB"></ul>
+        </article>
+      </section>
+
+      <div class="timer-clocks" aria-live="off">
+        <section class="timer-clock timer-clock-match" aria-labelledby="timerMatchLabel">
+          <p id="timerMatchLabel" data-de="Match Clock" data-en="Match Clock">Match Clock</p>
+          <output id="timerMatchClock" aria-label="Match Clock">20:00</output>
+          <div class="timer-adjustments" data-timer-operator>
+            <button type="button" data-timer-action="adjust" data-clock="match" data-delta="60">+1 Min</button>
+            <button type="button" data-timer-action="adjust" data-clock="match" data-delta="-60">−1 Min</button>
+            <button type="button" data-timer-action="adjust" data-clock="match" data-delta="5" data-de="+5 Sek" data-en="+5 Sec">+5 Sek</button>
+            <button type="button" data-timer-action="adjust" data-clock="match" data-delta="-5" data-de="−5 Sek" data-en="−5 Sec">−5 Sek</button>
+            <button class="timer-reset" type="button" data-timer-action="reset" data-clock="match" data-de="Match zurücksetzen" data-en="Reset match">Match zurücksetzen</button>
+          </div>
+        </section>
+
+        <section class="timer-clock timer-clock-set" aria-labelledby="timerSetLabel">
+          <p id="timerSetLabel" data-de="Set Clock" data-en="Set Clock">Set Clock</p>
+          <output id="timerSetClock" aria-label="Set Clock">03:00</output>
+          <div class="timer-adjustments" data-timer-operator>
+            <button type="button" data-timer-action="adjust" data-clock="set" data-delta="60">+1 Min</button>
+            <button type="button" data-timer-action="adjust" data-clock="set" data-delta="-60">−1 Min</button>
+            <button type="button" data-timer-action="adjust" data-clock="set" data-delta="5" data-de="+5 Sek" data-en="+5 Sec">+5 Sek</button>
+            <button type="button" data-timer-action="adjust" data-clock="set" data-delta="-5" data-de="−5 Sek" data-en="−5 Sec">−5 Sek</button>
+            <button class="timer-reset" type="button" data-timer-action="reset" data-clock="set" data-de="Set zurücksetzen" data-en="Reset set">Set zurücksetzen</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="timer-master" aria-labelledby="timerStatus">
+        <div class="timer-master-actions" data-timer-operator>
+          <button class="timer-start" id="timerStart" type="button" data-timer-action="start" data-de="Spiel starten" data-en="Start play">Spiel starten</button>
+          <button class="timer-pause" id="timerPause" type="button" data-timer-action="pause" data-de="Spiel pausieren" data-en="Pause play">Spiel pausieren</button>
+        </div>
+        <p class="timer-status" id="timerStatus">Bereit</p>
+      </section>
+
+      <aside class="timer-access" id="timerAccess">
+        <p id="timerAccessCopy"></p>
+        <div class="timer-access-actions">
+          <a class="timer-primary-link" id="timerLogin" href="/member" data-de="Als Head Ref anmelden" data-en="Sign in as Head Ref">Als Head Ref anmelden</a>
+          <a class="timer-secondary-link" id="timerMember" href="/member" hidden data-de="Mein Konto" data-en="My account">Mein Konto</a>
+        </div>
+      </aside>
+
+      <details class="timer-config" id="timerConfig" data-timer-operator open>
+        <summary data-de="Standardzeiten einstellen" data-en="Set default times">Standardzeiten einstellen</summary>
+        <div class="timer-config-forms">
+          <form id="timerMatchConfigForm">
+            <fieldset>
+              <legend data-de="Standard Match Clock" data-en="Default Match Clock">Standard Match Clock</legend>
+              <label><span data-de="Min" data-en="Min">Min</span><input id="timerMatchMinutes" type="number" min="0" max="99" step="1" inputmode="numeric" required></label>
+              <label><span data-de="Sek" data-en="Sec">Sec</span><input id="timerMatchSeconds" type="number" min="0" max="59" step="1" inputmode="numeric" required></label>
+            </fieldset>
+            <button class="timer-apply" type="submit" data-de="Match-Zeit übernehmen" data-en="Apply match time">Match-Zeit übernehmen</button>
+          </form>
+          <form id="timerSetConfigForm">
+            <fieldset>
+              <legend data-de="Standard Set Clock" data-en="Default Set Clock">Standard Set Clock</legend>
+              <label><span data-de="Min" data-en="Min">Min</span><input id="timerSetMinutes" type="number" min="0" max="99" step="1" inputmode="numeric" required></label>
+              <label><span data-de="Sek" data-en="Sec">Sek</span><input id="timerSetSeconds" type="number" min="0" max="59" step="1" inputmode="numeric" required></label>
+            </fieldset>
+            <button class="timer-apply" type="submit" data-de="Set-Zeit übernehmen" data-en="Apply set time">Set-Zeit übernehmen</button>
+          </form>
+        </div>
+        <p data-de="Während die Uhr läuft, gelten neue Standardzeiten erst beim Zurücksetzen." data-en="While the timer is running, new defaults take effect on reset.">Während die Uhr läuft, gelten neue Standardzeiten erst beim Zurücksetzen.</p>
+      </details>
+    </section>
+
+    <noscript><p class="timer-error">Bitte JavaScript aktivieren, um die Spieluhr zu verwenden. Please enable JavaScript to use the match timer.</p></noscript>
+  </main>
+
+  <footer class="timer-footer">
+    <span>Vienna Imperials · WDBF Match Timer</span>
+    <a href="/datenschutz.html" data-de="Datenschutz" data-en="Privacy">Datenschutz</a>
+  </footer>
+</body>
+</html>
