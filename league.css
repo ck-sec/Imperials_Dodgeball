@@ -30,6 +30,28 @@
 .league-error { border-color: #f87171; color: #fecaca; }
 .league-block { margin-top: 1.75rem; }
 .league-block h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 1.5rem; font-weight: 700; margin: 0 0 .65rem; }
+.league-guide { margin: 1rem 0 1.5rem; overflow: hidden; border: 1px solid #9c7937; border-radius: 12px; background: linear-gradient(145deg, #172d50, #0e2142); }
+.league-guide > summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 48px; padding: 1rem; color: #f0b830; font-weight: 700; line-height: 1.4; list-style: none; }
+.league-guide > summary::-webkit-details-marker { display: none; }
+.league-guide > summary::after { content: '+'; flex: 0 0 auto; font-size: 1.4rem; font-weight: 400; }
+.league-guide[open] > summary { border-bottom: 1px solid #47608b; }
+.league-guide[open] > summary::after { content: '\2212'; }
+.league-guide-body { padding: 1rem; }
+.league-guide-lead { margin: 0; color: #f4f7ff; font-size: 1rem; line-height: 1.65; }
+.league-guide-steps { display: grid; gap: .65rem; margin: 1rem 0 0; padding: 0; list-style: none; counter-reset: league-guide-step; }
+.league-guide-steps li { position: relative; min-width: 0; padding: .85rem .85rem .85rem 3rem; border: 1px solid #375681; border-radius: 9px; background: rgba(12,27,58,.55); counter-increment: league-guide-step; }
+.league-guide-steps li::before { content: counter(league-guide-step); position: absolute; top: .85rem; left: .85rem; display: grid; place-items: center; width: 1.45rem; height: 1.45rem; border-radius: 50%; background: #f0b830; color: #0c1b3a; font-size: .75rem; font-weight: 800; }
+.league-guide-steps strong { display: block; margin-bottom: .3rem; color: #f4f7ff; }
+.league-guide-steps span, .league-guide-card p { color: var(--league-muted); font-size: .85rem; line-height: 1.6; }
+.league-guide-section { margin-top: 1.35rem; }
+.league-guide-section h3 { margin: 0 0 .75rem; font-family: 'Barlow Condensed', sans-serif; font-size: 1.35rem; }
+.league-guide-grid { display: grid; gap: .75rem; }
+.league-guide-card { min-width: 0; padding: 1rem; border: 1px solid #47608b; border-radius: 10px; background: #102447; }
+.league-guide-card h4 { margin: 0; color: #f0b830; font-family: 'Barlow Condensed', sans-serif; font-size: 1.15rem; }
+.league-guide-card p { margin: .65rem 0 0; }
+.league-guide-score { display: block; margin-top: .3rem; color: #f4f7ff; font-family: 'Barlow Condensed', sans-serif; font-size: 1.45rem; }
+.league-guide-callout { padding: .8rem; border-left: 3px solid #f0b830; background: rgba(240,184,48,.08); color: #dbe5f6; font-size: .85rem; line-height: 1.6; }
+.league-guide-privacy { margin: 1.25rem 0 .75rem; color: var(--league-muted); font-size: .8rem; line-height: 1.55; }
 .league-rules { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
 .league-score-examples { margin: .75rem 0; display: grid; gap: .5rem; font-size: .85rem; }
 .league-score-examples > div { display: grid; grid-template-columns: 65px minmax(0, 1fr); gap: .75rem; padding: .5rem 0; border-top: 1px solid #375681; }
@@ -136,6 +158,7 @@
 .league-training-note { margin: 0 0 1rem; }
 .league-rsvp-error { color: #fecaca; font-size: .85rem; margin-top: .75rem; }
 @media (min-width: 620px) {
+  .league-guide-steps, .league-guide-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .league-hof-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .league-team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .league-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }

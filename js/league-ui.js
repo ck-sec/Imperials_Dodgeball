@@ -69,6 +69,54 @@ window.LeagueUI = (function() {
       noHistory: 'No scored trainings in this season yet.'
     }
   };
+  const guideText = {
+    de: {
+      title: 'Neu dabei? Die Liga in 60 Sekunden',
+      lead: 'Du meldest dich nicht für eine fixe Mannschaft oder gleich für die ganze Saison an. Wähle einfach die Donnerstage, an denen du spielen willst. Anfänger*innen sind ausdrücklich willkommen.',
+      steps: [
+        ['Termin wählen', 'Öffne im Mitgliederbereich „Training“ und tippe beim gewünschten Donnerstag auf „Dabei“. Jeder Termin braucht eine eigene Zusage. Du kannst sie ändern, bis die Teams veröffentlicht werden; danach hilft dir der Club bei Änderungen.'],
+        ['Faire Teams', 'Die Admins übernehmen die Zusagen. Das System erstellt möglichst gleich große und ausgeglichene Teams anhand einer privaten ELO-Spielstärke sowie der Rookie- und Geschlechterverteilung. Es ist keine zufällige Auslosung.'],
+        ['Alle spielen', 'Jedes Team spielt einmal gegen jedes andere. Ref-Einsätze und Pausen werden verteilt. Bei größeren Kadern wechseln Ersatzspieler*innen durch und gehören trotzdem voll zum Team.'],
+        ['Ergebnis bestätigen', 'Head Refs oder Admins speichern die Scores und bestätigen am Ende die Platzierungen. Dann erhält jede Person im Team – auch rotierende Ersatzspieler*innen – dieselben Basis-Platzierungspunkte.']
+      ],
+      pointsHeading: 'Zwei Punktesysteme – bitte nicht verwechseln',
+      matchTitle: 'Matchpunkte',
+      matchScore: '2 / 1 / 0',
+      matchBody: 'Nur für die Team-Platzierung an diesem Donnerstag: Sieg = 2, Unentschieden = 1, Niederlage = 0. Danach zählen Punktedifferenz und erzielte Punkte. Einen exakten Gleichstand lösen die Admins.',
+      seasonTitle: 'Saisonpunkte',
+      seasonScore: 'Platz = Punkte',
+      seasonBody: 'Die endgültige Team-Platzierung wird in Punkte für deine persönliche Saison-Rangliste umgerechnet. Alle gewerteten Donnerstage werden zusammengezählt; gleiche Gesamtpunkte bedeuten den gleichen Rang.',
+      eloHeading: 'Was macht die geheime ELO?',
+      eloBody: 'ELO ist nur ein interner Schätzwert für faire zukünftige Teams. Sie ist kein öffentlicher Rang, keine Belohnung und kein Teil deiner Saisonpunkte. Nach einem finalisierten Abend vergleicht das System eure Platzierung mit der Erwartung aus den durchschnittlichen Teamstärken: besser als erwartet bedeutet ELO rauf, schlechter als erwartet ELO runter. Alle im selben Team bekommen dieselbe Änderung; persönliche Statistiken zählen nicht.',
+      eloNote: 'Wichtig: ELO mischt die Teams. Sie wählt keine einzelnen Gegner aus – im Spielplan trifft weiterhin jedes Team auf jedes andere.',
+      awardsHeading: 'Saisonpunkte, BP und Rangstufen',
+      privacy: 'Nach der Teamfreigabe sind dein Name, dein Team, der Spielplan und die Ergebnisse öffentlich. Deine ELO bleibt privat.',
+      signup: 'Donnerstag auswählen & anmelden'
+    },
+    en: {
+      title: 'New here? The league in 60 seconds',
+      lead: 'You are not joining a fixed squad or committing to the whole season. Simply choose the Thursdays you want to play. Complete beginners are very welcome.',
+      steps: [
+        ['Pick a date', 'Open Training in the member area and press Going on the Thursday you want. Each date needs its own RSVP. You can change it until teams are published; after that, contact the club for changes.'],
+        ['Fair teams', 'Admins take the Going list. The system builds near-equal, balanced squads using a private ELO skill estimate plus the spread of rookies and genders. This is not a random draw.'],
+        ['Everyone plays', 'Every team plays every other team once. Ref duties and rest rounds are shared. Larger squads rotate substitutes, who still count as full team members.'],
+        ['Results are confirmed', 'Head Refs or admins save the scores and confirm the final places. Every person on a team – including rotating substitutes – then receives the same base placement points.']
+      ],
+      pointsHeading: 'Two point systems – do not mix them up',
+      matchTitle: 'Match points',
+      matchScore: '2 / 1 / 0',
+      matchBody: 'These only decide the team places for that Thursday: win = 2, draw = 1, loss = 0. Next come score difference and points scored. Admins resolve an exact tie.',
+      seasonTitle: 'Season points',
+      seasonScore: 'Place = points',
+      seasonBody: 'Your team’s final place becomes points in your personal season standings. Every scored Thursday is added together; equal totals share the same rank.',
+      eloHeading: 'What does the hidden ELO do?',
+      eloBody: 'ELO is only an internal estimate used to make future teams fair. It is not a public rank, a reward, or part of your season points. After results are final, the system compares your finish with the expectation from the squads’ average strengths: better than expected means ELO goes up; worse means it goes down. Everyone on the same team gets the same change; individual stats do not count.',
+      eloNote: 'Important: ELO balances the squads. It does not pick individual opponents – the schedule is still round robin, so every team plays every other team.',
+      awardsHeading: 'Season points, BP and tiers',
+      privacy: 'After teams are published, your name, team, schedule and results are public. Your ELO stays private.',
+      signup: 'Choose a Thursday & register'
+    }
+  };
 
   function date(value, lang = 'en') {
     const day = String(value).slice(0, 10);
@@ -81,16 +129,17 @@ window.LeagueUI = (function() {
     return seasons.map(s => `<option value="${escape(s.id)}"${s.id === selected ? ' selected' : ''}>${escape(s.name)}</option>`).join('');
   }
 
-  function rules(season, lang) {
-    const t = text[lang];
+  function ruleDetails(season, lang) {
+    const activeLang = text[lang] ? lang : 'en';
+    const t = text[activeLang];
     const awards = season.placement_points;
     const relative = season.scoring_mode !== 'fixed';
     const step = season.points_step === undefined ? 0.5 : season.points_step;
     const bonusMax = season.bonus_points_max === undefined ? 1 : season.bonus_points_max;
     const bonusStep = season.bonus_points_step === undefined ? 0.5 : season.bonus_points_step;
-    const format = value => value.toLocaleString(lang === 'de' ? 'de-AT' : 'en-GB');
+    const format = value => value.toLocaleString(activeLang === 'de' ? 'de-AT' : 'en-GB');
     const scale = relative
-      ? `<p class="league-copy">${lang === 'de'
+      ? `<p class="league-copy">${activeLang === 'de'
         ? 'Relative Platzierung, gerundet auf ' + format(step) + ' Punkte. Reihenfolge: 1. bis letzter Platz.'
         : 'Relative finish, rounded to ' + format(step) + ' points. Listed from first to last place.'}</p>
         <dl class="league-score-examples">${[2, 3, 4, 5, 6].map(count => `<div>
@@ -99,19 +148,90 @@ window.LeagueUI = (function() {
       : `<div class="league-rules">${awards.map((points, i) =>
         `<span class="league-chip">${i + 1}. ${escape(t.place)}: ${escape(format(points))} ${escape(t.points)}</span>`
       ).join('')}<span class="league-chip">${escape(t.rest)}: ${escape(format(awards[awards.length - 1]))} ${escape(t.points)}</span></div>`;
+    return `${scale}
+      <p class="league-copy">${bonusMax === 0 ? escape(t.bonusOff) : escape(activeLang === 'de'
+        ? `Zus\u00e4tzlich bis zu ${format(bonusMax)} BP pro Spieler und Training, in ${format(bonusStep)}er-Schritten. ${t.bonusIncluded}`
+        : `Up to ${format(bonusMax)} BP per player and training, in steps of ${format(bonusStep)}. ${t.bonusIncluded}`)}</p>
+      <p class="league-copy">${activeLang === 'de'
+        ? 'Rangstufen nach Gesamtpunkten inklusive BP. Jede Saison beginnt neu.'
+        : 'Tiers use total season points including BP. Each season starts fresh.'}</p>
+      <ul class="league-tier-list" aria-label="${activeLang === 'de' ? 'Rangstufen' : 'Season tiers'}">${window.LeagueScoring.seasonTiers.map(tier =>
+        `<li>${tierBadge({ points: tier.minimum }, activeLang)}<span>${activeLang === 'de' ? 'ab' : 'from'} ${format(tier.minimum)} ${escape(t.points)}</span></li>`
+      ).join('')}</ul>`;
+  }
+
+  function rules(season, lang) {
+    const activeLang = text[lang] ? lang : 'en';
+    const t = text[activeLang];
     return `<p class="league-copy">${escape(t.total)}</p>
-      <details><summary class="league-btn">${escape(t.rules)}</summary>
-        ${scale}
-        <p class="league-copy">${bonusMax === 0 ? escape(t.bonusOff) : escape(lang === 'de'
-          ? `Zus\u00e4tzlich bis zu ${format(bonusMax)} BP pro Spieler und Training, in ${format(bonusStep)}er-Schritten. ${t.bonusIncluded}`
-          : `Up to ${format(bonusMax)} BP per player and training, in steps of ${format(bonusStep)}. ${t.bonusIncluded}`)}</p>
-        <p class="league-copy">${lang === 'de'
-          ? 'Rangstufen nach Gesamtpunkten inklusive BP. Jede Saison beginnt neu.'
-          : 'Tiers use total season points including BP. Each season starts fresh.'}</p>
-        <ul class="league-tier-list" aria-label="${lang === 'de' ? 'Rangstufen' : 'Season tiers'}">${window.LeagueScoring.seasonTiers.map(tier =>
-          `<li>${tierBadge({ points: tier.minimum }, lang)}<span>${lang === 'de' ? 'ab' : 'from'} ${format(tier.minimum)} ${escape(t.points)}</span></li>`
-        ).join('')}</ul>
-      </details>`;
+      <details><summary class="league-btn">${escape(t.rules)}</summary>${ruleDetails(season, activeLang)}</details>`;
+  }
+
+  function guide(season, lang = 'en') {
+    const activeLang = text[lang] ? lang : 'en';
+    const copy = guideText[activeLang];
+    const scoring = window.LeagueScoring;
+    const format = value => value.toLocaleString(activeLang === 'de' ? 'de-AT' : 'en-GB');
+    const awards = scoring.placementPoints(season, 5);
+    const bonusMax = season.bonus_points_max === undefined ? 1 : season.bonus_points_max;
+    const bonusStep = season.bonus_points_step === undefined ? 0.5 : season.bonus_points_step;
+    const diamond = scoring.seasonTiers.find(tier => tier.id === 'diamond');
+    const standardExample = awards[0] === 3 && awards[2] === 2 && diamond.minimum === 70;
+    const awardsIntro = activeLang === 'de'
+      ? `Die Team-Platzierung wird zu deinen Basis-Saisonpunkten. Bei 5 Teams gibt es aktuell vom 1. bis zum letzten Platz ${awards.map(points => '+' + format(points)).join(' / ')}. Alle gewerteten Trainings zählen; es gibt keine Streichresultate.`
+      : `Your team place becomes your base season points. With 5 teams, the current awards from first to last are ${awards.map(points => '+' + format(points)).join(' / ')}. Every scored training counts; no results are dropped.`;
+    const bonusCopy = bonusMax === 0
+      ? (activeLang === 'de' ? 'Bonuspunkte sind in dieser Saison deaktiviert.' : 'Bonus points are disabled for this season.')
+      : bonusMax === 1 && bonusStep === 0.5
+        ? (activeLang === 'de'
+          ? 'Beim Last Man / Last Woman Standing gibt es pro ausgetragener Kategorie +1 BP für Platz 1 und +0,5 BP für Platz 2. BP zählen zur Gesamtpunktzahl und Rangstufe, verändern aber niemals ELO.'
+          : 'In each Last Man / Last Woman Standing category played, first place gets +1 BP and second gets +0.5 BP. BP count toward your total and tier, but never change ELO.')
+        : (activeLang === 'de'
+          ? `Zusätzliche BP können bis ${format(bonusMax)} pro Spieler*in und Training in ${format(bonusStep)}er-Schritten vergeben werden. Sie zählen zur Gesamtpunktzahl und Rangstufe, aber niemals zur ELO.`
+          : `Up to ${format(bonusMax)} extra BP per player and training can be awarded in steps of ${format(bonusStep)}. They count toward the total and tier, but never toward ELO.`);
+    const diamondCopy = standardExample
+      ? (activeLang === 'de'
+        ? 'Diamond beginnt bei 70 Gesamtpunkten – nicht bei 70 Siegen. Beispiel bei 5 Teams: 14 erste Plätze (42 Punkte) plus 14 dritte Plätze (28 Punkte) ergeben 70. BP zählen ebenfalls mit.'
+        : 'Diamond starts at 70 total points – not 70 wins. Example with 5 teams: 14 first-place finishes (42 points) plus 14 third-place finishes (28 points) make 70. BP count too.')
+      : (activeLang === 'de'
+        ? `Diamond beginnt bei ${format(diamond.minimum)} Gesamtpunkten – nicht bei ${format(diamond.minimum)} Siegen. Platzierungspunkte und BP zählen beide mit.`
+        : `Diamond starts at ${format(diamond.minimum)} total points – not ${format(diamond.minimum)} wins. Placement points and BP both count.`);
+    return `<details class="league-guide">
+      <summary>${escape(copy.title)}</summary>
+      <div class="league-guide-body">
+        <p class="league-guide-lead">${escape(copy.lead)}</p>
+        <ol class="league-guide-steps">${copy.steps.map(step => `<li><strong>${escape(step[0])}</strong><span>${escape(step[1])}</span></li>`).join('')}</ol>
+        <section class="league-guide-section">
+          <h3>${escape(copy.pointsHeading)}</h3>
+          <div class="league-guide-grid">
+            <div class="league-guide-card">
+              <h4>${escape(copy.matchTitle)}</h4>
+              <strong class="league-guide-score">${escape(copy.matchScore)}</strong>
+              <p>${escape(copy.matchBody)}</p>
+            </div>
+            <div class="league-guide-card">
+              <h4>${escape(copy.seasonTitle)}</h4>
+              <strong class="league-guide-score">${escape(copy.seasonScore)}</strong>
+              <p>${escape(copy.seasonBody)}</p>
+            </div>
+          </div>
+        </section>
+        <section class="league-guide-section">
+          <h3>${escape(copy.eloHeading)}</h3>
+          <p class="league-copy">${escape(copy.eloBody)}</p>
+          <p class="league-guide-callout">${escape(copy.eloNote)}</p>
+        </section>
+        <section class="league-guide-section">
+          <h3>${escape(copy.awardsHeading)}</h3>
+          <p class="league-copy">${escape(awardsIntro)}</p>
+          ${ruleDetails(season, activeLang)}
+          <p class="league-copy">${escape(bonusCopy)}</p>
+          <p class="league-guide-callout"><strong>Diamond:</strong> ${escape(diamondCopy)}</p>
+        </section>
+        <p class="league-guide-privacy">${escape(copy.privacy)}</p>
+        <a class="league-btn league-btn-primary" href="/member#training">${escape(copy.signup)}</a>
+      </div>
+    </details>`;
   }
 
   function tierBadge(entry, lang = 'en') {
@@ -313,5 +433,5 @@ window.LeagueUI = (function() {
       ${matchTable(eventData, lang)}`;
   }
 
-  return { escape, text, date, seasonOptions, rules, tierBadge, bonus, standings, movement, matchdayLink, event, matchTable, schedule };
+  return { escape, text, date, seasonOptions, rules, guide, tierBadge, bonus, standings, movement, matchdayLink, event, matchTable, schedule };
 })();

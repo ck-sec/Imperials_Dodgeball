@@ -601,8 +601,8 @@ test('admin assets cache-busted, role management title preserved, touch targets 
   const css = fs.readFileSync(path.join(rootPath, 'admin-league.css'), 'utf8');
   assert.match(html, /admin-league\.js\?v=20260914e/);
   assert.match(html, /admin-league\.css\?v=20260912b/);
-  assert.match(html, /\/league\.css\?v=20260912d/);
-  assert.match(html, /\/js\/league-ui\.js\?v=20260914e/);
+  assert.match(html, /\/league\.css\?v=20260915/);
+  assert.match(html, /\/js\/league-ui\.js\?v=20260915/);
   assert.ok(html.indexOf('admin-auth.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-scoring.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-ui.js') < html.indexOf('admin-league.js'));

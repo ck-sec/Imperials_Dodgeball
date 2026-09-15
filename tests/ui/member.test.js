@@ -149,9 +149,11 @@ test('member page is German-first, training-first and versions every local style
   assert.match(html, /data-tab="training" role="tab"[^>]+aria-selected="true"/);
   assert.doesNotMatch(html, /href="\/#training-league"|data-tab="stats"|data-tab="settings"/);
   assert.match(html, /<details[^>]+id="seasonOneArchive"/);
-  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=202609(?:12[b-d]?|14[de]?)$/);
-  for (const asset of ['/league.css', '/js/league-scoring.js']) assert.ok(html.includes(asset + '?v=20260912d'));
-  assert.ok(html.includes('/js/league-ui.js?v=20260914e'));
+  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=202609(?:12[b-d]?|14[de]?|15)$/);
+  assert.ok(html.includes('/league.css?v=20260915'));
+  assert.ok(html.includes('/js/league-scoring.js?v=20260912d'));
+  assert.ok(html.includes('/js/league-ui.js?v=20260915'));
+  assert.ok(html.includes('/js/member-league.js?v=20260915'));
   assert.ok(html.includes('/js/member-core.js?v=20260914'));
   for (const asset of ['/js/member-dashboard.js', '/js/member-init.js']) assert.ok(html.includes(asset + '?v=20260912c'));
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
@@ -647,9 +649,11 @@ test('league movement uses the supplied common baseline and marks new entrants',
   assert.match(app.node('trainingLeagueSummary').innerHTML, /Neu/);
   assert.match(app.node('trainingLeagueSummary').innerHTML, /\+3 Punkte/);
   assert.match(app.node('memberLeagueContent').innerHTML, /Latest scored/);
+  assert.match(app.node('memberLeagueContent').innerHTML, /Neu dabei\? Die Liga in 60 Sekunden/);
   app.window.SiteLanguage.set('en');
   assert.match(app.node('trainingLeagueSummary').innerHTML, /New/);
   assert.match(app.node('trainingLeagueSummary').innerHTML, /\+3 Points/);
+  assert.match(app.node('memberLeagueContent').innerHTML, /New here\? The league in 60 seconds/);
   assert.equal(app.translated[0].textContent, 'Choose training');
 });
 

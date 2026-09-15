@@ -73,6 +73,8 @@ function renderMemberLeague() {
       <label class="league-field">${mt('Saison', 'Season')}<select class="league-input" id="memberLeagueSeason">${ui.seasonOptions(data.seasons, data.season.id)}</select></label>
       <button class="league-btn" type="button" data-member-league-refresh>${mt('Aktualisieren', 'Refresh')}</button>
     </div>
+    <p class="league-copy">${escapeHtml(ui.date(data.season.start_date, lang))} – ${escapeHtml(ui.date(data.season.end_date, lang))}</p>
+    ${ui.guide(data.season, lang)}
     <div class="league-metrics">
       <div class="league-metric"><strong>${stats && stats.rank !== null ? '#' + escapeHtml(stats.rank) : '—'}</strong><span>${mt('Dein Rang', 'Your rank')}</span></div>
       <div class="league-metric"><strong>${escapeHtml(stats ? stats.points : 0)}</strong><span>${mt('Deine Punkte gesamt', 'Your total points')}</span><br>${ui.bonus(stats, lang)}</div>
@@ -90,10 +92,6 @@ function renderMemberLeague() {
         <span class="league-chip league-chip-gold">${mt('Platz', 'Place')} ${escapeHtml(entry.placement)} · +${escapeHtml(entry.points)} ${mt('Punkte', 'points')}</span>
         ${ui.bonus(entry, lang)}
       </li>`).join('')}</ol>` : `<p class="league-notice">${mt('Noch keine gewerteten Trainings.', 'No scored training yet.')}</p>`}
-    </details>
-    <details class="member-details"><summary>${mt('Regeln & Saison', 'Rules & season')}</summary>
-      <p class="league-copy">${escapeHtml(ui.date(data.season.start_date, lang))} – ${escapeHtml(ui.date(data.season.end_date, lang))}</p>
-      ${ui.rules(data.season, lang)}
     </details>`;
 }
 

@@ -79,7 +79,7 @@
 
   <style>body{background:#0C1B3A;color:#F4F7FF}#navbar{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;padding:.75rem 2rem;background:rgba(12,27,58,.95);backdrop-filter:blur(12px);border-bottom:1px solid rgba(53,103,192,.15);transition:transform .3s ease}.nav-logo{display:flex;align-items:center;gap:.5rem;text-decoration:none;color:#F4F7FF}.nav-logo span{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:.04em;text-transform:uppercase}.nav-links{display:flex;list-style:none;gap:1.5rem;margin-left:auto;align-items:center}.nav-links a{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(244,247,255,.7);text-decoration:none;transition:color .2s}.nav-cta{background:linear-gradient(135deg,#D4961A,#F0B830);color:#0C1B3A!important;padding:6px 16px;border-radius:4px;font-weight:700!important}.nav-toggle{display:none}#hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:6rem 2rem 4rem}.hero-content{position:relative;z-index:2;text-align:center;max-width:700px}.hero-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(4rem,12vw,9rem);letter-spacing:.04em;line-height:.95;color:#F4F7FF}.hero-title span{background:linear-gradient(135deg,#D4961A,#F0B830);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.hero-sub{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:1.1rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(244,247,255,.7);margin-top:1rem}.btn-primary{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;padding:14px 32px;border-radius:6px;background:linear-gradient(135deg,#D4961A,#F0B830);color:#0C1B3A;text-decoration:none;border:none;cursor:pointer}.btn-secondary{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;padding:14px 32px;border-radius:6px;background:transparent;color:#F0B830;border:1px solid rgba(240,184,48,.4);text-decoration:none;cursor:pointer}.reveal{opacity:0;transform:translateY(30px);transition:opacity .8s ease,transform .8s ease}.revealVisible{opacity:1;transform:translateY(0)}#progress-bar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,#D4961A,#F0B830);z-index:10001;transition:width .15s ease-out}@media(max-width:768px){.nav-links{display:none}.nav-toggle{display:flex}}</style>
   <link rel="stylesheet" href="/site.css?v=20260912" />
-  <link rel="stylesheet" href="/league.css?v=20260912d" />
+  <link rel="stylesheet" href="/league.css?v=20260915" />
   <link rel="stylesheet" href="/club-content.css?v=20260912" />
   <link rel="stylesheet" href="/public-ui.css?v=20260912b" />
 </head>
@@ -296,7 +296,7 @@
             <div class="league-card-meta">
               <strong data-en="Thursday · 18:00–21:00">Donnerstag · 18:00–21:00 Uhr</strong><br/>
               <span data-en="Volksschule in der Krieau · All levels welcome">Volksschule in der Krieau · Alle Levels willkommen</span><br/>
-              <span data-en="€10 per session">10 € pro Einheit</span> · <a href="/member#training" data-en="Check dates &amp; register">Termine &amp; Anmeldung</a>
+              <span data-en="€10 per session">10 € pro Einheit</span> · <a href="/member#training" data-en="Check dates &amp; register">Termine &amp; Anmeldung</a> · <a href="#training-league" data-en="How the league works">Liga einfach erklärt</a>
             </div>
           </div>
         </div>
@@ -385,11 +385,11 @@
         <h3 class="faq-category">Rund um den Einstieg</h3>
         <details class="faq-item">
           <summary class="faq-question">Was genau ist die Social League?</summary>
-          <p class="faq-answer">Bei der Social League steht das Miteinander im Vordergrund: Du wirst vor Ort per Losverfahren in ein Team eingeteilt, lernst jedes Mal neue Leute kennen, und der Fokus liegt auf Spaß statt Wettkampf.</p>
+          <p class="faq-answer">Bei der Social League steht das Miteinander im Vordergrund. Du meldest dich für jeden Donnerstag einzeln an. Danach erstellt das System anhand einer nicht öffentlichen ELO-Spielstärke sowie der Verteilung von Rookies und Geschlechtern möglichst ausgeglichene Teams – nicht per Zufall. So spielst du regelmäßig mit unterschiedlichen Leuten; Saisonpunkte sorgen für Extra-Motivation, der Spaß bleibt im Vordergrund. <a href="#training-league" style="color:var(--gold-lt);text-decoration:underline;">Liga einfach erklärt &rarr;</a></p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Muss ich Profi sein, um mitzuspielen?</summary>
-          <p class="faq-answer">Absolut nicht! Ob Nationalteamspieler oder absoluter Neuling – bei uns ist jede*r willkommen. Wir mischen die Teams bunt durch, damit alle voneinander lernen und auf ihre Kosten kommen.</p>
+          <p class="faq-answer">Absolut nicht! Ob Nationalteamspieler oder absoluter Neuling – bei uns ist jede*r willkommen. Wir bilden ausgeglichene, wechselnde Teams, damit alle voneinander lernen und auf ihre Kosten kommen.</p>
         </details>
 
         <h3 class="faq-category">Spielregeln</h3>
@@ -469,11 +469,11 @@
         <h3 class="faq-category">Getting Started</h3>
         <details class="faq-item">
           <summary class="faq-question">What exactly is the Social League?</summary>
-          <p class="faq-answer">The Social League is all about community: you're assigned to a team on the spot by random draw, meet new people every time, and the focus is on fun rather than competition.</p>
+          <p class="faq-answer">The Social League is all about community. You register separately for each Thursday. The system then uses a private ELO skill estimate plus the spread of rookies and genders to create teams that are as balanced as possible – not a random draw. You regularly play with different people; season points add motivation, while fun stays the priority. <a href="#training-league" style="color:var(--gold-lt);text-decoration:underline;">League explained simply &rarr;</a></p>
         </details>
         <details class="faq-item">
           <summary class="faq-question">Do I need to be a pro to play?</summary>
-          <p class="faq-answer">Not at all! Whether you're a national-team player or a complete beginner, everyone is welcome. We mix up the teams so that everyone can learn from each other and have a great time.</p>
+          <p class="faq-answer">Not at all! Whether you're a national-team player or a complete beginner, everyone is welcome. We build balanced, changing teams so everyone can learn from each other and have a great time.</p>
         </details>
 
         <h3 class="faq-category">Rules &amp; Gameplay</h3>
@@ -668,8 +668,8 @@
   <script src="/js/site-ui.js?v=20260912" defer></script>
   <script src="/js/site-forms.js?v=20260912" defer></script>
   <script src="/js/league-scoring.js?v=20260912d" defer></script>
-  <script src="/js/league-ui.js?v=20260914e" defer></script>
+  <script src="/js/league-ui.js?v=20260915" defer></script>
   <script src="/js/league-archive.js?v=20260912" defer></script>
-  <script src="/js/site-league.js?v=20260912c" defer></script>
+  <script src="/js/site-league.js?v=20260915" defer></script>
 </body>
 </html>

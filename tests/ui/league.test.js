@@ -168,6 +168,29 @@ test('relative scoring rules show the exact team-count scale', () => {
   assert.match(html, /6 Teams<\/dt><dd>\+3 \/ \+2.5 \/ \+2 \/ \+1.5 \/ \+1 \/ \+0.5/);
 });
 
+test('beginner guide explains signup, scoring, balancing and Diamond in plain language', () => {
+  const config = {
+    placement_points: [3, 2.5, 2, 1, 0.5], scoring_mode: 'relative', points_step: 0.5,
+    bonus_points_max: 1, bonus_points_step: 0.5
+  };
+  const en = ui.guide(config, 'en');
+  assert.match(en, /Each date needs its own RSVP/);
+  assert.match(en, /private ELO skill estimate/);
+  assert.match(en, /not a random draw/);
+  assert.match(en, /including rotating substitutes/);
+  assert.match(en, /win = 2, draw = 1, loss = 0/);
+  assert.match(en, /does not pick individual opponents/);
+  assert.match(en, /5 Teams<\/dt><dd>\+3 \/ \+2.5 \/ \+2 \/ \+1 \/ \+0.5/);
+  assert.match(en, /first place gets \+1 BP and second gets \+0.5 BP/);
+  assert.match(en, /Diamond starts at 70 total points/);
+  assert.match(en, /14 first-place finishes \(42 points\).*14 third-place finishes \(28 points\)/);
+  assert.match(en, /href="\/member#training"/);
+  const de = ui.guide(config, 'de');
+  assert.match(de, /Jeder Termin braucht eine eigene Zusage/);
+  assert.match(de, /keine zufällige Auslosung/);
+  assert.match(de, /Diamond beginnt bei 70 Gesamtpunkten/);
+});
+
 test('season selectors escape names and select the requested season', () => {
   const html = ui.seasonOptions([{ id: 'one', name: '<Autumn>' }, { id: 'two', name: 'Winter' }], 'two');
   assert.match(html, /&lt;Autumn&gt;/);
@@ -284,10 +307,9 @@ test('points rules expose the five tier thresholds without expanding the compact
 test('all ranking surfaces load the same refreshed tier logic, markup and styles', () => {
   for (const file of ['index.html', 'admin.html', 'member.html', 'spieltag.html']) {
     const html = fs.readFileSync(path.join(root, file), 'utf8');
-    for (const asset of ['/js/league-scoring.js', '/league.css']) {
-      assert.ok(html.includes(asset + '?v=20260912d'), file + ' must refresh ' + asset);
-    }
-    assert.ok(html.includes('/js/league-ui.js?v=20260914e'), file + ' must refresh league UI');
+    assert.ok(html.includes('/js/league-scoring.js?v=20260912d'), file + ' must refresh league scoring');
+    assert.ok(html.includes('/league.css?v=20260915'), file + ' must refresh league styles');
+    assert.ok(html.includes('/js/league-ui.js?v=20260915'), file + ' must refresh league UI');
   }
 });
 
