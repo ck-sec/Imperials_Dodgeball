@@ -345,17 +345,18 @@
             <input type="date" id="al-season-end" name="end_date" value="${esc(dateOnly(s.end_date))}" min="2000-01-01" max="2199-12-31" required></div>
           <div class="al-field">${label('al-season-scoring', 'Placement scoring mode')}
             <select id="al-season-scoring" name="scoring_mode" aria-describedby="al-scoring-help">
+              ${option('beaten', 'Teams beaten · participation + field-size reward', s.scoring_mode || 'fixed')}
               ${option('relative', 'Relative · scale the curve to all teams', s.scoring_mode || 'fixed')}
               ${option('fixed', 'Fixed · award by exact placement', s.scoring_mode || 'fixed')}
             </select></div>
-          <div class="al-field">${label('al-season-step', 'Relative points rounding')}
+          <div class="al-field">${label('al-season-step', 'Point increment / rounding')}
             <select id="al-season-step" name="points_step" aria-describedby="al-scoring-help">
               ${[0.1, 0.25, 0.5, 1].map(step => option(step, `Nearest ${step} point${step === 1 ? '' : 's'}`, s.points_step ?? 0.5)).join('')}
             </select></div>
-          <p class="al-small al-wide" id="al-scoring-help">Relative mode stretches the base five-award curve across the actual number of teams, interpolates between its awards, then rounds to your chosen step. Base awards must be multiples of that step: a step of 1 needs whole-number awards. Fixed mode uses each listed award exactly and repeats the last value for lower places; rounding does not change fixed awards.</p>
-          <div class="al-field al-wide">${label('al-season-points', 'Base placement awards, first to last')}
+          <p class="al-small al-wide" id="al-scoring-help">Teams-beaten mode awards the first value for participating plus the second value for every team your team finishes ahead of. Relative mode stretches a placement curve across the actual team count. Fixed mode uses each listed place exactly and repeats the last value. Calculated modes require values that are multiples of the selected increment.</p>
+          <div class="al-field al-wide">${label('al-season-points', 'Scoring values')}
             <input id="al-season-points" name="placement_points" value="${esc(s.placement_points.join(', '))}" required aria-describedby="al-points-help">
-            <p class="al-small" id="al-points-help">Default curve: 3, 2.5, 2, 1, 0.5. Custom curves may use any number of descending or equal awards. Every player earns their team’s points, including rotating substitutes. Season points sum EVERY finalized training, not just the best results.</p></div>
+            <p class="al-small" id="al-points-help">Season 2 teams-beaten values: 1, 0.5 = 1 participation point + 0.5 per team beaten. Relative/fixed curves list awards from first to last. Every player earns their team’s points, including rotating substitutes. Season points sum EVERY finalized training.</p></div>
           <div class="al-field">${label('al-season-bonus-max', 'Bonus points (BP) maximum per player / training')}
             <input id="al-season-bonus-max" name="bonus_points_max" type="number" min="0" max="10000" step="any" value="${number(s.bonus_points_max, 1)}" required></div>
           <div class="al-field">${label('al-season-bonus-step', 'BP award step')}
@@ -976,15 +977,22 @@
   function updateScoringPreview() {
     const values = $('al-season-points').value.split(',').map(value => value.trim());
     const points = values.map(Number);
+    const mode = $('al-season-scoring').value;
     if (values.some(value => !value) || points.length > 100 ||
-      points.some((point, i) => !Number.isFinite(point) || point < 0 || point > 10000 || (i && point > points[i - 1]))) {
-      $('al-season-awards').textContent = 'Enter valid descending or equal placement awards to preview.';
+      points.some((point, i) => !Number.isFinite(point) || point < 0 || point > 10000 ||
+        (mode !== 'beaten' && i && point > points[i - 1]))) {
+      $('al-season-awards').textContent = mode === 'beaten'
+        ? 'Enter valid non-negative participation and per-team values to preview.'
+        : 'Enter valid descending or equal placement awards to preview.';
       return;
     }
-    const mode = $('al-season-scoring').value;
     const step = Number($('al-season-step').value);
-    if (mode === 'relative' && points.some(point => Math.abs(point / step - Math.round(point / step)) >= 1e-8)) {
-      $('al-season-awards').textContent = `Relative base awards must be multiples of ${step}. Edit the awards or choose a finer rounding step.`;
+    if (mode === 'beaten' && points.length !== 2) {
+      $('al-season-awards').textContent = 'Teams-beaten mode requires exactly two values: participation points, then points per team beaten.';
+      return;
+    }
+    if (mode !== 'fixed' && points.some(point => Math.abs(point / step - Math.round(point / step)) >= 1e-8)) {
+      $('al-season-awards').textContent = `Calculated scoring values must be multiples of ${step}. Edit the values or choose a finer increment.`;
       return;
     }
     $('al-season-awards').innerHTML = scoringPreview({ placement_points: points, scoring_mode: mode, points_step: step });
@@ -1004,7 +1012,10 @@
   function eventAwardsSummary() {
     const rules = eventScoring();
     if (!rules || !state.teams.length) return '';
-    return `<p class="al-callout">This training’s saved ${rules.scoring_mode === 'relative' ? `relative rules · rounded to ${rules.points_step}` : 'fixed awards'}: <strong>${placementAwards(rules, state.teams.length).join(' / ')}</strong> points per player, from first place to last.</p>`;
+    const description = rules.scoring_mode === 'beaten'
+      ? `${rules.placement_points[0]} participation + ${rules.placement_points[1]} per team beaten`
+      : rules.scoring_mode === 'relative' ? `relative rules · rounded to ${rules.points_step}` : 'fixed awards';
+    return `<p class="al-callout">This training’s saved ${description}: <strong>${placementAwards(rules, state.teams.length).join(' / ')}</strong> points per player, from first place to last.</p>`;
   }
 
   function awardPoints(placement) {
@@ -1387,15 +1398,18 @@
     if (cancelled() && ['schedule', 'match', 'results', 'bonus'].includes(type)) throw new Error('Cancelled training — read-only. Choose an active Thursday.');
     if (type === 'season') {
       const points = String(data.get('placement_points')).split(',').map(s => s.trim());
-      if (points.some(p => !p || !Number.isFinite(Number(p)) || Number(p) < 0)) throw new Error('Enter placement points as non-negative numbers separated by commas, for example 3, 2.5, 2, 1, 0.5.');
-      if (points.length > 100 || points.some(p => Number(p) > 10000 || Math.round(Number(p) * 1e6) / 1e6 !== Number(p))) throw new Error('Use at most 100 placement awards, each between 0 and 10,000 with at most six decimal places.');
-      if (points.some((p, i) => i > 0 && Number(p) > Number(points[i - 1]))) throw new Error('Placement points must stay the same or decrease from first place down.');
-      if (String(data.get('start_date')) > String(data.get('end_date'))) throw new Error('The season end date must be on or after its start date.');
       const scoringMode = data.get('scoring_mode');
       const pointsStep = Number(data.get('points_step'));
-      if (!['relative', 'fixed'].includes(scoringMode) || ![0.1, 0.25, 0.5, 1].includes(pointsStep)) throw new Error('Choose a valid scoring mode and rounding step.');
-      if (scoringMode === 'relative' && points.some(point => Math.abs(Number(point) / pointsStep - Math.round(Number(point) / pointsStep)) >= 1e-8)) {
-        throw new Error(`Relative base awards must be multiples of ${pointsStep}. Edit the awards or choose a finer rounding step.`);
+      if (points.some(p => !p || !Number.isFinite(Number(p)) || Number(p) < 0)) throw new Error('Enter non-negative scoring values separated by commas, for example 1, 0.5.');
+      if (points.length > 100 || points.some(p => Number(p) > 10000 || Math.round(Number(p) * 1e6) / 1e6 !== Number(p))) throw new Error('Use at most 100 placement awards, each between 0 and 10,000 with at most six decimal places.');
+      if (scoringMode !== 'beaten' && points.some((p, i) => i > 0 && Number(p) > Number(points[i - 1]))) throw new Error('Placement points must stay the same or decrease from first place down.');
+      if (String(data.get('start_date')) > String(data.get('end_date'))) throw new Error('The season end date must be on or after its start date.');
+      if (!['beaten', 'relative', 'fixed'].includes(scoringMode) || ![0.1, 0.25, 0.5, 1].includes(pointsStep)) throw new Error('Choose a valid scoring mode and rounding step.');
+      if (scoringMode === 'beaten' && points.length !== 2) {
+        throw new Error('Teams-beaten mode requires exactly two values: participation points, then points per team beaten.');
+      }
+      if (scoringMode !== 'fixed' && points.some(point => Math.abs(Number(point) / pointsStep - Math.round(Number(point) / pointsStep)) >= 1e-8)) {
+        throw new Error(`Calculated scoring values must be multiples of ${pointsStep}. Edit the values or choose a finer increment.`);
       }
       const id = String(data.get('id') || '');
       if (!season() || id !== season().id) throw new Error('Only the existing Season 2 settings can be edited here.');

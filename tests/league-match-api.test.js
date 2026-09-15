@@ -238,7 +238,7 @@ test('scheduled results require all scores and automatically use the match table
   assert(ledger.filter(r => r.team_number === 1).every(r =>
     r.placement === 1 && r.points === 3 + r.bonus_points));
   assert(ledger.filter(r => r.team_number === 5).every(r =>
-    r.placement === 5 && r.points === 0.5 + r.bonus_points));
+    r.placement === 5 && r.points === 1 + r.bonus_points));
   assert(queries.some(q => q.text.includes("status = 'finalized', roster_locked = true")));
   assert.equal(matchStandings(5, event.schedule).standings[0].table_points, 8, 'Match-table points are separate from season points');
 });
@@ -360,11 +360,11 @@ test('reopening removes previous awards, retains scores, and a corrected match r
   await applyAction(sql, request('results', event), world);
   assert.notDeepEqual(world.results, originalAwards);
   assert(world.results.filter(r => r.team_number === 1).every(r =>
-    r.points === 3 + r.bonus_points && r.rating_delta === 12));
+    r.points === 2 + r.bonus_points && r.rating_delta === 12));
   assert(world.results.filter(r => r.team_number === 3).every(r =>
-    r.points === 2 + r.bonus_points && r.rating_delta === 0));
+    r.points === 1.5 + r.bonus_points && r.rating_delta === 0));
   assert(world.results.filter(r => r.team_number === 2).every(r =>
-    r.points === 0.5 + r.bonus_points && r.rating_delta === -12));
+    r.points === 1 + r.bonus_points && r.rating_delta === -12));
   assert.equal(world.results.length, 18);
   assert.equal(event.status, 'finalized');
   assert.equal(event.version, 4);

@@ -60,7 +60,7 @@ test('confirmed weekly calendar has 143 sessions from 168 candidates, excluding 
   assert.deepEqual(calendar.summary.skipped_dates.map(day => day.date), skippedDates);
   assert.equal(calendar.summary.skipped_dates.reduce((sum, day) => sum + day.sessions, 0), 25);
   assert.deepEqual(calendar.season, {
-    name: 'Season 2', placement_points: [3, 2.5, 2, 1, 0.5], scoring_mode: 'relative',
+    name: 'Season 2', placement_points: [1, 0.5], scoring_mode: 'beaten',
     points_step: 0.5, default_rating: 1000, rookie_rating: 800, k_factor: 24,
     start_date: '2026-09-14', end_date: '2027-07-02',
   });

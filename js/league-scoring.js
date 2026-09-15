@@ -29,9 +29,17 @@
       throw new TypeError('A finite placement points scale is required.');
     }
     const mode = settings.scoring_mode || 'relative';
-    if (!['relative', 'fixed'].includes(mode)) throw new TypeError('Invalid scoring mode.');
+    if (!['beaten', 'relative', 'fixed'].includes(mode)) throw new TypeError('Invalid scoring mode.');
     const step = settings.points_step === undefined ? 0.5 : settings.points_step;
     if (!Number.isFinite(step) || step <= 0) throw new TypeError('A positive points step is required.');
+    if (mode === 'beaten') {
+      if (points.length !== 2 || points.some(value => value < 0)) {
+        throw new TypeError('Teams-beaten scoring requires nonnegative participation and per-team values.');
+      }
+      const [participation, perTeamBeaten] = points;
+      return Array.from({ length: teamCount }, (_, index) =>
+        Number((participation + perTeamBeaten * (teamCount - index - 1)).toFixed(6)));
+    }
     return Array.from({ length: teamCount }, (_, index) => {
       if (mode === 'fixed') return points[Math.min(index, points.length - 1)];
       // Interpolate the configured curve by relative finish, not by team count.

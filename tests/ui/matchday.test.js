@@ -233,7 +233,7 @@ test('standalone page uses versioned local assets, external scripts, rewrite, an
   assert.match(html, /id="matchdayResultsPoster"/);
   assert.doesNotMatch(html, /publicsite.css|admin-auth.js|member-auth.js|\son[a-z]+=/);
   for (const script of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
-    assert.match(script[1], /src="\/js\/[^"]+\?v=202609(?:12[cd]|14e|15)"/);
+    assert.match(script[1], /src="\/js\/[^"]+\?v=202609(?:12[cd]|14e|15[a-z]?)"/);
     assert.equal(script[2].trim(), '');
   }
   assert.match(html, /id="matchdayLoginLink" href="\/member\?return_to=/);

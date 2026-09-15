@@ -4,7 +4,7 @@
 -- API numeric inputs have six-decimal precision; points 0..10000, seeds 0..10000, K 0..200.
 -- Guest links preserve the guest ID/seed and retain merged aliases; overlapping events reject merging.
 -- roster_ids use league IDs; rsvp_user_ids independently freeze source registrations even for manual squads.
--- Relative scoring interpolates over placement_points, then rounds to points_step.
+-- Teams-beaten scoring uses [participation, per team beaten]. Relative scoring interpolates a curve.
 -- Fixed mode repeats the last value. Legacy frozen snapshots without a mode remain fixed.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS league_scorekeeper BOOLEAN NOT NULL DEFAULT FALSE;
 -- statement-breakpoint
@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS league_seasons (
   name VARCHAR(100) NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL CHECK (end_date >= start_date),
-  placement_points JSONB NOT NULL DEFAULT '[3,2.5,2,1,0.5]'::jsonb,
-  scoring_mode VARCHAR(8) NOT NULL DEFAULT 'relative' CHECK (scoring_mode IN ('relative', 'fixed')),
+  placement_points JSONB NOT NULL DEFAULT '[1,0.5]'::jsonb,
+  scoring_mode VARCHAR(8) NOT NULL DEFAULT 'beaten' CHECK (scoring_mode IN ('beaten', 'relative', 'fixed')),
   points_step NUMERIC NOT NULL DEFAULT 0.5 CHECK (points_step IN (0.1, 0.25, 0.5, 1)),
   bonus_points_max NUMERIC NOT NULL DEFAULT 1 CHECK (bonus_points_max BETWEEN 0 AND 10000),
   bonus_points_step NUMERIC NOT NULL DEFAULT 0.5 CHECK (bonus_points_step > 0 AND bonus_points_step <= 10000),
@@ -27,16 +27,21 @@ CREATE TABLE IF NOT EXISTS league_seasons (
   CONSTRAINT league_seasons_bonus_increment_check CHECK (mod(bonus_points_max, bonus_points_step) = 0)
 );
 -- statement-breakpoint
--- Existing seasons keep their fixed rules; new seasons default to relative.
+-- Existing rows keep fixed compatibility when the mode column is first added; new seasons default to teams-beaten.
 -- No event snapshots or result ledgers are rewritten by this upgrade.
 ALTER TABLE league_seasons ADD COLUMN IF NOT EXISTS scoring_mode VARCHAR(8) NOT NULL DEFAULT 'fixed'
-  CHECK (scoring_mode IN ('relative', 'fixed'));
+  CHECK (scoring_mode IN ('beaten', 'relative', 'fixed'));
 -- statement-breakpoint
 ALTER TABLE league_seasons ADD COLUMN IF NOT EXISTS points_step NUMERIC NOT NULL DEFAULT 0.5
   CHECK (points_step IN (0.1, 0.25, 0.5, 1));
 -- statement-breakpoint
-ALTER TABLE league_seasons ALTER COLUMN scoring_mode SET DEFAULT 'relative',
-  ALTER COLUMN placement_points SET DEFAULT '[3,2.5,2,1,0.5]'::jsonb;
+ALTER TABLE league_seasons DROP CONSTRAINT IF EXISTS league_seasons_scoring_mode_check;
+-- statement-breakpoint
+ALTER TABLE league_seasons ADD CONSTRAINT league_seasons_scoring_mode_check
+  CHECK (scoring_mode IN ('beaten', 'relative', 'fixed'));
+-- statement-breakpoint
+ALTER TABLE league_seasons ALTER COLUMN scoring_mode SET DEFAULT 'beaten',
+  ALTER COLUMN placement_points SET DEFAULT '[1,0.5]'::jsonb;
 -- statement-breakpoint
 CREATE TABLE IF NOT EXISTS league_players (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

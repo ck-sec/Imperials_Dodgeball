@@ -133,7 +133,7 @@ test('guest results use durable player IDs and retain points without any account
   world.events = [scored];
   world.results = result.ledger.map(r => ({ ...r, event_id: scored.id }));
   const guestResult = world.results.find(r => r.player_id === id(50));
-  assert([3, 0.5].includes(guestResult.points));
+  assert([1.5, 1].includes(guestResult.points));
   assert(!Object.hasOwn(guestResult, 'user_id'));
   assert.equal(publicView(world, id(100)).standings.find(p => p.display_name === 'Named Guest').points, guestResult.points);
   assert.equal(playerView(world).find(p => p.id === id(50)).rating, 800 + guestResult.rating_delta);

@@ -7,11 +7,11 @@ const {
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const table = (config, count) => Array.from({ length: count }, (_, i) => pointsForPlacement(config, i + 1, count));
 const expected = [
-  [3, 0.5],
-  [3, 2, 0.5],
-  [3, 2.5, 1.5, 0.5],
-  [3, 2.5, 2, 1, 0.5],
-  [3, 2.5, 2, 1.5, 1, 0.5],
+  [1.5, 1],
+  [2, 1.5, 1],
+  [2.5, 2, 1.5, 1],
+  [3, 2.5, 2, 1.5, 1],
+  [3.5, 3, 2.5, 2, 1.5, 1],
 ];
 function event(count, config = settings({})) {
   return {
@@ -29,10 +29,10 @@ function event(count, config = settings({})) {
   };
 }
 
-test('relative defaults exactly match the approved placement tables for two through six teams', () => {
+test('teams-beaten defaults exactly match the approved placement tables for two through six teams', () => {
   const config = settings({});
-  assert.deepEqual(config.placement_points, [3, 2.5, 2, 1, 0.5]);
-  assert.equal(config.scoring_mode, 'relative');
+  assert.deepEqual(config.placement_points, [1, 0.5]);
+  assert.equal(config.scoring_mode, 'beaten');
   assert.equal(config.points_step, 0.5);
   for (let count = 2; count <= 6; count++) {
     assert.deepEqual(table(config, count), expected[count - 2], `${count}-team table`);
@@ -44,14 +44,14 @@ test('relative defaults exactly match the approved placement tables for two thro
 });
 
 test('relative interpolation handles custom scales, all supported steps, half ties and constant arrays', () => {
-  assert.deepEqual(table(settings({ placement_points: [2, 0.5], points_step: 0.25 }), 5),
+  assert.deepEqual(table(settings({ placement_points: [2, 0.5], scoring_mode: 'relative', points_step: 0.25 }), 5),
     [2, 1.75, 1.25, 1, 0.5]);
-  assert.deepEqual(table(settings({ placement_points: [0.5, 0.2], points_step: 0.1 }), 3),
+  assert.deepEqual(table(settings({ placement_points: [0.5, 0.2], scoring_mode: 'relative', points_step: 0.1 }), 3),
     [0.5, 0.4, 0.2], 'Exact half ties round upward despite binary floating-point representation');
-  assert.deepEqual(table(settings({ placement_points: [4, 2, 0], points_step: 1 }), 4), [4, 3, 1, 0]);
-  assert.deepEqual(table(settings({ placement_points: [1.5], points_step: 0.5 }), 6), [1.5, 1.5, 1.5, 1.5, 1.5, 1.5]);
+  assert.deepEqual(table(settings({ placement_points: [4, 2, 0], scoring_mode: 'relative', points_step: 1 }), 4), [4, 3, 1, 0]);
+  assert.deepEqual(table(settings({ placement_points: [1.5], scoring_mode: 'relative', points_step: 0.5 }), 6), [1.5, 1.5, 1.5, 1.5, 1.5, 1.5]);
   for (let count = 2; count <= 125; count++) {
-    const points = table(settings({}), count);
+    const points = table(settings({ placement_points: [3, 2.5, 2, 1, 0.5], scoring_mode: 'relative' }), count);
     assert.equal(points[0], 3);
     assert.equal(points.at(-1), 0.5);
     assert(points.every((p, i) => Number.isInteger(p * 2) && (i === 0 || p <= points[i - 1])));
@@ -59,9 +59,11 @@ test('relative interpolation handles custom scales, all supported steps, half ti
 });
 
 test('relative baseline alignment and scoring-mode/step validation return clear errors', () => {
-  assert.throws(() => settings({ placement_points: [3, 2.3, 0.5], points_step: 0.5 }),
+  assert.throws(() => settings({ placement_points: [3, 2.3, 0.5], scoring_mode: 'relative', points_step: 0.5 }),
     error => error.status === 400 && /multiples of points_step/.test(error.message));
-  assert.throws(() => settings({ points_step: 1 }), /multiples of points_step/);
+  assert.throws(() => settings({ placement_points: [1, 0.5], scoring_mode: 'beaten', points_step: 1 }), /multiples of points_step/);
+  assert.throws(() => settings({ placement_points: [1], scoring_mode: 'beaten' }), /requires \[participation points/);
+  assert.deepEqual(table(settings({ placement_points: [0.5, 1], scoring_mode: 'beaten' }), 3), [2.5, 1.5, 0.5]);
   for (const step of [0, 0.2, 2, '0.5', NaN, Infinity, null]) {
     assert.throws(() => settings({ points_step: step }), /points_step must/);
   }
@@ -86,7 +88,7 @@ test('fixed mode and pre-mode legacy snapshots preserve exact repeated-last awar
   assert.equal(scored.ledger.find(r => r.placement === 6).points, 1);
 });
 
-test('frozen relative config survives season changes and corrections recompute from that snapshot only', () => {
+test('frozen teams-beaten config survives season changes and corrections recompute from that snapshot only', () => {
   const seasonSettings = settings({});
   const frozen = event(4, seasonSettings);
   const placements = frozen.teams.map(t => ({ team_number: t.number, placement: t.number }));
@@ -96,9 +98,9 @@ test('frozen relative config survives season changes and corrections recompute f
   const correctedPlacements = placements.map(p => ({ ...p, placement: 5 - p.placement }));
   const corrected = scoreEvent({ ...frozen, teams: original.teams }, correctedPlacements);
   assert.deepEqual(corrected, scoreEvent(frozen, correctedPlacements));
-  assert.equal(corrected.ledger.find(r => r.team_number === 1).points, 0.5);
+  assert.equal(corrected.ledger.find(r => r.team_number === 1).points, 1);
   assert.equal(corrected.ledger.find(r => r.team_number === 2).points, 1.5);
-  assert.equal(corrected.ledger.find(r => r.team_number === 4).points, 3);
+  assert.equal(corrected.ledger.find(r => r.team_number === 4).points, 2.5);
   assert.deepEqual(scoreEvent({ ...frozen, teams: corrected.teams }, placements), original);
 });
 
@@ -113,13 +115,13 @@ test('public season rules and frozen event awards remain separate, including leg
     events: [frozen], results: scored.ledger.map(r => ({ ...r, event_id: frozen.id })),
   };
   const publicResult = publicView(world, id(100));
-  assert.equal(publicResult.season.scoring_mode, 'relative');
+  assert.equal(publicResult.season.scoring_mode, 'beaten');
   assert.equal(publicResult.season.points_step, 0.5);
-  assert.equal(publicResult.seasons[0].scoring_mode, 'relative');
+  assert.equal(publicResult.seasons[0].scoring_mode, 'beaten');
   assert.deepEqual(publicResult.events[0].teams.map(t => t.points), [5, 4, 3, 2, 1, 1]);
   const admin = adminView(world);
   assert.equal(admin.events[0].scoring_mode, 'fixed');
   assert.equal(admin.events[0].points_step, 0.5);
   assert.deepEqual(admin.events[0].placement_points, [5, 4, 3, 2, 1]);
-  assert.equal(admin.seasons[0].scoring_mode, 'relative');
+  assert.equal(admin.seasons[0].scoring_mode, 'beaten');
 });

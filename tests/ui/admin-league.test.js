@@ -50,7 +50,8 @@ function dataFixture() {
   return {
     seasons: [
       { id: 'old', name: 'Season 1', start_date: '2025-09-01', end_date: '2026-07-03', placement_points: [3, 2, 1] },
-      { id: 's2', name: 'Season 2', start_date: '2026-09-14', end_date: '2027-07-02', placement_points: [3, 2, 1], bonus_points_max: 9, bonus_points_step: 1 }
+      { id: 's2', name: 'Season 2', start_date: '2026-09-14', end_date: '2027-07-02',
+        placement_points: [1, 0.5], scoring_mode: 'beaten', points_step: 0.5, bonus_points_max: 9, bonus_points_step: 1 }
     ],
     players,
     members: players.filter(p => p.user_id).map(p => ({ id: p.user_id, display_name: p.display_name, league_scorekeeper: false })),
@@ -561,7 +562,7 @@ test('season BP settings submit only the exact existing season and validate cap/
   const a = await app();
   const fields = {
     id: 's2', name: 'Unwanted rename', start_date: '2026-09-14', end_date: '2027-07-02',
-    placement_points: '3, 2, 1', scoring_mode: 'fixed', points_step: '0.5', bonus_points_max: '1', bonus_points_step: '0.25',
+    placement_points: '1, 0.5', scoring_mode: 'beaten', points_step: '0.5', bonus_points_max: '1', bonus_points_step: '0.25',
     k_factor: '24', default_rating: '1000', rookie_rating: '800'
   };
   await a.api.submit(a.form('season', fields));
@@ -570,6 +571,9 @@ test('season BP settings submit only the exact existing season and validate cap/
   assert.equal(body.id, 's2');
   assert.equal(body.bonus_points_max, 1);
   assert.equal(body.bonus_points_step, 0.25);
+  assert.deepEqual(body.placement_points, [1, 0.5]);
+  assert.equal(body.scoring_mode, 'beaten');
+  await assert.rejects(a.api.submit(a.form('season', { ...fields, placement_points: '1, 0.5, 0.25' })), /exactly two values/);
   await assert.rejects(a.api.submit(a.form('season', { ...fields, id: '' })), /existing Season 2/);
   await assert.rejects(a.api.submit(a.form('season', { ...fields, bonus_points_max: '0.3' })), /multiple/);
 });
@@ -599,10 +603,10 @@ test('permanent Head Ref role only lists eligible members, never guest profiles,
 test('admin assets cache-busted, role management title preserved, touch targets avoid HTML5-only dragging', () => {
   const html = fs.readFileSync(path.join(rootPath, 'admin.html'), 'utf8');
   const css = fs.readFileSync(path.join(rootPath, 'admin-league.css'), 'utf8');
-  assert.match(html, /admin-league\.js\?v=20260914e/);
+  assert.match(html, /admin-league\.js\?v=20260915c/);
   assert.match(html, /admin-league\.css\?v=20260912b/);
   assert.match(html, /\/league\.css\?v=20260915/);
-  assert.match(html, /\/js\/league-ui\.js\?v=20260915/);
+  assert.match(html, /\/js\/league-ui\.js\?v=20260915c/);
   assert.ok(html.indexOf('admin-auth.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-scoring.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-ui.js') < html.indexOf('admin-league.js'));

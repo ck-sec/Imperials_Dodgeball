@@ -189,16 +189,18 @@ test('manual squads permit swaps and names but reject missing/duplicate players 
 
 test('finite numeric validation, real dates, bounds, booleans, UUIDs and versions', () => {
   const valid = { action: 'save_season', name: 'Season', start_date: '2026-01-01', end_date: '2026-12-31' };
-  assert.deepEqual(validateAction(valid).placement_points, [3, 2.5, 2, 1, 0.5]);
+  assert.deepEqual(validateAction(valid).placement_points, [1, 0.5]);
+  assert.equal(validateAction(valid).scoring_mode, 'beaten');
   for (const bad of [Infinity, NaN, '24', null, -1, 201]) {
     assert.throws(() => validateAction({ ...valid, k_factor: bad }), LeagueError);
   }
   for (const date of ['2026-02-30', '2026-13-01', '2026-2-02']) {
     assert.throws(() => validateAction({ ...valid, start_date: date }), LeagueError);
   }
-  for (const points of [[], [1, 2], [NaN], [-1], [10001]]) {
+  for (const points of [[], [NaN], [-1], [10001]]) {
     assert.throws(() => settings({ placement_points: points }), LeagueError);
   }
+  assert.throws(() => settings({ placement_points: [1, 2], scoring_mode: 'relative' }), LeagueError);
   assert.throws(() => validateAction({ action: 'publish', event_id: id(1), version: '1' }), LeagueError);
   assert.throws(() => validateAction({ action: 'publish', event_id: 'bad', version: 1 }), LeagueError);
   assert.throws(() => validateAction({ action: 'save_player', user_id: id(1), gender: 'male', is_rookie: 'false', initial_rating: 1000 }), LeagueError);
@@ -225,7 +227,7 @@ test('pairwise Elo is normalized, uses frozen squad means, and awards every subs
     number: i + 1, name: `Legacy Team ${i + 1}`, placement: null, players: sixPlayers.slice(i * 6, (i + 1) * 6),
   })) };
   const sixResult = scoreEvent(six, six.teams.map(t => ({ team_number: t.number, placement: t.number })));
-  assert.equal(sixResult.ledger.find(r => r.placement === 6).points, 0.5);
+  assert.equal(sixResult.ledger.find(r => r.placement === 6).points, 1);
   assert(sixResult.ledger.every(r => Math.abs(r.rating_delta) <= 12));
 });
 
@@ -248,7 +250,7 @@ test('public release filters seasons and drafts; equal ALL-training totals share
   assert.deepEqual(result.guide_season, result.season);
   assert.equal(result.events.length, 2);
   assert.equal(result.standings.length, 12);
-  assert(result.standings.every(p => p.points === 3.5 && p.played === 2 && p.wins === 1 && p.rank === 1));
+  assert(result.standings.every(p => p.points === 2.5 && p.played === 2 && p.wins === 1 && p.rank === 1));
   assert.throws(() => publicView(world, world.seasons[1].id), error => error.status === 404);
   const forbidden = /"(rating|initial_rating|gender|is_rookie|user_id|player_id|email|roster_ids|settings)"/;
   assert(!forbidden.test(JSON.stringify(result)));
@@ -269,8 +271,8 @@ test('public release filters seasons and drafts; equal ALL-training totals share
 test('personal history contains only personal released placements, never private balancing fields', () => {
   const world = fixture();
   const result = publicView(world, world.seasons[0].id, id(1001));
-  assert.deepEqual(result.stats, { rank: 1, points: 3.5, base_points: 3.5, bonus_points: 0, played: 2, wins: 1,
-    points_gain: 0.5, previous_rank: 1, rank_gain: 0 });
+  assert.deepEqual(result.stats, { rank: 1, points: 2.5, base_points: 2.5, bonus_points: 0, played: 2, wins: 1,
+    points_gain: 1, previous_rank: 1, rank_gain: 0 });
   assert.equal(result.history.length, 2);
   assert(!/"(rating|initial_rating|gender|is_rookie|user_id|player_id|email)"/.test(JSON.stringify(result)));
   assert.deepEqual(publicView(world, world.seasons[0].id, id(999)).stats, { rank: null, points: 0, base_points: 0, bonus_points: 0, played: 0, wins: 0,
@@ -320,22 +322,22 @@ test('admin results preview exposes frozen event points and K despite later seas
   world.seasons[0].points_step = 1;
   const admin = adminView(world);
   const event = admin.events.find(e => e.id === world.events[0].id);
-  assert.deepEqual(event.placement_points, [3, 2.5, 2, 1, 0.5]);
+  assert.deepEqual(event.placement_points, [1, 0.5]);
   assert.equal(event.k_factor, 24);
-  assert.equal(event.scoring_mode, 'relative');
+  assert.equal(event.scoring_mode, 'beaten');
   assert.equal(event.points_step, 0.5);
   event.placement_points[0] = 999;
-  assert.equal(world.events[0].settings.placement_points[0], 3, 'Projection must not mutate the frozen snapshot');
+  assert.equal(world.events[0].settings.placement_points[0], 1, 'Projection must not mutate the frozen snapshot');
   assert.deepEqual(admin.seasons[0].placement_points, [100, 50]);
 });
 
 test('migration is additive, idempotent and preserves PL/pgSQL statement bodies', () => {
   const schema = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'league-schema.sql'), 'utf8');
   const statements = migrationStatements(schema);
-  assert.equal(statements.length, 15);
+  assert.equal(statements.length, 17);
   assert(statements.every(s => /CREATE (TABLE IF NOT EXISTS|INDEX IF NOT EXISTS|OR REPLACE FUNCTION)|ALTER TABLE (league_(seasons|events)|users)/.test(s)));
   assert.match(schema, /CREATE TABLE IF NOT EXISTS league_match_timers/);
-  assert(!/UPDATE\s+users|DROP\s|TRUNCATE\s/i.test(schema));
+  assert(!/UPDATE\s+users|DROP\s+(?:TABLE|COLUMN)|TRUNCATE\s/i.test(schema));
   assert(!/UPDATE\s+league_(events|results)/i.test(schema));
   assert(statements.at(-1).includes("DETAIL = 'LEAGUE_'"));
   assert.match(statements.at(-1), /END;\r?\n\$league\$;/);

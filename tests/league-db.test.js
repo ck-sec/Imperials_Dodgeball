@@ -94,6 +94,7 @@ test('generation snapshots server players and settings, locks session, and check
   assert(snapshot.every(p => p.gender === 'unspecified' && p.rating === 1000));
   assert.match(queries[guardIndex].text, /u\.is_active = true AND u\.status = 'approved'/);
   assert.match(queries[guardIndex].text, /SUM\(r\.rating_delta\)/);
+  assert(queries.some(q => q.text.includes('Season 2 scoring is being updated')));
   assert(queries.some(q => q.text.includes('Season settings changed')));
   const settingsGuard = queries.find(q => q.text.includes('Season settings changed'));
   assert.match(settingsGuard.text, /'scoring_mode', scoring_mode, 'points_step', points_step/);
@@ -103,6 +104,49 @@ test('generation snapshots server players and settings, locks session, and check
   assert.equal(teamNames.length, 5, 'The real generation path should prefer five referee-safe teams');
   assert.equal(new Set(teamNames).size, teamNames.length);
   assert(teamNames.every(name => typeof name === 'string' && name.length > 0 && !/^Team \d+$/.test(name)));
+});
+
+test('Season 2 old-rule drafts cannot cross the code-first migration window', async () => {
+  const world = worldFixture();
+  Object.assign(world.seasons[0], {
+    name: 'Season 2', start_date: '2026-09-12', end_date: '2027-07-02',
+    placement_points: [3, 2.5, 2, 1, 0.5], scoring_mode: 'relative',
+  });
+  world.sessions[0].session_date = '2026-09-12';
+  const generation = validateAction({
+    action: 'generate', season_id: id(100), session_id: id(200), team_size: 4,
+  });
+  await assert.rejects(applyAction(recorder(), generation, world), /scoring is being updated/);
+  const seasonUpdate = validateAction({
+    action: 'save_season', id: id(100), name: 'Season 2',
+    start_date: '2026-09-12', end_date: '2027-07-02',
+    placement_points: [1, 0.5], scoring_mode: 'beaten',
+  });
+  await assert.rejects(applyAction(recorder(), seasonUpdate, world), /scoring is being updated/);
+
+  const event = eventFixture(world, 'draft');
+  event.session_date = world.sessions[0].session_date;
+  event.settings = { ...structuredClone(DEFAULTS), placement_points: [3, 2.5, 2, 1, 0.5], scoring_mode: 'relative' };
+  await assert.rejects(applyAction(recorder(), { action: 'publish', event_id: event.id, version: 1 }, world),
+    /scoring is being updated/);
+  event.status = 'published';
+  await assert.rejects(applyAction(recorder(), {
+    action: 'results', event_id: event.id, version: 1,
+    placements: event.teams.map(team => ({ team_number: team.number, placement: team.number })),
+  }, world), /scoring is being updated/);
+
+  Object.assign(world.seasons[0], { placement_points: [1, 0.5], scoring_mode: 'beaten' });
+  event.status = 'draft';
+  await assert.rejects(applyAction(recorder(), { action: 'publish', event_id: event.id, version: 1 }, world),
+    /scoring is being updated/);
+  event.status = 'published';
+  const sql = recorder();
+  await applyAction(sql, {
+    action: 'results', event_id: event.id, version: 1,
+    placements: event.teams.map(team => ({ team_number: team.number, placement: team.number })),
+  }, world);
+  assert(sql.transactions[0].queries.some(query => query.text.includes('INSERT INTO league_results')),
+    'Frozen historical relative results remain correctable after the season migration');
 });
 
 test('generated names persist through reads/publication/scoring and remain manually editable', async () => {
@@ -185,6 +229,7 @@ test('publish verifies eligible attendance and unchanged date after obtaining th
   const attendanceGuard = queries.findIndex(q => q.text.includes('Eligible attendance changed'));
   const mutation = queries.findIndex(q => q.text.includes("SET status = 'published'"));
   assert(rowLock >= 0 && attendanceGuard > rowLock && mutation > attendanceGuard);
+  assert(queries.some(q => q.text.includes('Season 2 scoring is being updated')));
   assert.deepEqual(JSON.parse(queries[attendanceGuard].values[0]), event.rsvp_user_ids);
   assert.match(queries[attendanceGuard].text, /u\.is_active = true AND u\.status = 'approved'/);
   assert(queries.some(q => q.text.includes('t.session_date =')));
@@ -205,10 +250,11 @@ test('result write is one guarded transaction replacing the ledger, never increm
   const insertion = queries.findIndex(q => q.text.includes('INSERT INTO league_results'));
   const update = queries.findIndex(q => q.text.includes("status = 'finalized'"));
   assert(guard > 0 && deletion > guard && insertion > deletion && update > insertion);
+  assert(queries.some(q => q.text.includes('Season 2 scoring is being updated')));
   assert(queries.some(q => q.text.includes("AT TIME ZONE 'Europe/Vienna'")));
   const ledger = JSON.parse(queries[insertion].values[1]);
   assert.equal(ledger.length, 12);
-  assert(ledger.every(r => [3, 2, 0.5].includes(r.points)));
+  assert(ledger.every(r => [2, 1.5, 1].includes(r.points)));
   assert(!queries.some(q => /UPDATE league_players|rating_delta\s*=\s*rating_delta\s*\+/.test(q.text)));
   await assert.rejects(applyAction(recorder(), { ...input, version: 0 }, world), error => error.status === 409);
   event.session_date = '2099-01-01';
@@ -249,6 +295,7 @@ test('season/settings writes guard assigned dates and player edits never touch t
   await applyAction(sql, validateAction({ action: 'save_season', ...world.seasons[0] }), null);
   let queries = sql.transactions[0].queries;
   assert.match(queries[0].text, /pg_advisory_xact_lock/);
+  assert(queries.some(q => q.text.includes('Season 2 scoring is being updated')));
   assert(queries.some(q => q.text.includes('Season dates cannot exclude assigned training events')));
   assert(!queries.some(q => /UPDATE league_events|DELETE FROM league_results/.test(q.text)));
   await applyAction(sql, validateAction({

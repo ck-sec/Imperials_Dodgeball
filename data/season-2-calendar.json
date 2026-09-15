@@ -5,8 +5,8 @@
   "end_date": "2027-07-02",
   "season": {
     "name": "Season 2",
-    "placement_points": [3, 2.5, 2, 1, 0.5],
-    "scoring_mode": "relative",
+    "placement_points": [1, 0.5],
+    "scoring_mode": "beaten",
     "points_step": 0.5,
     "default_rating": 1000,
     "rookie_rating": 800,

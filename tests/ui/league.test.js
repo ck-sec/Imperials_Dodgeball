@@ -170,7 +170,7 @@ test('relative scoring rules show the exact team-count scale', () => {
 
 test('beginner guide explains signup, scoring, balancing and Diamond in plain language', () => {
   const config = {
-    placement_points: [3, 2.5, 2, 1, 0.5], scoring_mode: 'relative', points_step: 0.5,
+    placement_points: [1, 0.5], scoring_mode: 'beaten', points_step: 0.5,
     bonus_points_max: 1, bonus_points_step: 0.5
   };
   const en = ui.guide(config, 'en');
@@ -180,7 +180,10 @@ test('beginner guide explains signup, scoring, balancing and Diamond in plain la
   assert.match(en, /including rotating substitutes/);
   assert.match(en, /win = 2, draw = 1, loss = 0/);
   assert.match(en, /does not pick individual opponents/);
-  assert.match(en, /5 Teams<\/dt><dd>\+3 \/ \+2.5 \/ \+2 \/ \+1 \/ \+0.5/);
+  assert.match(en, /1 participation point plus 0.5 points for every team/);
+  assert.match(en, /2 Teams<\/dt><dd>\+1.5 \/ \+1/);
+  assert.match(en, /5 Teams<\/dt><dd>\+3 \/ \+2.5 \/ \+2 \/ \+1.5 \/ \+1/);
+  assert.match(en, /6 Teams<\/dt><dd>\+3.5 \/ \+3 \/ \+2.5 \/ \+2 \/ \+1.5 \/ \+1/);
   assert.match(en, /first place gets \+1 BP and second gets \+0.5 BP/);
   assert.match(en, /Diamond starts at 70 total points/);
   assert.match(en, /14 first-place finishes \(42 points\).*14 third-place finishes \(28 points\)/);
@@ -307,9 +310,9 @@ test('points rules expose the five tier thresholds without expanding the compact
 test('all ranking surfaces load the same refreshed tier logic, markup and styles', () => {
   for (const file of ['index.html', 'admin.html', 'member.html', 'spieltag.html']) {
     const html = fs.readFileSync(path.join(root, file), 'utf8');
-    assert.ok(html.includes('/js/league-scoring.js?v=20260912d'), file + ' must refresh league scoring');
+    assert.ok(html.includes('/js/league-scoring.js?v=20260915c'), file + ' must refresh league scoring');
     assert.ok(html.includes('/league.css?v=20260915'), file + ' must refresh league styles');
-    assert.ok(html.includes('/js/league-ui.js?v=20260915'), file + ' must refresh league UI');
+    assert.ok(html.includes('/js/league-ui.js?v=20260915c'), file + ' must refresh league UI');
   }
 });
 

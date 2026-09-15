@@ -133,19 +133,25 @@ window.LeagueUI = (function() {
     const activeLang = text[lang] ? lang : 'en';
     const t = text[activeLang];
     const awards = season.placement_points;
-    const relative = season.scoring_mode !== 'fixed';
+    const mode = season.scoring_mode || 'fixed';
     const step = season.points_step === undefined ? 0.5 : season.points_step;
     const bonusMax = season.bonus_points_max === undefined ? 1 : season.bonus_points_max;
     const bonusStep = season.bonus_points_step === undefined ? 0.5 : season.bonus_points_step;
     const format = value => value.toLocaleString(activeLang === 'de' ? 'de-AT' : 'en-GB');
-    const scale = relative
+    const table = () => `<dl class="league-score-examples">${[2, 3, 4, 5, 6].map(count => `<div>
+      <dt>${count} Teams</dt><dd>${window.LeagueScoring.placementPoints(season, count).map(points => '+' + format(points)).join(' / ')}</dd>
+    </div>`).join('')}</dl>`;
+    const scale = mode === 'beaten'
       ? `<p class="league-copy">${activeLang === 'de'
+        ? `${format(awards[0])} Punkt für die Teilnahme plus ${format(awards[1])} Punkte für jedes Team, vor dem dein Team landet. Mehr Teams bedeuten deshalb mehr mögliche Punkte.`
+        : `${format(awards[0])} participation point plus ${format(awards[1])} points for every team your squad finishes above. More teams therefore mean more points are available.`}</p>
+        ${table()}`
+      : mode === 'relative'
+        ? `<p class="league-copy">${activeLang === 'de'
         ? 'Relative Platzierung, gerundet auf ' + format(step) + ' Punkte. Reihenfolge: 1. bis letzter Platz.'
         : 'Relative finish, rounded to ' + format(step) + ' points. Listed from first to last place.'}</p>
-        <dl class="league-score-examples">${[2, 3, 4, 5, 6].map(count => `<div>
-          <dt>${count} Teams</dt><dd>${window.LeagueScoring.placementPoints(season, count).map(points => '+' + format(points)).join(' / ')}</dd>
-        </div>`).join('')}</dl>`
-      : `<div class="league-rules">${awards.map((points, i) =>
+        ${table()}`
+        : `<div class="league-rules">${awards.map((points, i) =>
         `<span class="league-chip">${i + 1}. ${escape(t.place)}: ${escape(format(points))} ${escape(t.points)}</span>`
       ).join('')}<span class="league-chip">${escape(t.rest)}: ${escape(format(awards[awards.length - 1]))} ${escape(t.points)}</span></div>`;
     return `${scale}
