@@ -77,7 +77,7 @@ test('public scripts comply with self-only CSP without executable inline handler
     for (const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
       if (/type="application\/ld\+json"/.test(script[1])) JSON.parse(script[2]);
       else {
-        assert.match(script[1], /src="\/js\/[^"]+\?v=202609(?:12[b-d]?|14[de]|15)"/, file);
+        assert.match(script[1], /src="\/js\/[^"]+\?v=202609(?:12[b-d]?|14[de]|15b?)"/, file);
         assert.equal(script[2].trim(), '', file);
       }
     }
@@ -165,7 +165,7 @@ test('homepage keeps focused offers, progressive FAQ detail and one permanent Ha
   assert.match(home, /href="#hall-of-fame" data-league-hof/);
   assert.ok(home.indexOf('data-league-hof') < home.indexOf('data-league-content'));
   assert.match(home, /league-ui\.js\?v=20260915"/);
-  assert.match(home, /site-league\.js\?v=20260915"/);
+  assert.match(home, /site-league\.js\?v=20260915b"/);
   assert.match(home, /private ELO skill estimate/);
   assert.match(home, /nicht öffentlichen ELO-Spielstärke/);
   assert.doesNotMatch(home, /by random draw|per Losverfahren/);
@@ -304,6 +304,19 @@ test('public league uses shared language and renders refreshed comparison metada
   await settle();
   assert.match(page.content.innerHTML, /Updated training/);
   assert.match(page.nodes['[data-league-standings]'].innerHTML, /\+2 Punkte/);
+});
+
+test('current-season guide remains visible before the first teams are published', async () => {
+  const page = leaguePage();
+  const guideSeason = currentLeague().season;
+  page.requests[0].resolve({
+    season: null, guide_season: guideSeason, seasons: [], comparison_event: null, standings: [], events: []
+  });
+  page.requests[1].resolve(JSON.parse(read('data/season-1.json')));
+  await settle();
+  assert.match(page.content.innerHTML, /New here\? The league in 60 seconds/);
+  assert.match(page.content.innerHTML, /No teams published yet/);
+  assert.doesNotMatch(page.content.innerHTML, /data-league-tab/);
 });
 
 test('one season selector opens frozen 125-player archive without current comparison deltas', async () => {

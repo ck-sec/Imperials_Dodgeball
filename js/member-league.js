@@ -59,12 +59,16 @@ function renderMemberLeague() {
   const data = memberLeagueData;
   if (!data) return;
   const root = byId('memberLeagueContent');
-  if (!data.season) {
-    root.innerHTML = `<p class="league-notice">${mt('Noch keine Liga veröffentlicht. Dein Training findest du im Training-Tab.', 'No league published yet. Find upcoming sessions in Training.')}</p><button class="league-btn" type="button" data-member-league-refresh>${mt('Aktualisieren', 'Refresh')}</button>`;
-    return;
-  }
   const ui = window.LeagueUI;
   const lang = memberLang();
+  if (!data.season) {
+    const season = data.guide_season;
+    root.innerHTML = `${season ? `<p class="league-copy">${escapeHtml(ui.date(season.start_date, lang))} – ${escapeHtml(ui.date(season.end_date, lang))}</p>
+      ${ui.guide(season, lang)}` : ''}
+      <p class="league-notice">${mt('Noch keine Liga veröffentlicht. Dein Training findest du im Training-Tab.', 'No league published yet. Find upcoming sessions in Training.')}</p>
+      <button class="league-btn" type="button" data-member-league-refresh>${mt('Aktualisieren', 'Refresh')}</button>`;
+    return;
+  }
   const stats = data.stats;
   const standings = data.standings || [];
   const history = data.history || [];

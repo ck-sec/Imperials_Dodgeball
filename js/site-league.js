@@ -151,6 +151,13 @@
       ${standingsPanel(false)}`;
   }
 
+  function renderGuideOnly() {
+    const season = data.guide_season;
+    return `<p class="league-copy">${ui.escape(ui.date(season.start_date, lang))} &ndash; ${ui.escape(ui.date(season.end_date, lang))}</p>
+      ${ui.guide(season, lang)}
+      <p class="league-notice">${ui.escape(ui.text[lang].empty)}</p>`;
+  }
+
   function render() {
     const focused = document.activeElement;
     const focusAttribute = focused && content.contains(focused)
@@ -174,7 +181,9 @@
     if (busy) body = `<p class="league-notice" role="status">${ui.escape(t.loading)}</p>`;
     else if (failed) body = `<p class="league-notice league-error" role="alert">${ui.escape(t.error)}</p>`;
     else if (archived) body = renderArchive();
-    else body = data && data.season ? renderCurrent() : `<p class="league-notice">${ui.escape(t.empty)}</p>`;
+    else body = data && data.season ? renderCurrent()
+      : data && data.guide_season ? renderGuideOnly()
+        : `<p class="league-notice">${ui.escape(t.empty)}</p>`;
     content.innerHTML = `<div class="league-toolbar league-season-toolbar">
       <label class="league-field">${ui.escape(t.season)}<select class="league-input" data-league-season>${options}<option value="season-1"${archived ? ' selected' : ''}>Season 1</option></select></label>
       <button class="league-btn" data-league-refresh${busy ? ' disabled' : ''}>${ui.escape(t.refresh)}</button>

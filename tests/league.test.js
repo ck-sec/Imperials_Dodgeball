@@ -245,6 +245,7 @@ test('public release filters seasons and drafts; equal ALL-training totals share
   const world = fixture();
   const result = publicView(world, world.seasons[0].id);
   assert.equal(result.seasons.length, 1);
+  assert.deepEqual(result.guide_season, result.season);
   assert.equal(result.events.length, 2);
   assert.equal(result.standings.length, 12);
   assert(result.standings.every(p => p.points === 3.5 && p.played === 2 && p.wins === 1 && p.rank === 1));
@@ -276,7 +277,14 @@ test('personal history contains only personal released placements, never private
     points_gain: 0, previous_rank: null, rank_gain: null });
   const empty = { ...world, events: [], results: [] };
   assert.deepEqual(publicView(empty, undefined, id(1)).stats, { rank: null, points: 0, base_points: 0, bonus_points: 0, played: 0, wins: 0 });
-  assert.equal(publicView(empty).season, null);
+  const beforeFirstRelease = publicView(empty, undefined, undefined, '2026-06-01');
+  assert.equal(beforeFirstRelease.season, null);
+  assert.equal(beforeFirstRelease.guide_season.id, world.seasons[0].id);
+  assert.deepEqual(Object.keys(beforeFirstRelease.guide_season).sort(), [
+    'bonus_points_max', 'bonus_points_step', 'end_date', 'id', 'name', 'placement_points',
+    'points_step', 'scoring_mode', 'start_date'
+  ]);
+  assert.doesNotMatch(JSON.stringify(beforeFirstRelease.guide_season), /rating|gender|rookie|settings/);
 });
 
 test('season selection uses current dates, otherwise latest starting published season', () => {

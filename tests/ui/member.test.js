@@ -149,11 +149,11 @@ test('member page is German-first, training-first and versions every local style
   assert.match(html, /data-tab="training" role="tab"[^>]+aria-selected="true"/);
   assert.doesNotMatch(html, /href="\/#training-league"|data-tab="stats"|data-tab="settings"/);
   assert.match(html, /<details[^>]+id="seasonOneArchive"/);
-  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=202609(?:12[b-d]?|14[de]?|15)$/);
+  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=202609(?:12[b-d]?|14[de]?|15b?)$/);
   assert.ok(html.includes('/league.css?v=20260915'));
   assert.ok(html.includes('/js/league-scoring.js?v=20260912d'));
   assert.ok(html.includes('/js/league-ui.js?v=20260915'));
-  assert.ok(html.includes('/js/member-league.js?v=20260915'));
+  assert.ok(html.includes('/js/member-league.js?v=20260915b'));
   assert.ok(html.includes('/js/member-core.js?v=20260914'));
   for (const asset of ['/js/member-dashboard.js', '/js/member-init.js']) assert.ok(html.includes(asset + '?v=20260912c'));
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
@@ -671,6 +671,16 @@ test('member summaries and training history show BP as part of the server total'
   app.window.SiteLanguage.set('en');
   assert.match(app.node('memberLeagueContent').innerHTML, /Your total points/);
   assert.match(app.node('memberLeagueContent').innerHTML, /BP 0.5/);
+});
+
+test('member league explains the active season before teams are published', () => {
+  const app = fixtureApp();
+  app.context.payload = { season: null, guide_season: season, my_events: [], events: [] };
+  app.run('memberLeagueData = payload; renderMemberLeague()');
+  assert.match(app.node('memberLeagueContent').innerHTML, /Neu dabei\? Die Liga in 60 Sekunden/);
+  assert.match(app.node('memberLeagueContent').innerHTML, /Noch keine Liga veröffentlicht/);
+  app.window.SiteLanguage.set('en');
+  assert.match(app.node('memberLeagueContent').innerHTML, /New here\? The league in 60 seconds/);
 });
 
 test('own Thursday team has one visible matchday link before expandable details', () => {

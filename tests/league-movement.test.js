@@ -159,6 +159,7 @@ test('empty and unfinalized seasons have no fabricated comparison or movement fi
   world.events = [];
   payload = publicView(world, undefined, id(1001), '2026-09-08');
   assert.equal(payload.season, null);
+  assert.equal(payload.guide_season.id, world.seasons[0].id);
   assert.equal(payload.comparison_event, null);
   assert.deepEqual(payload.my_events, []);
 });
