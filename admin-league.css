@@ -52,7 +52,19 @@
 .al-check { display: flex; align-items: center; gap: .75rem; min-height: 48px; padding: .65rem 0; }
 .al-steps { display: flex; list-style: none; gap: .4rem; padding: 0; margin: 0 0 1rem; flex-wrap: wrap; }
 .al-steps li { flex: 1 1 auto; }
-.al-steps a { display: flex; justify-content: center; align-items: center; min-height: 44px; padding: .5rem .6rem; border-radius: 8px; background: #142a50; font-size: .8rem; text-decoration: none; }
+.al-steps .al-button { width: 100%; min-height: 44px; padding: .5rem .6rem; font-size: .85rem; }
+#tab-league .al-steps [aria-current="step"] { background: #f6c969; color: #0c1b3a; border-color: #f6c969; }
+.al-flow-context { display: flex; flex-wrap: wrap; gap: .3rem 1rem; position: sticky; top: .5rem; z-index: 5; padding: .75rem 1rem; margin-bottom: 1rem; border: 1px solid #637391; border-radius: 9px; background: #0c1b3a; font-size: .85rem; }
+.al-flow-context strong { color: #f6c969; }
+#tab-league .al-stage-title { font-size: 2rem; scroll-margin-top: 120px; }
+.al-stage-actions { justify-content: space-between; margin: 1rem 0 2rem; }
+.al-checklist { list-style: none; padding: 0; margin: 1rem 0; }
+.al-checklist li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: .75rem; border-top: 1px solid #3a4e71; padding: 1rem 0; }
+.al-checklist p { margin: .3rem 0; }
+.al-check-state { font-weight: 700; font-size: .8rem; }
+.al-check-ready .al-check-state { color: #adf3d4; }
+.al-check-pending .al-check-state { color: #ffe1a0; }
+.al-checklist .al-button { min-height: 44px; padding: .4rem .75rem; font-size: .8rem; margin-top: .35rem; }
 .al-status { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: .8rem 0; }
 .al-chip { display: inline-block; border-radius: 6px; padding: .15rem .45rem; font-size: .75rem; font-weight: 600; background: #273d60; color: #e0e9fa; overflow-wrap: anywhere; }
 .al-chip.al-rookie { background: #3a2e56; color: #e9d6ff; }

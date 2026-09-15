@@ -230,6 +230,66 @@ test('draft swaps require no shuffle; duplicates/missing references reject, unde
   }
 });
 
+test('uneven and incomplete drafts save exactly, but publication requires squad sizes to differ by at most one', async () => {
+  for (const sizes of [[2, 4], [2, 3], [0, 3]]) {
+    const world = fixture(), event = world.events[0], sql = recorder();
+    const ids = world.profiles.map(player => player.id);
+    const teams = [
+      { number: 1, name: 'First squad', player_ids: ids.slice(0, sizes[0]) },
+      { number: 2, name: 'Second squad', player_ids: ids.slice(sizes[0], sizes[0] + sizes[1]) },
+    ];
+    await applyAction(sql, request('save_draft', event, { teams, team_size: 2 }), world);
+    const update = sql.transactions[0].queries.find(query => /UPDATE league_events SET teams/.test(query.text));
+    assert.deepEqual(JSON.parse(update.values[0]).map(team => team.players.length), sizes);
+    assert(!sql.transactions[0].queries.some(query => query.text.includes("status = 'published'")));
+    Object.assign(event, draftTeams(event, teams, 2, playerView(world)));
+    if (sizes[0] === 2 && sizes[1] === 3) {
+      assert.doesNotThrow(() => requirePublishableRoster(event));
+      await applyAction(sql, request('publish', event), world);
+      assert(sql.transactions[1].queries.some(query => query.text.includes("status = 'published'")));
+    } else {
+      const error = sizes[0] === 0 ? /on-court/ : /at most one rotating substitute/;
+      assert.throws(() => requirePublishableRoster(event), error);
+      await assert.rejects(applyAction(sql, request('publish', event), world), error);
+      assert.equal(sql.transactions.length, 1);
+    }
+  }
+});
+
+test('unscheduled manual placements remain publishable and correctable without booking times', async () => {
+  const world = fixture(), event = world.events[0], sql = recorder();
+  Object.assign(world.sessions[0], { start_time: null, end_time: null });
+  await applyAction(sql, request('publish', event), world);
+  event.status = 'published';
+  await applyAction(sql, request('results', event, { placements: placement(event) }), world);
+  finalized(world, event);
+  const corrected = placement(event).map(team => ({ ...team, placement: 3 - team.placement }));
+  await applyAction(sql, request('results', event, { placements: corrected }), world);
+  for (const { queries } of sql.transactions) {
+    assert(!queries.some(query => query.text.includes('Training booking changed')));
+  }
+  const results = sql.transactions[2].queries.find(query => /INSERT INTO league_results/.test(query.text));
+  assert.deepEqual(JSON.parse(results.values[1]), scoreEvent(event, corrected).ledger);
+});
+
+test('legacy schedules remain correctable with changed bookings but cannot be republished', async () => {
+  const world = fixture(), event = world.events[0], sql = recorder();
+  event.schedule = legacyTwoTeamSchedule();
+  await assert.rejects(applyAction(sql, request('publish', event), world), /Regenerate the schedule before publishing/);
+  Object.assign(world.sessions[0], { start_time: '23:00:00', end_time: '01:00:00' });
+  event.status = 'published';
+  event.schedule.rounds[0].matches[0].score_a = 2;
+  event.schedule.rounds[0].matches[0].score_b = 1;
+  await applyAction(sql, request('results', event), world);
+  finalized(world, event);
+  event.schedule.rounds[0].matches[0].score_b = 3;
+  await applyAction(sql, request('results', event), world);
+  assert(sql.transactions.every(({ queries }) => !queries.some(query => query.text.includes('Training booking changed'))));
+  const corrected = sql.transactions[1].queries.find(query => /INSERT INTO league_results/.test(query.text));
+  const ledger = JSON.parse(corrected.values[1]);
+  assert(ledger.filter(row => row.team_number === 2).every(row => row.placement === 1));
+});
+
 test('exact draft save reconciles changed RSVP deliberately without regeneration or reshuffling', async () => {
   const world = fixture(), event = world.events[0];
   world.attendance.push({ session_id: event.session_id, user_id: id(104) });

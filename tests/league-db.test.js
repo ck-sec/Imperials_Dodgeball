@@ -14,7 +14,8 @@ function worldFixture() {
     users, profiles: users.map((u, i) => ({ id: id(i + 1), user_id: u.id, display_name: u.display_name,
       gender: 'unspecified', is_rookie: false, initial_rating: null, merged_into: null })), events: [], results: [],
     seasons: [{ id: id(100), name: 'Season', start_date: '2020-01-01', end_date: '2099-12-31', ...DEFAULTS }],
-    sessions: [{ id: id(200), title: 'Training', session_date: '2026-01-01', start_time: '19:00:00', is_cancelled: false }],
+    sessions: [{ id: id(200), title: 'Training', session_date: '2026-01-01',
+      start_time: '18:00:00', end_time: '20:10:00', is_cancelled: false }],
     attendance: users.map(u => ({ session_id: id(200), user_id: u.id })),
   };
 }

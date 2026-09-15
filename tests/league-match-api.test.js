@@ -14,7 +14,7 @@ function fixture(teamCount = 5) {
     gender: i % 2 ? 'female' : 'male', is_rookie: false, rating: 1000, initial_rating: 1000, merged_into: null,
   }));
   const session = { id: id(3000), title: 'Training', session_date: '2026-01-01',
-    start_time: '19:00:00', location: 'Vienna', is_cancelled: false };
+    start_time: '18:00:00', end_time: '20:10:00', location: 'Vienna', is_cancelled: false };
   const event = {
     id: id(2000), season_id: id(4000), session_id: session.id, session_date: session.session_date,
     status: 'draft', version: 1, settings: structuredClone(DEFAULTS), roster_locked: false, schedule: null,
@@ -163,6 +163,120 @@ test('schedule creation is versioned and draft-only; five teams fit ten matches 
   event.status = 'draft';
   await assert.rejects(applyAction(recorder(), { ...input, courts: 1 }, world), /needs 230 minutes/);
 });
+
+test('admin sessions and events expose stored booking start/end, not the shorter league program', () => {
+  const world = fixture();
+  scheduled(world);
+  world.sessions[0].end_time = '21:00:00.5';
+  const view = adminView(world);
+  for (const record of [view.sessions[0], view.events[0]]) {
+    assert.equal(record.start_time, '18:00:00');
+    assert.equal(record.end_time, '21:00:00.5');
+  }
+});
+
+for (const action of ['generate_schedule', 'publish']) {
+  test(`${action} rejects meetup outside the stored booking and program overflow including the finale`, async () => {
+    const cases = [
+      { booking: { start_time: '19:00:00' }, error: /booking start/ },
+      { booking: { start_time: '18:00:00.000001' }, error: /booking start/ },
+      { booking: { end_time: '19:59:00' }, error: /including the finale/ },
+      { booking: { end_time: '20:00:00' }, error: /including the finale/ },
+      { booking: { end_time: '20:09:59.999999' }, error: /including the finale/ },
+      { booking: { start_time: null }, error: /valid start and end times/ },
+      { booking: { end_time: undefined }, error: /valid start and end times/ },
+      { booking: { start_time: 'invalid' }, error: /valid start and end times/ },
+      { booking: { end_time: '24:00:00' }, error: /valid start and end times/ },
+      { booking: { start_time: '22:00', end_time: '02:00' }, error: /overnight/ },
+      { booking: { start_time: '23:00', end_time: '23:59' }, meetup_time: '23:00', error: /same day/ },
+    ];
+    for (const scenario of cases) {
+      const world = fixture(2), event = world.events[0], sql = recorder();
+      Object.assign(world.sessions[0], scenario.booking);
+      const meetup_time = scenario.meetup_time || '18:00';
+      if (action === 'publish') event.schedule = buildSchedule(2, { meetup_time });
+      await assert.rejects(applyAction(sql, request(action, event, { meetup_time }), world), error => {
+        assert.equal(error.status, 400);
+        assert.match(error.message, scenario.error);
+        assert.match(error.message, /Training tab/);
+        return true;
+      });
+      assert.equal(sql.transactions.length, 0, 'Invalid booking must be rejected before any writes');
+    }
+  });
+
+  test(`${action} accepts exact booked boundaries for both referee policies`, async () => {
+    for (const count of [2, 5]) {
+      const world = fixture(count), event = world.events[0], sql = recorder();
+      if (action === 'publish') scheduled(world);
+      await applyAction(sql, request(action, event), world);
+      assert.equal(sql.transactions.length, 1);
+      assert(sql.transactions[0].some(query => query.text.includes('UPDATE league_events')));
+    }
+  });
+
+  test(`${action} rechecks the current booking transactionally after locks to prevent booking-edit races`, async () => {
+    for (const change of [
+      { start_time: '19:00:00' }, { start_time: '18:00:00.000001' },
+      { end_time: '20:00:00' }, { end_time: '20:09:59.999999' },
+      { start_time: null }, { end_time: null }, { end_time: '17:00:00' }, { end_time: '24:00:00' },
+      { start_time: '17:00:00', end_time: '21:00:00', valid: true },
+    ]) {
+      const world = fixture(2), event = world.events[0], current = { ...world.sessions[0] };
+      if (action === 'publish') scheduled(world);
+      let writes = 0, locked = false, checked = false;
+      const sql = recorder(queries => {
+        assert.match(queries[0].text, /pg_advisory_xact_lock/);
+        for (const query of queries) {
+          if (/training_sessions.*FOR UPDATE/.test(query.text)) {
+            Object.assign(current, change);
+            locked = true;
+          } else if (query.text.includes('Training booking changed')) {
+            assert(locked, 'The booking check must follow the training row lock');
+            assert.match(query.text, /FROM training_sessions/);
+            assert.match(query.text, /start_time IS NOT NULL AND end_time IS NOT NULL/);
+            assert.match(query.text, /start_time < end_time AND end_time < TIME '24:00:00'/);
+            assert.match(query.text, /::time >= start_time/);
+            assert.match(query.text, /EXTRACT\(EPOCH FROM .*::time\)/);
+            assert.match(query.text, /::numeric \+ .*::numeric\) \* 60/);
+            assert.match(query.text, /<= EXTRACT\(EPOCH FROM end_time\)/);
+            assert.match(query.text, /Training tab/);
+            assert.deepEqual(query.values, [event.session_id, '18:00', '18:00', 120, 10]);
+            const seconds = value => {
+              if (value === null) return null;
+              const [hours, minutes, seconds = 0] = value.split(':').map(Number);
+              return hours * 3600 + minutes * 60 + seconds;
+            };
+            const start = seconds(current.start_time), end = seconds(current.end_time);
+            const meetup = seconds(query.values[1]);
+            const finish = meetup + (query.values[3] + query.values[4]) * 60;
+            checked = true;
+            if (!(start !== null && end !== null && start < end && end < 86400 && meetup >= start && finish <= end)) {
+              throw Object.assign(new Error('Training booking changed. Check the Training tab.'), {
+                code: 'P0001', detail: 'LEAGUE_409',
+              });
+            }
+          } else if (query.text.includes('UPDATE league_events')) {
+            assert(checked, 'No schedule or publication may be saved before checking the booking');
+            writes++;
+          }
+        }
+        return queries.map(() => []);
+      });
+      const result = applyAction(sql, request(action, event), world);
+      if (change.valid) {
+        await result;
+        assert.equal(writes, 1, 'A changed booking that still fits remains valid');
+      } else {
+        await assert.rejects(result, error => dbError(error).status === 409);
+        assert.equal(writes, 0, 'The changed booking must reject the stale schedule without writing');
+      }
+      assert(checked);
+      assert.equal(world.sessions[0].start_time, '18:00:00', 'The pre-lock snapshot still has the old booking');
+      assert.equal(world.sessions[0].end_time, '20:10:00');
+    }
+  });
+}
 
 test('unscored draft squad changes and regeneration clear the schedule for explicit regeneration', async () => {
   const world = fixture();
@@ -318,6 +432,7 @@ test('persisted scores and schedule timing are revalidated rather than trusted o
 test('reopening removes previous awards, retains scores, and a corrected match replaces points and rating deltas', async () => {
   const world = fixture(3);
   const event = scheduled(world, decisive);
+  Object.assign(world.sessions[0], { start_time: null, end_time: null });
   awardFinale(event);
   const initial = scoreEvent(event, eventPlacements(event));
   event.teams = initial.teams;
@@ -327,6 +442,7 @@ test('reopening removes previous awards, retains scores, and a corrected match r
   const originalScores = JSON.stringify(event.schedule);
   const sql = recorder(queries => {
     for (const q of queries) {
+      assert(!q.text.includes('Training booking changed'), 'Historical corrections do not revalidate booking times');
       if (q.text.includes('DELETE FROM league_results')) world.results = [];
       else if (q.text.includes('INSERT INTO league_results')) {
         world.results = JSON.parse(q.values[1]).map(r => ({ ...r, event_id: event.id }));

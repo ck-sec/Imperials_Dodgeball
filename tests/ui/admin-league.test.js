@@ -26,6 +26,7 @@ function node(id = '', dataset = {}) {
     replaceChildren(...items) { this.children = items; },
     contains(item) { return item?.outside !== true; },
     focus() { this.focused = true; },
+    scrollIntoView() { this.scrolled = true; },
     reportValidity() { return true; },
     setPointerCapture(id) { captured.add(id); },
     hasPointerCapture(id) { return captured.has(id); },
@@ -37,6 +38,8 @@ function node(id = '', dataset = {}) {
       if (selector === '[data-al-handle]') return this.dataset.alHandle ? this : null;
       if (selector.includes('data-al-drop')) return this.dataset.alDropPlayer || this.dataset.alDropTeam ? this : null;
       if (selector === '[data-al-action]') return this.dataset.alAction ? this : null;
+      if (selector === '[data-al-stage]') return this.stagePanel || (this.dataset.alStage ? this : null);
+      if (selector === 'a[href^="#al-"]') return this.getAttribute('href')?.startsWith('#al-') ? this : null;
       return null;
     }
   };
@@ -56,11 +59,11 @@ function dataFixture() {
     players,
     members: players.filter(p => p.user_id).map(p => ({ id: p.user_id, display_name: p.display_name, league_scorekeeper: false })),
     sessions: [
-      { id: 'far', session_date: '2027-07-01', title: 'Thursday', start_time: '19:00', attending_player_ids: [] },
+      { id: 'far', session_date: '2027-07-01', title: 'Thursday', start_time: '19:00', end_time: '21:00', attending_player_ids: [] },
       { id: 'monday', session_date: '2026-09-21', title: 'Monday', attending_player_ids: [] },
       { id: 'cancelled', session_date: '2026-09-24', is_cancelled: true, title: 'Cancelled', attending_player_ids: [] },
-      { id: 'next', session_date: '2026-09-17', start_time: '19:00', title: 'Thursday', attending_player_ids: ['p1', 'p2', 'p3', 'p4'] },
-      { id: 'another', session_date: '2026-10-01', start_time: '19:00', title: 'Thursday', attending_player_ids: [] },
+      { id: 'next', session_date: '2026-09-17', start_time: '19:00', end_time: '21:00', title: 'Thursday', attending_player_ids: ['p1', 'p2', 'p3', 'p4'] },
+      { id: 'another', session_date: '2026-10-01', start_time: '19:00', end_time: '21:00', title: 'Thursday', attending_player_ids: [] },
       { id: 'outside', session_date: '2027-07-08', title: 'Outside Season 2', attending_player_ids: [] }
     ],
     events: [{
@@ -88,10 +91,13 @@ async function app(options = {}) {
     get: () => rendered,
     set(html) {
       rendered = html;
+      const panels = [...html.matchAll(/<section data-al-stage="([^"]+)"/g)];
       for (const tag of html.matchAll(/<[a-z][^>]*>/gi)) {
         const id = /\bid="([^"]+)"/.exec(tag[0])?.[1];
         if (!id) continue;
         const el = node(decode(id));
+        const panel = panels.filter(panel => panel.index <= tag.index).at(-1);
+        if (panel) el.stagePanel = get(`al-stage-${panel[1]}`);
         for (const attr of tag[0].matchAll(/([\w-]+)="([^"]*)"/g)) {
           const [, key, raw] = attr;
           const value = decode(raw);
@@ -173,12 +179,16 @@ async function app(options = {}) {
         event.schedule = null;
         event.status = 'draft';
         event.version++;
+      } else if (body.action === 'publish' || body.action === 'unpublish') {
+        event.status = body.action === 'publish' ? 'published' : 'draft';
+        event.version++;
       }
       return response({ event_id: event?.id });
     }
   });
   vm.runInContext(fs.readFileSync(path.join(rootPath, 'js', 'league-scoring.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(rootPath, 'js', 'league-ui.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(rootPath, 'js', 'league-schedule.js'), 'utf8'), context);
   vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'window.testAdmin = { state, sessions, dateOnly, loadData, render, handleAction, submit, changeSelection, hasChanges, publishWarning, bonusSettings, eligibleScorekeeper }; })();'), context);
   const api = window.testAdmin;
   if (!options.skipLoad) { await api.loadData(); api.render(); }
@@ -246,8 +256,8 @@ test('two-team mode generates head-to-head fixtures with an external ref and del
   }));
 
   await a.api.submit(a.form('schedule', {
-    meetup_time: '18:00', courts: '1', match_minutes: '60', break_minutes: '0',
-    warmup_minutes: '15', available_minutes: '120', finale_minutes: '10',
+    meetup_time: '19:00', courts: '1', match_minutes: '60', break_minutes: '0',
+    warmup_minutes: '15', available_minutes: '110', finale_minutes: '10',
   }));
   const scheduleWrite = a.requests.find(request => request.body?.action === 'generate_schedule');
   assert(scheduleWrite, JSON.stringify(a.requests));
@@ -600,16 +610,171 @@ test('permanent Head Ref role only lists eligible members, never guest profiles,
   assert.equal(a.api.state.dirtyRoster, true);
 });
 
+test('five-stage navigation preserves unsaved inputs, moves focus and exposes just one stage', async () => {
+  const a = await app();
+  assert.equal(a.api.state.stage, 'teams');
+  a.input('al-guest-name', 'Guest waiting for signup');
+  a.input('al-team-name-1', 'Gold renamed', { alTeamName: '1' });
+  const inputBefore = a.get('al-team-name-1');
+  await a.action('stage:publish');
+  assert.equal(a.get('al-stage-publish').hidden, false);
+  assert.equal(a.get('al-stage-teams').hidden, true);
+  assert.equal(a.get('al-step-publish').getAttribute('aria-current'), 'step');
+  assert.equal(a.get('al-stage-title-publish').focused, true);
+  await a.action('stage:teams');
+  assert.equal(a.get('al-team-name-1'), inputBefore, 'Stage navigation must not replace form DOM');
+  assert.equal(inputBefore.value, 'Gold renamed');
+  assert.equal(a.get('al-guest-name').value, 'Guest waiting for signup');
+  assert.equal(a.api.state.dirtyTeams, true);
+  assert.equal(a.requests.filter(request => request.body).length, 0);
+  assert.match(a.get('al-flow-context').innerHTML, /Unsaved edits/);
+  await assert.rejects(a.action('stage:missing'), /Unknown league administration step/);
+});
+
+test('new trainings open Players; published and final events open Results without blocking historical corrections', async () => {
+  const fresh = dataFixture();
+  fresh.events = [];
+  const a = await app({ data: fresh });
+  assert.equal(a.api.state.stage, 'players');
+  for (const status of ['published', 'finalized']) {
+    const data = dataFixture();
+    data.events[0].status = status;
+    data.events[0].schedule = buildSchedule(2);
+    const b = await app({ data });
+    assert.equal(b.api.state.stage, 'results');
+    assert.equal(b.get('al-stage-results').hidden, false);
+    assert.equal(b.api.publishWarning(), '');
+  }
+});
+
+test('cross-stage fixture links reveal the destination and keyboard focus before scrolling', async () => {
+  const data = dataFixture();
+  data.events[0].status = 'published';
+  data.events[0].schedule = buildSchedule(2);
+  const a = await app({ data });
+  await a.action('stage:publish');
+  const link = node();
+  link.setAttribute('href', '#al-matches');
+  a.emit('click', link, { detail: 0 });
+  assert.equal(a.api.state.stage, 'results');
+  assert.equal(a.get('al-stage-results').hidden, false);
+  assert.equal(a.get('al-matches').focused, true);
+  assert.equal(a.get('al-matches').scrolled, true);
+});
+
+test('discard timing restores every saved field, including customized meetup, warm-up and finale', async () => {
+  const data = dataFixture();
+  data.events[0].schedule = buildSchedule(2, {
+    courts: 1, match_minutes: 25, break_minutes: 2, meetup_time: '19:20',
+    warmup_minutes: 20, available_minutes: 85, finale_minutes: 5
+  });
+  const a = await app({ data });
+  const saved = clone(a.api.state.scheduleSettings);
+  for (const [key, value] of Object.entries(saved)) {
+    a.input(`al-schedule-${key}`, key === 'meetup_time' ? '20:00' : String(Number(value) + 1), { alSchedule: key });
+  }
+  assert.equal(a.api.state.dirtySchedule, true);
+  await a.action('discard-schedule');
+  assert.deepEqual(clone(a.api.state.scheduleSettings), saved);
+  assert.equal(a.api.state.dirtySchedule, false);
+  assert.match(a.html(), /value="19:20"/);
+  assert.doesNotMatch(a.html(), /Schedule invalid:|Meetup time must use/);
+});
+
+test('unsaved schedules reset to complete booking-aware defaults, not a hard-coded 18:00 start', async () => {
+  const a = await app();
+  const defaults = clone(a.api.state.scheduleSettings);
+  assert.equal(defaults.meetup_time, '19:00');
+  assert.equal(defaults.available_minutes + defaults.finale_minutes, 120);
+  a.input('al-schedule-meetup_time', '20:00', { alSchedule: 'meetup_time' });
+  await a.action('discard-schedule');
+  assert.deepEqual(clone(a.api.state.scheduleSettings), defaults);
+  assert.equal(a.api.state.dirtySchedule, false);
+  assert.doesNotMatch(a.html(), /Schedule invalid:/);
+});
+
+test('booking overflow and missing end times block scheduling before any write', async () => {
+  for (const missingEnd of [false, true]) {
+    const data = dataFixture();
+    if (missingEnd) delete data.sessions.find(session => session.id === 'next').end_time;
+    const a = await app({ data });
+    await assert.rejects(a.api.submit(a.form('schedule', {
+      courts: '1', match_minutes: '60', break_minutes: '0', meetup_time: '20:00',
+      warmup_minutes: '15', available_minutes: '120', finale_minutes: '10'
+    })), missingEnd ? /Training|booking|end time/i : /booking|booked|end|21:00/i);
+    assert.equal(a.requests.filter(request => request.body).length, 0);
+  }
+});
+
+test('publication requires deliberate manual mode and public-name review, then advances to Results', async () => {
+  const a = await app();
+  await a.action('stage:publish');
+  assert.match(a.api.publishWarning(), /Generate a schedule/);
+  assert.equal(a.get('al-publish-button').disabled, true);
+  const manual = a.get('al-manual-placements');
+  manual.checked = true;
+  a.emit('change', manual);
+  assert.match(a.api.publishWarning(), /Review the team and player names/);
+  const names = a.get('al-names-reviewed');
+  names.checked = true;
+  a.emit('change', names);
+  assert.equal(a.api.publishWarning(), '');
+  assert.equal(a.get('al-publish-button').disabled, false);
+  await a.action('publish');
+  assert.equal(a.store.events[0].status, 'published');
+  assert.equal(a.api.state.stage, 'results');
+  assert.equal(a.get('al-stage-results').hidden, false);
+  await a.action('unpublish');
+  assert.equal(a.api.state.stage, 'teams');
+  assert.equal(a.api.state.namesReviewed, false);
+  assert.equal(a.api.state.manualPlacements, false);
+});
+
+test('publication checklist catches duplicate assignments and a saved schedule outside the booking', async () => {
+  const data = dataFixture();
+  data.events[0].schedule = buildSchedule(2, { meetup_time: '20:00' });
+  const a = await app({ data });
+  a.api.state.namesReviewed = true;
+  assert.match(a.api.publishWarning(), /booking|booked|end|21:00/i);
+  a.api.state.teams[1].player_ids[0] = 'p1';
+  assert.match(a.api.publishWarning(), /exactly one team/);
+  await assert.rejects(a.action('publish'), /exactly one team/);
+  assert.equal(a.requests.filter(request => request.body).length, 0);
+});
+
+test('two-team schedules need explicit external-ref confirmation before publishing', async () => {
+  const data = dataFixture();
+  data.events[0].schedule = buildSchedule(2, {
+    courts: 1, match_minutes: 60, break_minutes: 0, meetup_time: '19:00',
+    warmup_minutes: 15, available_minutes: 110, finale_minutes: 10
+  });
+  const a = await app({ data });
+  const names = a.get('al-names-reviewed');
+  names.checked = true;
+  a.emit('change', names);
+  assert.match(a.api.publishWarning(), /Arrange an external Head Ref/);
+  assert.equal(a.get('al-publish-button').disabled, true);
+  const ref = a.get('al-referee-reviewed');
+  ref.checked = true;
+  a.emit('change', ref);
+  assert.equal(a.api.publishWarning(), '');
+  assert.equal(a.get('al-publish-button').disabled, false);
+  await a.action('publish');
+  assert.equal(a.store.events[0].status, 'published');
+});
+
 test('admin assets cache-busted, role management title preserved, touch targets avoid HTML5-only dragging', () => {
   const html = fs.readFileSync(path.join(rootPath, 'admin.html'), 'utf8');
   const css = fs.readFileSync(path.join(rootPath, 'admin-league.css'), 'utf8');
-  assert.match(html, /admin-league\.js\?v=20260915c/);
-  assert.match(html, /admin-league\.css\?v=20260912b/);
+  assert.match(html, /admin-league\.js\?v=20260916a/);
+  assert.match(html, /admin-league\.css\?v=20260916a/);
+  assert.match(html, /league-schedule\.js\?v=20260916a/);
   assert.match(html, /\/league\.css\?v=20260915/);
   assert.match(html, /\/js\/league-ui\.js\?v=20260915c/);
   assert.ok(html.indexOf('admin-auth.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-scoring.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-ui.js') < html.indexOf('admin-league.js'));
+  assert.ok(html.indexOf('league-schedule.js') < html.indexOf('admin-league.js'));
   assert.match(source, /href="\/timer\?event=/);
   assert.match(source, /data-al-poster="itinerary" href="\/spieltag\?event=.*&export=itinerary"/);
   assert.match(source, /data-al-poster="results" href="\/spieltag\?event=.*&export=results"/);
