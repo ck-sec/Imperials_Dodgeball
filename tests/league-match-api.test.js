@@ -76,9 +76,66 @@ test('generation prefers five or three referee-safe squads and never excludes se
     assert.deepEqual([...ids].sort(), players.map(p => p.id).sort());
     assert.equal(new Set(ids).size, 36);
   }
+  const headToHead = balanceTeams(players, 6, 2, true);
+  assert.equal(headToHead.teams.length, 2);
+  assert.deepEqual(headToHead.teams.map(team => team.players.length), [18, 18]);
+  assert.equal(headToHead.teams.flatMap(team => team.players).length, players.length);
   const valid = { action: 'generate', season_id: id(1), session_id: id(2), team_size: 6 };
   assert.equal(validateAction(valid).max_teams, 5);
-  for (const max of [1, 2, 6, '5', 2.5, null]) assert.throws(() => validateAction({ ...valid, max_teams: max }), /max_teams/);
+  assert.equal(validateAction({ ...valid, max_teams: 2 }).max_teams, 2);
+  for (const max of [1, 6, '5', 2.5, null]) assert.throws(() => validateAction({ ...valid, max_teams: max }), /max_teams/);
+  assert.equal(validateAction({ ...valid, max_teams: 2, player_ids: [id(1), id(2), id(3), id(4)] }).player_ids.length, 4);
+  assert.throws(() => validateAction({ ...valid, max_teams: 2, player_ids: [id(1), id(2), id(3)] }), /4–500/);
+});
+
+test('two-team generation, schedule and publication use the external-ref program', async () => {
+  const world = fixture(2);
+  const event = world.events[0];
+  assert.equal(event.teams.length, 2);
+  const sql = recorder();
+  await applyAction(sql, request('generate_schedule', event, {
+    courts: 1, match_minutes: 60, break_minutes: 0,
+  }), world);
+  const mutation = sql.transactions[0].find(query => query.text.includes('UPDATE league_events SET schedule'));
+  const schedule = JSON.parse(mutation.values[0]);
+  assert.equal(schedule.referee_policy, 'external_ref_v1');
+  assert.equal(schedule.active_courts, 1);
+  assert.equal(schedule.rounds.length, 1);
+  assert.equal(schedule.rounds[0].referee_team, null);
+  event.schedule = schedule;
+
+  const normalized = matchData(event);
+  assert.equal(normalized.schedule.referee_policy, 'external_ref_v1');
+  assert.equal(normalized.schedule.finale_start_minute, 120);
+  await applyAction(recorder(), request('publish', event), world);
+  event.status = 'published';
+  const visible = publicView(world, event.season_id).events[0];
+  assert.equal(visible.schedule.referee_policy, 'external_ref_v1');
+  assert.equal(visible.schedule.active_courts, 1);
+});
+
+test('an unscored saved or published schedule can be deleted transactionally', async () => {
+  const world = fixture(2);
+  const event = scheduled(world);
+  event.status = 'published';
+  const sql = recorder();
+  await applyAction(sql, request('delete_schedule', event), world);
+  const queries = sql.transactions[0];
+  const timerDelete = queries.find(query => query.text.includes('DELETE FROM league_match_timers'));
+  const eventUpdate = queries.find(query => query.text.includes('SET schedule = NULL'));
+  assert(timerDelete);
+  assert(eventUpdate);
+  assert(eventUpdate.text.includes("status = 'draft'"));
+  assert(queries.findIndex(query => query.text.includes('status = ANY')) < queries.indexOf(timerDelete));
+  assert(queries.indexOf(timerDelete) < queries.indexOf(eventUpdate));
+
+  event.schedule.rounds[0].matches[0].score_a = 0;
+  event.schedule.rounds[0].matches[0].score_b = 0;
+  await assert.rejects(applyAction(recorder(), request('delete_schedule', event), world), /Teams are locked/);
+  event.schedule = null;
+  await assert.rejects(applyAction(recorder(), request('delete_schedule', event), world), /no schedule/);
+  event.status = 'finalized';
+  await assert.rejects(applyAction(recorder(), request('delete_schedule', event), world), /Only draft or unscored published/);
 });
 
 test('schedule creation is versioned and draft-only; five teams fit ten matches in 120 minutes', async () => {

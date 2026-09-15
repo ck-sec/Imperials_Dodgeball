@@ -85,7 +85,7 @@ test('timer page is branded, external-script-only, responsive and publicly routa
   assert.match(html, /id="timerMatchConfigForm"/);
   assert.match(html, /id="timerSetConfigForm"/);
   assert.match(html, /timer\.css\?v=20260914b/);
-  assert.match(html, /timer\.js\?v=20260914d/);
+  assert.match(html, /timer\.js\?v=20260914e/);
   assert.doesNotMatch(html, /\son[a-z]+=/i);
   for (const script of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
     assert.match(script[1], /src="\/js\/[^"]+"/);
@@ -96,6 +96,7 @@ test('timer page is branded, external-script-only, responsive and publicly routa
   assert.match(css, /timer-controls-locked/);
   assert.match(css, /:fullscreen/);
   assert.match(css, /prefers-reduced-motion/);
+  assert.match(source, /data\.match\.external_referee \? t\(\)\.externalRef/);
 });
 
 test('timer route and member return links accept only one canonical local fixture target', () => {

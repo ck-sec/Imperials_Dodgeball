@@ -13,8 +13,8 @@
 .matchday-toolbar { display: grid; gap: .65rem; }
 .matchday-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
 .matchday-actions > .league-btn { flex: 1; }
-.matchday-pdf { min-width: 180px; }
-.matchday-pdf[aria-busy="true"] { cursor: wait; }
+.matchday-poster { min-width: 180px; }
+.matchday-poster[aria-busy="true"] { cursor: wait; }
 .matchday-sync { min-height: 1.4em; margin: .6rem 0; color: #b5c2da; font-size: .75rem; }
 .matchday-share { margin-block: .75rem; }
 .matchday-auth { border: 1px solid #375681; border-radius: 10px; padding: .9rem; margin: 1rem 0 1.5rem; background: #102447; }

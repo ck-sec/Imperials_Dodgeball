@@ -9,13 +9,13 @@
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/fonts/fonts.css?v=20260912c">
   <link rel="stylesheet" href="/league.css?v=20260912d">
-  <link rel="stylesheet" href="/matchday.css?v=20260914d">
+  <link rel="stylesheet" href="/matchday.css?v=20260914e">
   <script src="/js/site-language.js?v=20260912c" defer></script>
   <script src="/js/site-utils.js?v=20260912c" defer></script>
   <script src="/js/league-scoring.js?v=20260912d" defer></script>
-  <script src="/js/league-ui.js?v=20260914d" defer></script>
-  <script src="/js/league-pdf.js?v=20260914d" defer></script>
-  <script src="/js/matchday.js?v=20260914d" defer></script>
+  <script src="/js/league-ui.js?v=20260914e" defer></script>
+  <script src="/js/league-poster.js?v=20260914e" defer></script>
+  <script src="/js/matchday.js?v=20260914e" defer></script>
 </head>
 <body class="matchday-page league" id="matchdayPage">
   <a class="matchday-skip" href="#main" data-de="Zum Spieltag" data-en="Skip to matchday">Zum Spieltag</a>
@@ -40,8 +40,8 @@
       <div class="matchday-actions">
         <button class="league-btn" type="button" id="matchdayRefresh" data-de="Aktualisieren" data-en="Refresh">Aktualisieren</button>
         <button class="league-btn" type="button" id="matchdayShare" disabled data-de="Link teilen" data-en="Share link">Link teilen</button>
-        <button class="league-btn league-btn-primary matchday-pdf" type="button" id="matchdayPdf" disabled data-de="Spielplan-PDF" data-en="Fixtures PDF">Spielplan-PDF</button>
-        <button class="league-btn matchday-pdf" type="button" id="matchdayResultsPdf" disabled data-de="Ergebnis-PDF" data-en="Results PDF" title="Nach Spieltag-Abschluss / After matchday finalization">Ergebnis-PDF</button>
+        <button class="league-btn league-btn-primary matchday-poster" type="button" id="matchdayPoster" disabled data-de="Spielplan-Bild" data-en="Fixtures image">Spielplan-Bild</button>
+        <button class="league-btn matchday-poster" type="button" id="matchdayResultsPoster" disabled data-de="Ergebnis-Bild" data-en="Results image" title="Nach Spieltag-Abschluss / After matchday finalization">Ergebnis-Bild</button>
       </div>
     </div>
     <p class="matchday-sync" id="matchdaySync" role="status" aria-live="polite"></p>

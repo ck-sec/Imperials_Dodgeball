@@ -16,7 +16,8 @@
       publicReadOnly: 'Öffentliche Ansicht · Head Refs melden sich mit ihrem normalen Konto an.',
       scoring: 'Ergebnisse pro Spiel speichern. Korrekturen sind bis zum Abschluss möglich.',
       noSchedule: 'Noch kein Spielplan freigegeben.', round: 'Runde', court: 'Feld', game: 'Spiel',
-      bye: 'Pause', refTeam: 'Ref-Team', score: 'Punkte', save: 'Speichern', saving: 'Wird gespeichert …', saved: 'Gespeichert',
+      bye: 'Pause', refTeam: 'Ref-Team', externalRef: 'Externer Head Ref / Admin',
+      score: 'Punkte', save: 'Speichern', saving: 'Wird gespeichert …', saved: 'Gespeichert',
       program: 'Ablauf', meetWarmup: 'Treffpunkt & Aufwärmen', gamesWindow: 'Ligaspiele',
       finale: 'Last Man / Last Woman Standing', finaleAwards: 'Sieger +1 BP · Zweite +0,5 BP',
       finaleResults: 'Finale-Ergebnisse', winner: 'Sieger', runnerUp: 'Zweiter Platz',
@@ -42,13 +43,13 @@
       saveFailed: 'Nicht gespeichert. Bitte Eingaben prüfen und erneut versuchen.',
       otherDrafts: 'Ungespeicherte Eingaben auf einem anderen Spieltag bleiben in diesem Tab erhalten.',
       viewTimer: 'Live-Timer ansehen', startTimer: 'Spiel starten · Timer',
-      itineraryPdfCreate: 'Spielplan-PDF', itineraryPdfShare: 'Spielplan teilen',
-      resultsPdfCreate: 'Ergebnis-PDF', resultsPdfShare: 'Ergebnisse teilen', pdfCreating: 'PDF wird gestaltet …',
-      pdfReady: 'PDF heruntergeladen und zum Teilen bereit. Tippe erneut auf „PDF teilen“.',
-      pdfDownloaded: 'PDF heruntergeladen.', pdfShared: 'PDF zum Teilen geöffnet.',
-      pdfFailed: 'PDF konnte nicht erstellt werden. Bitte erneut versuchen.',
-      pdfChanged: 'Der Spieltag wurde während des Exports aktualisiert. Bitte PDF erneut erstellen.',
-      pdfResultsUnavailable: 'Das Ergebnis-PDF ist nach dem Abschluss des Spieltags verfügbar.'
+      itineraryPosterCreate: 'Spielplan-Bild', itineraryPosterShare: 'Spielplan teilen',
+      resultsPosterCreate: 'Ergebnis-Bild', resultsPosterShare: 'Ergebnisse teilen', posterCreating: 'Bild wird gestaltet …',
+      posterReady: 'Bild heruntergeladen und zum Teilen bereit. Tippe erneut auf „Bild teilen“.',
+      posterDownloaded: 'Bild heruntergeladen.', posterShared: 'Bild zum Teilen geöffnet.',
+      posterFailed: 'Das Bild konnte nicht erstellt werden. Bitte erneut versuchen.',
+      posterChanged: 'Der Spieltag wurde während des Exports aktualisiert. Bitte das Bild erneut erstellen.',
+      posterResultsUnavailable: 'Das Ergebnis-Bild ist nach dem Abschluss des Spieltags verfügbar.'
     },
     en: {
       title: 'Matchday', choose: 'Choose matchday', empty: 'No published Thursday matchday yet.',
@@ -62,7 +63,8 @@
       publicReadOnly: 'Public view · Head Refs sign in with their normal account.',
       scoring: 'Save each game separately. Scores can be corrected until finalization.',
       noSchedule: 'No published schedule yet.', round: 'Round', court: 'Court', game: 'Game',
-      bye: 'Rest', refTeam: 'Ref team', score: 'Score', save: 'Save', saving: 'Saving …', saved: 'Saved',
+      bye: 'Rest', refTeam: 'Ref team', externalRef: 'External Head Ref / admin',
+      score: 'Score', save: 'Save', saving: 'Saving …', saved: 'Saved',
       program: 'Itinerary', meetWarmup: 'Meet & warm-up', gamesWindow: 'League games',
       finale: 'Last Man / Last Woman Standing', finaleAwards: 'Winner +1 BP · runner-up +0.5 BP',
       finaleResults: 'Finale results', winner: 'Winner', runnerUp: 'Runner-up',
@@ -88,13 +90,13 @@
       saveFailed: 'Not saved. Please check your entries and try again.',
       otherDrafts: 'Unsaved entries on another matchday are kept in this tab.',
       viewTimer: 'View live timer', startTimer: 'Start game · timer',
-      itineraryPdfCreate: 'Fixtures PDF', itineraryPdfShare: 'Share fixtures',
-      resultsPdfCreate: 'Results PDF', resultsPdfShare: 'Share results', pdfCreating: 'Designing PDF …',
-      pdfReady: 'PDF downloaded and ready to share. Tap “Share PDF” again.',
-      pdfDownloaded: 'PDF downloaded.', pdfShared: 'PDF sharing opened.',
-      pdfFailed: 'The PDF could not be created. Please try again.',
-      pdfChanged: 'The matchday changed during export. Please create the PDF again.',
-      pdfResultsUnavailable: 'The results PDF is available after the matchday is finalized.'
+      itineraryPosterCreate: 'Fixtures image', itineraryPosterShare: 'Share fixtures',
+      resultsPosterCreate: 'Results image', resultsPosterShare: 'Share results', posterCreating: 'Designing image …',
+      posterReady: 'Image downloaded and ready to share. Tap “Share image” again.',
+      posterDownloaded: 'Image downloaded.', posterShared: 'Image sharing opened.',
+      posterFailed: 'The image could not be created. Please try again.',
+      posterChanged: 'The matchday changed during export. Please create the image again.',
+      posterResultsUnavailable: 'The results image is available after the matchday is finalized.'
     }
   };
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
@@ -119,11 +121,13 @@
     const schedule = event && event.schedule;
     if (!schedule || !schedule.referee_policy) return '';
     const finaleStart = schedule.finale_start_minute;
+    const officiating = schedule.referee_policy === 'external_ref_v1'
+      ? `<p class="matchday-ref-team"><strong>${esc(copy.externalRef)}</strong></p>` : '';
     return `<h3>${esc(copy.program)}</h3><div class="matchday-program-grid">
       <div><strong>${esc(scheduleClock(event, 0))}</strong><span>${esc(copy.meetWarmup)}</span><small>${esc(scheduleClock(event, schedule.warmup_minutes))}</small></div>
       <div><strong>${esc(scheduleClock(event, schedule.warmup_minutes))}</strong><span>${esc(copy.gamesWindow)}</span><small>${esc(scheduleClock(event, finaleStart))}</small></div>
       <div><strong>${esc(scheduleClock(event, finaleStart))}</strong><span>${esc(copy.finale)}</span><small>${esc(scheduleClock(event, schedule.total_duration_minutes))} · ${esc(copy.finaleAwards)}</small></div>
-    </div>`;
+    </div>${officiating}`;
   }
 
   function finaleMarkup(event, copy) {
@@ -556,7 +560,7 @@
     const t = text[lang];
     const names = new Map(event.teams.map(team => [team.number, team.name]));
     return event.schedule.rounds.map(round => `<section class="matchday-round" data-round-number="${esc(round.number)}">
-      <h3><span class="matchday-round-label">${esc(t.round)} ${esc(round.number)}</span><span>${esc(clock(event.start_time, round.start_minute))} – ${esc(clock(event.start_time, round.end_minute))}</span></h3>
+      <h3><span class="matchday-round-label">${esc(t.round)} ${esc(round.number)}</span><span>${esc(clock(event.schedule.meetup_time || event.start_time, round.start_minute))} – ${esc(clock(event.schedule.meetup_time || event.start_time, round.end_minute))}</span></h3>
       <div class="matchday-round-games">${round.matches.map(match => `<form class="matchday-game" data-match-number="${esc(match.number)}" data-fixture-identity="${esc(fixtureIdentity(event, match))}" novalidate>
         <div class="matchday-game-meta"><span class="matchday-game-label" data-court="${esc(match.court)}">${esc(t.game)} ${esc(match.number)} · ${esc(t.court)} ${esc(match.court)}</span><span class="matchday-game-status"></span></div>
         <div class="matchday-read-scores">
@@ -586,7 +590,8 @@
           <a class="league-btn matchday-timer-link" href="${esc(timerPath(event.id, match.number))}">${esc(t.viewTimer)}</a>
         </div>
       </form>`).join('')}</div>
-      ${round.referee_team ? `<p class="matchday-ref-team"><strong>${esc(t.refTeam)}:</strong> ${esc(names.get(round.referee_team))}</p>` : ''}
+      ${round.referee_team ? `<p class="matchday-ref-team"><strong>${esc(t.refTeam)}:</strong> ${esc(names.get(round.referee_team))}</p>`
+        : event.schedule.referee_policy === 'external_ref_v1' ? `<p class="matchday-ref-team"><strong>${esc(t.externalRef)}</strong></p>` : ''}
       ${round.rest_teams && round.rest_teams.length ? `<p class="league-copy"><span class="matchday-bye-label">${esc(t.bye)}</span>: ${round.rest_teams.map(number => esc(names.get(number))).join(', ')}</p>` : ''}
     </section>`).join('');
   }
@@ -605,12 +610,12 @@
     const initial = readEvent(window.location.search);
     const initialParams = new URLSearchParams(window.location.search);
     const requestedExport = initialParams.getAll('export').length === 1 ? initialParams.get('export') : '';
-    let autoPdf = ['pdf', 'itinerary', 'results'].includes(requestedExport) ? requestedExport : '';
+    let autoPoster = ['image', 'pdf', 'itinerary', 'results'].includes(requestedExport) ? requestedExport : '';
     let invalidLink = initial.invalid;
     let token = '';
     let storedDrafts = '';
     let draftStorageWarning = false;
-    const pdfStates = {
+    const posterStates = {
       itinerary: { key: '', result: null, file: null, busy: false },
       results: { key: '', result: null, file: null, busy: false }
     };
@@ -623,7 +628,7 @@
     function historyEvent(id, replace) {
       window.history[replace ? 'replaceState' : 'pushState'](null, '', urlFor(id));
     }
-    function pdfKey(event, mode) {
+    function posterKey(event, mode) {
       return event ? [event.id, event.version, lang(), mode].join(':') : '';
     }
     const controller = createController({
@@ -765,31 +770,31 @@
       const event = data && data.event;
       const permissions = data && data.permissions || {};
       for (const mode of ['itinerary', 'results']) {
-        const pdfState = pdfStates[mode];
-        const nextPdfKey = pdfKey(event, mode);
-        if (pdfState.key && pdfState.key !== nextPdfKey) {
-          pdfState.key = '';
-          pdfState.result = null;
-          pdfState.file = null;
+        const posterState = posterStates[mode];
+        const nextPosterKey = posterKey(event, mode);
+        if (posterState.key && posterState.key !== nextPosterKey) {
+          posterState.key = '';
+          posterState.result = null;
+          posterState.file = null;
         }
       }
-      const pdfBusy = pdfStates.itinerary.busy || pdfStates.results.busy;
+      const posterBusy = posterStates.itinerary.busy || posterStates.results.busy;
       $('matchdayRefresh').disabled = state.loading || !!state.saving || Date.now() < state.retryUntil;
       $('matchdayRefresh').setAttribute('aria-busy', String(state.loading));
       $('matchdaySelect').disabled = !data || !data.events.length || !!state.saving;
       $('matchdayShare').disabled = !event;
-      const itineraryState = pdfStates.itinerary;
-      $('matchdayPdf').disabled = !event || !event.schedule || pdfBusy;
-      $('matchdayPdf').setAttribute('aria-busy', String(itineraryState.busy));
-      $('matchdayPdf').textContent = itineraryState.busy ? t().pdfCreating
-        : itineraryState.file && window.LeaguePDF && window.LeaguePDF.canShare(itineraryState.file)
-          ? t().itineraryPdfShare : t().itineraryPdfCreate;
-      const resultsState = pdfStates.results;
-      $('matchdayResultsPdf').disabled = !event || !event.schedule || event.status !== 'finalized' || pdfBusy;
-      $('matchdayResultsPdf').setAttribute('aria-busy', String(resultsState.busy));
-      $('matchdayResultsPdf').textContent = resultsState.busy ? t().pdfCreating
-        : resultsState.file && window.LeaguePDF && window.LeaguePDF.canShare(resultsState.file)
-          ? t().resultsPdfShare : t().resultsPdfCreate;
+      const itineraryState = posterStates.itinerary;
+      $('matchdayPoster').disabled = !event || !event.schedule || posterBusy;
+      $('matchdayPoster').setAttribute('aria-busy', String(itineraryState.busy));
+      $('matchdayPoster').textContent = itineraryState.busy ? t().posterCreating
+        : itineraryState.file && window.LeaguePoster && window.LeaguePoster.canShare(itineraryState.file)
+          ? t().itineraryPosterShare : t().itineraryPosterCreate;
+      const resultsState = posterStates.results;
+      $('matchdayResultsPoster').disabled = !event || !event.schedule || event.status !== 'finalized' || posterBusy;
+      $('matchdayResultsPoster').setAttribute('aria-busy', String(resultsState.busy));
+      $('matchdayResultsPoster').textContent = resultsState.busy ? t().posterCreating
+        : resultsState.file && window.LeaguePoster && window.LeaguePoster.canShare(resultsState.file)
+          ? t().resultsPosterShare : t().resultsPosterCreate;
       if (data) setHTML($('matchdaySelect'), '<option value="">' + esc(t().choose) + '</option>' + data.events.filter(publishedThursday).map(item =>
         '<option value="' + esc(item.id) + '">' + esc(window.LeagueUI.date(item.session_date, lang()) + ' · ' + item.title) + '</option>').join(''));
       $('matchdaySelect').value = state.requested;
@@ -816,14 +821,15 @@
         const finale = finaleMarkup(event, t());
         setHTML($('matchdayFinale'), finale);
         $('matchdayFinale').hidden = !finale;
-        if (autoPdf && !pdfBusy) {
-          const mode = autoPdf === 'pdf' ? (event.status === 'finalized' ? 'results' : 'itinerary') : autoPdf;
-          autoPdf = '';
+        if (autoPoster && !posterBusy) {
+          const mode = ['pdf', 'image'].includes(autoPoster)
+            ? (event.status === 'finalized' ? 'results' : 'itinerary') : autoPoster;
+          autoPoster = '';
           if (mode === 'results' && event.status !== 'finalized') {
-            transientMessage = t().pdfResultsUnavailable;
+            transientMessage = t().posterResultsUnavailable;
             setTimeout(render, 0);
           }
-          else setTimeout(() => { void exportPdf(mode, true); }, 0);
+          else setTimeout(() => { void exportPoster(mode, true); }, 0);
         }
       }
       const role = permissions.is_admin ? 'admin' : permissions.is_scorekeeper ? 'scorekeeper' : state.memberKnown ? 'member' : 'signIn';
@@ -871,66 +877,66 @@
       controller.select(selected.id);
     });
     $('matchdayRefresh').addEventListener('click', () => { transientMessage = ''; void controller.load(true); });
-    async function exportPdf(mode, forceDownload = false) {
+    async function exportPoster(mode, forceDownload = false) {
       const data = state.data;
       const event = data && data.event;
-      if (!['itinerary', 'results'].includes(mode) || !event || !event.schedule || !window.LeaguePDF) return;
+      if (!['itinerary', 'results'].includes(mode) || !event || !event.schedule || !window.LeaguePoster) return;
       if (mode === 'results' && event.status !== 'finalized') {
-        transientMessage = t().pdfResultsUnavailable;
+        transientMessage = t().posterResultsUnavailable;
         render();
         return;
       }
-      if (pdfStates.itinerary.busy || pdfStates.results.busy) return;
-      const pdfState = pdfStates[mode];
-      const key = pdfKey(event, mode);
-      if (pdfState.result && pdfState.key === key) {
-        if (!forceDownload && pdfState.file && window.LeaguePDF.canShare(pdfState.file)) {
+      if (posterStates.itinerary.busy || posterStates.results.busy) return;
+      const posterState = posterStates[mode];
+      const key = posterKey(event, mode);
+      if (posterState.result && posterState.key === key) {
+        if (!forceDownload && posterState.file && window.LeaguePoster.canShare(posterState.file)) {
           try {
-            await window.LeaguePDF.share(pdfState.file, event.title);
-            transientMessage = t().pdfShared;
+            await window.LeaguePoster.share(posterState.file, event.title);
+            transientMessage = t().posterShared;
           } catch (error) {
             if (error.name !== 'AbortError') {
-              console.error('League PDF sharing failed:', error.name);
-              transientMessage = t().pdfFailed;
+              console.error('League image sharing failed:', error.name);
+              transientMessage = t().posterFailed;
             }
           }
         } else {
-          window.LeaguePDF.save(pdfState.result);
-          transientMessage = t().pdfDownloaded;
+          window.LeaguePoster.save(posterState.result);
+          transientMessage = t().posterDownloaded;
         }
         render();
         return;
       }
-      pdfState.busy = true;
-      transientMessage = t().pdfCreating;
+      posterState.busy = true;
+      transientMessage = t().posterCreating;
       render();
       try {
-        const result = await window.LeaguePDF.create(event, {
+        const result = await window.LeaguePoster.create(event, {
           lang: lang(),
           mode,
           standings: data.standings,
           publicUrl: new URL(urlFor(event.id), window.location.origin).href,
         });
-        if (!state.data || pdfKey(state.data.event, mode) !== key) {
-          transientMessage = t().pdfChanged;
+        if (!state.data || posterKey(state.data.event, mode) !== key) {
+          transientMessage = t().posterChanged;
           return;
         }
-        pdfState.key = key;
-        pdfState.result = result;
-        pdfState.file = window.LeaguePDF.asFile(result);
-        window.LeaguePDF.save(result);
-        transientMessage = !forceDownload && pdfState.file && window.LeaguePDF.canShare(pdfState.file)
-          ? t().pdfReady : t().pdfDownloaded;
+        posterState.key = key;
+        posterState.result = result;
+        posterState.file = window.LeaguePoster.asFile(result);
+        window.LeaguePoster.save(result);
+        transientMessage = !forceDownload && posterState.file && window.LeaguePoster.canShare(posterState.file)
+          ? t().posterReady : t().posterDownloaded;
       } catch (error) {
-        console.error('League PDF export failed:', error.name);
-        transientMessage = t().pdfFailed;
+        console.error('League image export failed:', error.name);
+        transientMessage = t().posterFailed;
       } finally {
-        pdfState.busy = false;
+        posterState.busy = false;
         render();
       }
     }
-    $('matchdayPdf').addEventListener('click', () => { void exportPdf('itinerary', false); });
-    $('matchdayResultsPdf').addEventListener('click', () => { void exportPdf('results', false); });
+    $('matchdayPoster').addEventListener('click', () => { void exportPoster('itinerary', false); });
+    $('matchdayResultsPoster').addEventListener('click', () => { void exportPoster('results', false); });
     $('matchdaySearch').addEventListener('input', renderStandings);
     $('matchdayMatches').addEventListener('input', event => {
       const input = event.target.closest('input[data-side]');

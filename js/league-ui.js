@@ -18,6 +18,7 @@ window.LeagueUI = (function() {
       rankDown: 'Pl\u00e4tze gefallen', rankDownOne: 'Platz gefallen',
       teams: 'Teams', training: 'Training ausw\u00e4hlen', members: 'Spieler',
       schedule: 'Spielplan', round: 'Runde', court: 'Feld', bye: 'Pause', refTeam: 'Ref-Team',
+      externalRef: 'Externer Head Ref / Admin',
       program: '18:00 Treffpunkt & Aufwärmen · 18:15 Ligaspiele · 20:00 Last Man / Last Woman Standing (max. 10 Min.)',
       noSchedule: 'Noch kein Spielplan freigegeben.', pendingMatch: 'Ausstehend',
       matchTable: 'Spieltagstabelle', matchPoints: 'Matchpunkte',
@@ -50,6 +51,7 @@ window.LeagueUI = (function() {
       rankDown: 'places down', rankDownOne: 'place down',
       teams: 'Teams', training: 'Choose training', members: 'players',
       schedule: 'Schedule', round: 'Round', court: 'Court', bye: 'Rest', refTeam: 'Ref team',
+      externalRef: 'External Head Ref / admin',
       program: '18:00 meet & warm-up · 18:15 league games · 20:00 Last Man / Last Woman Standing (10 min max)',
       noSchedule: 'No published match schedule yet.', pendingMatch: 'Pending',
       matchTable: 'Match standings', matchPoints: 'Match points',
@@ -304,7 +306,8 @@ window.LeagueUI = (function() {
             <strong>${Number.isInteger(match.score_a) && Number.isInteger(match.score_b) ? match.score_a + ' : ' + match.score_b : escape(t.pendingMatch)}</strong>
             <span>${escape(names.get(match.team_b))}</span></div>
         </div>`).join('')}
-        ${round.referee_team ? `<p class="league-copy"><strong>${escape(t.refTeam)}: ${escape(names.get(round.referee_team))}</strong></p>` : ''}
+        ${round.referee_team ? `<p class="league-copy"><strong>${escape(t.refTeam)}: ${escape(names.get(round.referee_team))}</strong></p>`
+          : schedule.referee_policy === 'external_ref_v1' ? `<p class="league-copy"><strong>${escape(t.externalRef)}</strong></p>` : ''}
         ${round.rest_teams?.length ? `<p class="league-copy">${escape(t.bye)}: ${round.rest_teams.map(team => escape(names.get(team))).join(', ')}</p>` : ''}
       </details>`).join('')}</div>
       ${matchTable(eventData, lang)}`;

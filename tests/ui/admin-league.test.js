@@ -149,7 +149,8 @@ async function app(options = {}) {
       const response = (value, status = 200) => ({ ok: status < 400, status, json: async () => clone(value) });
       if (!body) return response(store);
       if (options.rejectAction === body.action) return response({ error: 'Training changed. Refresh before retrying.' }, 409);
-      const event = store.events.find(e => e.id === body.event_id);
+      const event = store.events.find(e => e.id === body.event_id
+        || (!body.event_id && e.session_id === body.session_id));
       if (body.action === 'save_draft') {
         event.teams = body.teams.map(t => ({ ...t, players: t.player_ids.map(id => store.players.find(p => p.id === id)) }));
         event.team_size = body.team_size;
@@ -160,6 +161,17 @@ async function app(options = {}) {
         event.version++;
       } else if (body.action === 'set_scorekeeper') {
         store.members.find(m => m.id === body.user_id).league_scorekeeper = body.enabled;
+      } else if (body.action === 'generate') {
+        event.max_teams = body.max_teams;
+        event.schedule = null;
+        event.version++;
+      } else if (body.action === 'generate_schedule') {
+        event.schedule = buildSchedule(event.teams.length, body);
+        event.version++;
+      } else if (body.action === 'delete_schedule') {
+        event.schedule = null;
+        event.status = 'draft';
+        event.version++;
       }
       return response({ event_id: event?.id });
     }
@@ -216,6 +228,55 @@ test('missing and ambiguous Season 2 fail closed rather than using the first sea
   }
 });
 
+test('two-team mode generates head-to-head fixtures with an external ref and deletes a published schedule', async () => {
+  const a = await app();
+  assert.match(a.html(), /value="2"[^>]*>2 squads maximum/);
+  const maximum = node('al-max-teams');
+  maximum.value = '2';
+  a.emit('change', maximum);
+  assert.match(a.get('al-plan').textContent, /external Head Ref\/admin/);
+  await a.action('generate');
+  const generate = a.requests.find(request => request.body?.action === 'generate').body;
+  assert.equal(generate.max_teams, 2);
+  assert.equal(generate.player_ids.length, 4);
+  assert.equal(a.api.state.conflict, false, JSON.stringify({
+    busy: a.api.state.busy,
+    notice: a.get('al-notice').children.map(child => child.textContent),
+  }));
+
+  await a.api.submit(a.form('schedule', {
+    meetup_time: '18:00', courts: '1', match_minutes: '60', break_minutes: '0',
+    warmup_minutes: '15', available_minutes: '120', finale_minutes: '10',
+  }));
+  const scheduleWrite = a.requests.find(request => request.body?.action === 'generate_schedule');
+  assert(scheduleWrite, JSON.stringify(a.requests));
+  const scheduleRequest = scheduleWrite.body;
+  assert.equal(scheduleRequest.courts, 1);
+  assert.match(a.html(), /External ref:<\/strong> Head Ref\/admin required/);
+
+  a.store.events[0].status = 'published';
+  a.api.state.data.events[0].status = 'published';
+  a.api.render();
+  assert.match(a.html(), /Delete published schedule/);
+  await a.action('delete-schedule');
+  assert.deepEqual(a.requests.find(request => request.body?.action === 'delete_schedule').body, {
+    action: 'delete_schedule', event_id: 'event-1', version: 5,
+  });
+  assert.equal(a.store.events[0].status, 'draft');
+  assert.equal(a.store.events[0].schedule, null);
+  assert.match(a.html(), /No schedule saved/);
+});
+
+test('schedule deletion refuses unresolved local edits before contacting the server', async () => {
+  const data = dataFixture();
+  data.events[0].status = 'published';
+  data.events[0].schedule = buildSchedule(2);
+  const a = await app({ data });
+  a.api.state.dirtySchedule = true;
+  await assert.rejects(a.action('delete-schedule'), /Save or discard all local/);
+  assert.equal(a.requests.filter(request => request.body?.action === 'delete_schedule').length, 0);
+});
+
 test('selection and unsaved edits survive refresh RSVP and rejected training switch; server conflict never retries', async () => {
   const a = await app({ confirm: () => false });
   await a.action('remove-player:p1');
@@ -243,7 +304,7 @@ test('remove changes this draft only, keeps roster filters and other squads cons
   assert.equal(a.store.players.length, 6);
   assert.equal(a.store.events[0].teams[0].players.length, 2);
   assert.equal(a.requests.filter(r => r.body).length, 0);
-  assert.match(a.api.publishWarning(), /at least 6/);
+  assert.match(a.api.publishWarning(), /at least 4/);
   assert.equal(a.get('al-save-teams').disabled, false);
   assert.equal(a.get('al-publish-button').disabled, true);
   await a.action('undo-draft');
@@ -271,7 +332,7 @@ test('save_draft persists an understrength lineup with version; no rebalance or 
   });
   assert.equal(a.api.state.dirtyTeams, false);
   assert.equal(a.api.state.sessionId, 'next');
-  await assert.rejects(a.action('publish'), /at least 6/);
+  await assert.rejects(a.action('publish'), /at least 4/);
   assert.equal(a.requests.filter(r => r.body).length, 1);
 });
 
@@ -317,7 +378,7 @@ test('tap/keyboard selection swaps and moves without reshuffling; unassigned add
   await a.action('pick-player:p2');
   await a.action('place-player:2');
   assert.deepEqual(ids(a.api.state), [['p3'], ['p1', 'p4', 'p2']]);
-  assert.match(a.api.publishWarning(), /at least 6/);
+  assert.match(a.api.publishWarning(), /needs 2/);
   const added = node('al-roster-p5', { alPlayer: 'p5' });
   added.checked = true;
   a.emit('change', added);
@@ -538,18 +599,19 @@ test('permanent Head Ref role only lists eligible members, never guest profiles,
 test('admin assets cache-busted, role management title preserved, touch targets avoid HTML5-only dragging', () => {
   const html = fs.readFileSync(path.join(rootPath, 'admin.html'), 'utf8');
   const css = fs.readFileSync(path.join(rootPath, 'admin-league.css'), 'utf8');
-  assert.match(html, /admin-league\.js\?v=20260914d/);
+  assert.match(html, /admin-league\.js\?v=20260914e/);
   assert.match(html, /admin-league\.css\?v=20260912b/);
   assert.match(html, /\/league\.css\?v=20260912d/);
-  assert.match(html, /\/js\/league-ui\.js\?v=20260914d/);
+  assert.match(html, /\/js\/league-ui\.js\?v=20260914e/);
   assert.ok(html.indexOf('admin-auth.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-scoring.js') < html.indexOf('league-ui.js'));
   assert.ok(html.indexOf('league-ui.js') < html.indexOf('admin-league.js'));
   assert.match(source, /href="\/timer\?event=/);
-  assert.match(source, /data-al-pdf="itinerary" href="\/spieltag\?event=.*&export=itinerary"/);
-  assert.match(source, /data-al-pdf="results" href="\/spieltag\?event=.*&export=results"/);
+  assert.match(source, /data-al-poster="itinerary" href="\/spieltag\?event=.*&export=itinerary"/);
+  assert.match(source, /data-al-poster="results" href="\/spieltag\?event=.*&export=results"/);
   assert.match(source, /data-al-finale="\$\{gender\}:\$\{points\}"/);
   assert.match(source, /one assigned ref team/);
+  assert.match(source, /external Head Ref required/);
   assert.match(source, /Last Man \/ Last Woman Standing · max 10 minutes/);
   assert.match(html, /data-tab="members"[^>]+>Members<\/button>/);
   assert.match(css, /touch-action: none/);

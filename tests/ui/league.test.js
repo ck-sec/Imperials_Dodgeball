@@ -287,7 +287,7 @@ test('all ranking surfaces load the same refreshed tier logic, markup and styles
     for (const asset of ['/js/league-scoring.js', '/league.css']) {
       assert.ok(html.includes(asset + '?v=20260912d'), file + ' must refresh ' + asset);
     }
-    assert.ok(html.includes('/js/league-ui.js?v=20260914d'), file + ' must refresh league UI');
+    assert.ok(html.includes('/js/league-ui.js?v=20260914e'), file + ' must refresh league UI');
   }
 });
 

@@ -31,20 +31,21 @@ Donnerstagsbetrieb. Also nicht nur die letzten Komfort-Aenderungen.
   `node scripts\migrate-match-timer.js --apply --expected-host DEIN_DB_HOST`.
   Ohne `--apply` laeuft das Skript nur als sicherer Offline-Dry-Run.
 
-## Update 14. September 2026: WhatsApp-PDF
+## Update 14. September 2026: WhatsApp-Bilder
 
 - Jeder veroeffentlichte oder abgeschlossene Spieltag kann im Match Center als
-  einseitiges, querformatiges WhatsApp-Poster exportiert werden. Das
-  **Spielplan-PDF** ist schon direkt nach der Veroeffentlichung verfuegbar und
+  einzelnes, hochformatiges **1080 x 1920 JPEG** fuer WhatsApp und Handy
+  exportiert werden. Das **Spielplan-Bild** ist schon direkt nach der
+  Veroeffentlichung verfuegbar und
   zeigt ohne Ergebnis-Spoiler die Teams, Aufstellungen, Rundenzeiten, Felder,
   Begegnungen und Pausen als Match Tree.
-- Nach dem Abschluss steht zusaetzlich ein separates **Ergebnis-PDF** im selben
+- Nach dem Abschluss steht zusaetzlich ein separates **Ergebnis-Bild** im selben
   Design bereit. Es zeigt alle Endresultate im Match Tree und die Tagestabelle.
 - Der Export entsteht direkt im Browser aus denselben oeffentlichen Daten wie
   der Spieltag. Private Ratings, Geschlecht, Rookie-Markierungen, Konto-IDs und
-  Rollen werden weder gelesen noch in das PDF geschrieben.
-- Auf Geraeten mit Datei-Freigabe kann das bereits erstellte PDF ueber
-  **PDF teilen** direkt an WhatsApp uebergeben werden. Andernfalls wird die
+  Rollen werden weder gelesen noch in das Bild geschrieben.
+- Auf Geraeten mit Datei-Freigabe kann das bereits erstellte JPEG ueber
+  **Bild teilen** direkt an WhatsApp uebergeben werden. Andernfalls wird die
   Datei mit einem WhatsApp-tauglichen Namen heruntergeladen.
 
 ## Update 14. September 2026: Ref-Team und fixer Abendablauf
@@ -52,20 +53,28 @@ Donnerstagsbetrieb. Also nicht nur die letzten Komfort-Aenderungen.
 - Neue Aufstellungen bevorzugen fuenf Teams fuer zwei kleine Felder oder drei
   Teams fuer ein grosses Feld. Damit bleibt in jeder Spielrunde mindestens ein
   nicht spielendes Team als klar zugewiesenes Ref-Team frei.
+- Zwei Teams sind als bewusster Head-to-Head-Modus ebenfalls moeglich. Weil
+  beide Teams gleichzeitig spielen, muss dafuer ein externer Head Ref oder
+  Admin pfeifen; Spielplan, Match Center, Timer und Export weisen darauf hin.
 - Falls eine bestehende Vierer-Aufstellung verwendet wird, laeuft bewusst nur
   eine Begegnung gleichzeitig: zwei Teams spielen, eines pfeift und eines hat
   Pause. Die Ref-Einsaetze werden ueber den ganzen Abend moeglichst gleichmaessig
   und ohne vermeidbare direkte Wiederholungen verteilt.
 - Der gemeinsame Ablauf steht jetzt im Admin, im oeffentlichen Match Center und
-  im Spielplan-PDF: **18:00 Treffpunkt und Warm-up**, **18:15 Spielbeginn**,
+  im Spielplan-Bild: **18:00 Treffpunkt und Warm-up**, **18:15 Spielbeginn**,
   **20:00 Spielende** und danach maximal zehn Minuten **Last Man / Last Woman
   Standing** bis **20:10**.
 - Die Last-Standing-Auszeichnungen werden vor dem Ergebnisabschluss strukturiert
   ausgewaehlt: Sieger und Siegerin erhalten jeweils **+1 BP**, die beiden
   Zweitplatzierten jeweils **+0,5 BP**. Diese BP fliessen wie alle anderen BP in
   Tages- und Saison-Gesamtpunkte ein.
-- Spielplan, Timer und beide WhatsApp-PDFs zeigen das je Runde eingeteilte
-  Ref-Team; separate Pausenteams werden eindeutig davon unterschieden.
+- Spielplan, Timer und beide WhatsApp-Bilder zeigen das je Runde eingeteilte
+  Ref-Team beziehungsweise im Zwei-Team-Modus den externen Head Ref; separate
+  Pausenteams werden eindeutig davon unterschieden.
+- Ein noch ungewerteter gespeicherter oder bereits veroeffentlichter Spielplan
+  kann geloescht werden. Bei einem veroeffentlichten Spieltag werden Teams und
+  Aufstellung sofort wieder privat; Timer-Zustaende werden entfernt. Die Teams
+  bleiben als Entwurf fuer einen neuen Spielplan erhalten.
 
 ## 1. Social League: von der Aufstellung bis zur Saisonwertung
 
@@ -219,12 +228,12 @@ Absagen oder Einstellungen.
    ausgeglichenen Entwurf erzeugen. Danach gezielt verschieben oder tauschen.
    Neue Teilnehmer einem Team zuordnen und **Save draft** verwenden.
    **Rebalance teams** nur waehlen, wenn du wirklich neu verteilen willst.
-4. **Spielplan erstellen:** Standard sind **2 Spielfelder, 20 Minuten je Match,
-   5 Minuten Wechselpause und 120 Minuten Gesamtzeit**. Mit **5 Teams passen
-   10 Jeder-gegen-jeden-Matches** in genau diese zwei Stunden. Das ist der
-   Spielblock innerhalb des Trainings, nicht die gesamte Hallenzeit.
-   Aufwaermen und Verzoegerungen sind darin nicht als Reserve eingeplant.
-   Ein unpassender Zeitplan wird abgelehnt, nicht stillschweigend verkuerzt.
+4. **Spielplan erstellen:** Standard sind **18:00 Treffpunkt**, 15 Minuten
+   Warm-up und Ligaspiele ab **18:15** bis spaetestens **20:00**. Fuenf Teams
+   nutzen zwei Felder mit einem rotierenden Ref-Team; drei Teams ein Feld.
+   Fuer zwei Teams bewusst den Head-to-Head-Modus waehlen und einen externen
+   Head Ref oder Admin einteilen. Ein unpassender Zeitplan wird abgelehnt, nicht
+   stillschweigend verkuerzt.
 5. **Freigeben und Link teilen:** Teams und Spielplan veroeffentlichen und den
    Spieltagslink aus dem Adminbereich teilen. Das geht schon vor dem Training.
    Auch Gastnamen werden damit oeffentlich; Gaeste vorher darauf hinweisen.
@@ -335,6 +344,10 @@ Zuschauer brauchen auf der Spieltagsseite keinen Login.
   voruebergehend zur privaten Aufstellung zurueckkehren. Das blendet die
   oeffentlichen Teams aus. Gespeicherte Aufstellungsaenderungen loeschen einen
   vorhandenen, ungewerteten Spielplan; danach neu erstellen und wieder freigeben.
+- **Nur den Spielplan ersetzen?** Mit **Delete published schedule** den
+  ungewerteten Spielplan samt Timer-Zustaenden loeschen. Der Spieltag wird
+  sofort privat, Teams und Aufstellung bleiben als Entwurf erhalten. Danach
+  neuen Spielplan erstellen und erneut freigeben.
 - **Ab dem ersten gespeicherten Match bleibt die Aufstellung dauerhaft gesperrt.**
   Auch nach dem Abschluss oder einem Wiedereroeffnen werden Teams und
   Teilnehmer nicht wieder bearbeitbar.

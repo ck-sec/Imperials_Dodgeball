@@ -67,7 +67,7 @@ const finalized = (world, event) => {
   world.results = world.results.filter(r => r.event_id !== event.id).concat(result.ledger.map(r => ({ ...r, event_id: event.id })));
 };
 
-test('legacy balancing supports two squads while new generation requires a third referee squad', () => {
+test('generation requires a deliberate two-team maximum before using an external referee', () => {
   const people = playerView(fixture());
   for (const size of [2, 3]) {
     const result = balanceTeams(people.slice(0, size * 2), size);
@@ -78,6 +78,8 @@ test('legacy balancing supports two squads while new generation requires a third
   assert.throws(() => balanceTeams(people.slice(0, 3), 'auto'));
   assert.throws(() => validateAction({ action: 'generate', season_id: id(300), session_id: id(200), team_size: 2,
     player_ids: people.slice(0, 4).map(p => p.id) }), /6–500/);
+  assert.equal(validateAction({ action: 'generate', season_id: id(300), session_id: id(200), team_size: 2,
+    player_ids: people.slice(0, 4).map(p => p.id), max_teams: 2 }).max_teams, 2);
   assert.equal(validateAction({ action: 'generate', season_id: id(300), session_id: id(200), team_size: 2,
     player_ids: people.map(p => p.id), max_teams: 3 }).team_size, 2);
 });

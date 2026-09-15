@@ -227,6 +227,15 @@ test('timer view exposes public fixture details but controls only to current-day
   event.status = 'finalized';
   assert.equal(timerView(world, event.id, 1, { is_admin: true }, null, AT, EVENT_DATE).permissions.can_control, false);
   assert.throws(() => timerView(world, event.id, 99, {}, null, AT, EVENT_DATE), error => error.status === 404);
+
+  const headToHead = fixture();
+  headToHead.events[0].teams = balanceTeams(
+    headToHead.profiles.map(({ user_id, ...player }) => player), 3, 2, true
+  ).teams;
+  headToHead.events[0].schedule = buildSchedule(2);
+  const external = timerView(headToHead, headToHead.events[0].id, 1, {}, null, AT, EVENT_DATE);
+  assert.equal(external.match.referee_team, null);
+  assert.equal(external.match.external_referee, true);
 });
 
 test('timer schema is additive in fresh installs and has a guarded standalone migration', async () => {

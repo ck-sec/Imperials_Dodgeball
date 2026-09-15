@@ -1,9 +1,9 @@
-/* Single-page, dependency-free league poster from the safe public matchday payload. */
+/* Single-image, dependency-free league poster from the safe public matchday payload. */
 (function () {
   'use strict';
 
-  const WIDTH = 1754;
-  const HEIGHT = 1240;
+  const WIDTH = 1080;
+  const HEIGHT = 1920;
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const COLORS = {
     deep: '#061329',
@@ -37,6 +37,7 @@
       game: 'SPIEL',
       bye: 'PAUSE',
       refTeam: 'REF-TEAM',
+      externalRef: 'EXTERNER HEAD REF / ADMIN',
       meetWarmup: 'TREFFPUNKT & AUFWÄRMEN',
       leagueGames: 'LIGASPIELE',
       finale: 'LAST MAN / LAST WOMAN',
@@ -72,6 +73,7 @@
       game: 'GAME',
       bye: 'REST',
       refTeam: 'REF TEAM',
+      externalRef: 'EXTERNAL HEAD REF / ADMIN',
       meetWarmup: 'MEET & WARM-UP',
       leagueGames: 'LEAGUE GAMES',
       finale: 'LAST MAN / LAST WOMAN',
@@ -109,10 +111,10 @@
 
   function projectEvent(event, standings = []) {
     if (!event || typeof event !== 'object' || !UUID.test(event.id || '')) fail('A valid published league event is required');
-    if (!['published', 'finalized'].includes(event.status)) fail('Publish the league before exporting its PDF');
+    if (!['published', 'finalized'].includes(event.status)) fail('Publish the league before exporting its image');
     if (!Array.isArray(event.teams) || event.teams.length < 2) fail('The league needs at least two published teams');
     if (!event.schedule || !Array.isArray(event.schedule.rounds) || !event.schedule.rounds.length) {
-      fail('Generate a fixture schedule before exporting its PDF');
+      fail('Generate a fixture schedule before exporting its image');
     }
     return {
       id: event.id.toLowerCase(),
@@ -207,7 +209,7 @@
 
   function fileName(event, requestedMode) {
     const date = /^\d{4}-\d{2}-\d{2}$/.test(event.session_date) ? event.session_date : 'matchday';
-    return `vienna-imperials-${exportMode(event, requestedMode)}-${date}.pdf`;
+    return `vienna-imperials-${exportMode(event, requestedMode)}-${date}.jpg`;
   }
 
   function clock(start, offset) {
@@ -231,6 +233,9 @@
       teamCount: event.teams.length,
       roundCount: event.schedule.rounds.length,
       matchCount: allMatches(event).length,
+      width: WIDTH,
+      height: HEIGHT,
+      mimeType: 'image/jpeg',
     }];
   }
 
@@ -301,6 +306,39 @@
 
   function teamColor(number) {
     return [COLORS.cyan, COLORS.goldLight, COLORS.pink, COLORS.green, COLORS.violet][Math.abs(number - 1) % 5];
+  }
+
+  function portraitTeamHeight(teamCount) {
+    const rows = Math.ceil(teamCount / 2);
+    const cardHeight = teamCount <= 2 ? 220 : teamCount <= 4 ? 154 : 132;
+    return 66 + rows * cardHeight + Math.max(0, rows - 1) * 12 + 18;
+  }
+
+  function portraitFixtureLayout(roundCount, top) {
+    const preferredHeight = roundCount >= 6 ? 100 : roundCount >= 5 ? 110 : roundCount >= 3 ? 145 : 220;
+    const gap = roundCount >= 8 ? 5 : 9;
+    const sectionChrome = 66 + 18 + Math.max(0, roundCount - 1) * gap;
+    const fittingHeight = Math.floor((1498 - top - sectionChrome) / roundCount);
+    const rowHeight = Math.max(48, Math.min(preferredHeight, fittingHeight));
+    const height = sectionChrome + roundCount * rowHeight;
+    return { gap, rowHeight, height, bottom: top + height, compact: rowHeight < 80 };
+  }
+
+  function portraitLayout(event) {
+    const teamsTop = 306;
+    const teamsBottom = teamsTop + portraitTeamHeight(event.teams.length);
+    const fixturesTop = teamsBottom + 18;
+    const fixtures = portraitFixtureLayout(event.schedule.rounds.length, fixturesTop);
+    return {
+      teams_top: teamsTop,
+      teams_bottom: teamsBottom,
+      fixtures_top: fixturesTop,
+      fixtures_bottom: fixtures.bottom,
+      fixture_row_height: fixtures.rowHeight,
+      compact_fixtures: fixtures.compact,
+      summary_top: Math.max(fixtures.bottom + 18, 1498),
+      summary_bottom: 1850,
+    };
   }
 
   function drawHeader(ctx, event, images, t, lang, mode) {
@@ -602,34 +640,320 @@
     fitText(ctx, short, 1708, 1204, 520, 14, 10, 'right', COLORS.muted, 'Inter');
   }
 
+  function drawPortraitHeader(ctx, event, images, t, lang, mode) {
+    drawCoverImage(ctx, images.match, 0, 0, WIDTH, 286, .43);
+    const overlay = ctx.createLinearGradient(0, 0, WIDTH, 0);
+    overlay.addColorStop(0, 'rgba(6,19,41,.98)');
+    overlay.addColorStop(.64, 'rgba(6,19,41,.72)');
+    overlay.addColorStop(1, 'rgba(6,19,41,.94)');
+    ctx.fillStyle = overlay;
+    ctx.fillRect(0, 0, WIDTH, 286);
+    drawLogo(ctx, images.logo, 38, 22, 118);
+    ctx.fillStyle = COLORS.goldLight;
+    font(ctx, 23, 800, 'Barlow Condensed');
+    ctx.textAlign = 'left';
+    ctx.fillText('VIENNA IMPERIALS · SOCIAL LEAGUE', 178, 55);
+    fillRounded(ctx, 178, 74, 248, 42, 21, 'rgba(212,150,26,.94)', null);
+    ctx.fillStyle = COLORS.deep;
+    font(ctx, 19, 900, 'Barlow Condensed');
+    ctx.textAlign = 'center';
+    ctx.fillText(mode === 'results' ? t.final : t.itinerary, 302, 102);
+    ctx.fillStyle = COLORS.cloud;
+    font(ctx, 21, 700);
+    ctx.textAlign = 'right';
+    ctx.fillText(eventDate(event.session_date, lang), WIDTH - 38, 54);
+    const time = [event.start_time && event.start_time.slice(0, 5), event.end_time && event.end_time.slice(0, 5)]
+      .filter(Boolean).join('–');
+    fitText(ctx, [time, event.location].filter(Boolean).join(' · '), WIDTH - 38, 91, 500, 18, 13,
+      'right', COLORS.muted, 'Inter');
+    fitText(ctx, event.title, 38, 202, WIDTH - 76, 62, 34, 'left', COLORS.cloud, 'Bebas Neue');
+    const stats = `${allMatches(event).length} ${t.matches} · ${event.schedule.active_courts} ${t.courts} · ${event.schedule.duration_minutes} ${t.minutes}`;
+    fitText(ctx, stats, 38, 248, WIDTH - 76, 20, 14, 'left', COLORS.goldLight, 'Inter');
+    ctx.fillStyle = COLORS.gold;
+    ctx.fillRect(0, 278, WIDTH, 8);
+  }
+
+  function drawPortraitTeams(ctx, event, t, mode, top) {
+    const x = 34;
+    const width = WIDTH - 68;
+    const rows = Math.ceil(event.teams.length / 2);
+    const cardHeight = event.teams.length <= 2 ? 220 : event.teams.length <= 4 ? 154 : 132;
+    const gap = 12;
+    const height = portraitTeamHeight(event.teams.length);
+    fillRounded(ctx, x, top, width, height, 25, 'rgba(7,26,56,.91)', 'rgba(54,91,142,.76)');
+    ctx.fillStyle = COLORS.goldLight;
+    font(ctx, 26, 800, 'Barlow Condensed');
+    ctx.textAlign = 'left';
+    ctx.fillText(t.teams, x + 22, top + 42);
+
+    const cardWidth = (width - 56) / 2;
+    event.teams.forEach((team, index) => {
+      const column = index % 2;
+      const row = Math.floor(index / 2);
+      const cardX = x + 22 + column * (cardWidth + 12);
+      const cardY = top + 60 + row * (cardHeight + gap);
+      const color = teamColor(team.number);
+      fillRounded(ctx, cardX, cardY, cardWidth, cardHeight, 17, 'rgba(3,13,30,.91)', 'rgba(179,193,217,.26)');
+      ctx.fillStyle = color;
+      ctx.fillRect(cardX, cardY, 7, cardHeight);
+      fillRounded(ctx, cardX + 18, cardY + 13, 42, 34, 11, color, null);
+      ctx.fillStyle = COLORS.deep;
+      font(ctx, 22, 900, 'Bebas Neue');
+      ctx.textAlign = 'center';
+      ctx.fillText(String(team.number), cardX + 39, cardY + 38);
+      fitText(ctx, team.name, cardX + 72, cardY + 39, cardWidth - 100, 26, 16, 'left', COLORS.cloud);
+      if (mode === 'results' && team.placement !== null) {
+        ctx.fillStyle = COLORS.goldLight;
+        font(ctx, 17, 800, 'Barlow Condensed');
+        ctx.textAlign = 'right';
+        ctx.fillText('#' + team.placement, cardX + cardWidth - 15, cardY + 39);
+      }
+      const lineHeight = 22;
+      const visibleRows = Math.max(1, Math.floor((cardHeight - 62) / lineHeight));
+      const capacity = visibleRows * 2;
+      const truncated = team.players.length > capacity;
+      const visibleCapacity = truncated ? Math.max(1, capacity - 1) : capacity;
+      const columnWidth = (cardWidth - 48) / 2;
+      team.players.slice(0, visibleCapacity).forEach((player, playerIndex) => {
+        const playerColumn = playerIndex % 2;
+        const playerRow = Math.floor(playerIndex / 2);
+        const playerX = cardX + 22 + playerColumn * columnWidth;
+        const playerY = cardY + 70 + playerRow * lineHeight;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(playerX + 3, playerY - 5, 3, 0, Math.PI * 2);
+        ctx.fill();
+        fitText(ctx, player.display_name, playerX + 13, playerY, columnWidth - 18, 15, 10,
+          'left', COLORS.cloud, 'Inter');
+      });
+      if (truncated) {
+        ctx.fillStyle = COLORS.muted;
+        font(ctx, 13, 700);
+        ctx.textAlign = 'right';
+        ctx.fillText(`+${team.players.length - visibleCapacity} ${t.more}`, cardX + cardWidth - 15, cardY + cardHeight - 12);
+      }
+    });
+    return top + height;
+  }
+
+  function drawPortraitFixtures(ctx, event, t, mode, top) {
+    const x = 34;
+    const width = WIDTH - 68;
+    const rounds = event.schedule.rounds;
+    const layout = portraitFixtureLayout(rounds.length, top);
+    const { gap, rowHeight, compact, height } = layout;
+    fillRounded(ctx, x, top, width, height, 25, 'rgba(7,26,56,.93)', 'rgba(54,91,142,.76)');
+    ctx.fillStyle = COLORS.goldLight;
+    font(ctx, 26, 800, 'Barlow Condensed');
+    ctx.textAlign = 'left';
+    ctx.fillText(t.tree, x + 22, top + 42);
+    ctx.fillStyle = COLORS.muted;
+    font(ctx, 15, 800, 'Barlow Condensed');
+    ctx.textAlign = 'right';
+    ctx.fillText(mode === 'results' ? t.treeKicker : t.itineraryKicker, x + width - 22, top + 40);
+    const names = new Map(event.teams.map(team => [team.number, team.name]));
+
+    rounds.forEach((round, roundIndex) => {
+      const rowY = top + 60 + roundIndex * (rowHeight + gap);
+      fillRounded(ctx, x + 16, rowY, width - 32, rowHeight, 16, 'rgba(3,13,30,.91)', 'rgba(54,91,142,.58)');
+      const sidebarX = x + 32;
+      const sidebarWidth = compact ? 240 : 170;
+      ctx.fillStyle = COLORS.goldLight;
+      font(ctx, compact ? 16 : 22, 800, 'Bebas Neue');
+      ctx.textAlign = 'left';
+      ctx.fillText(`${t.round} ${round.number}`, sidebarX, rowY + (compact ? 17 : 29));
+      ctx.fillStyle = COLORS.cloud;
+      font(ctx, compact ? 11 : 16, 700, 'Inter');
+      ctx.fillText(`${clock(event.schedule.meetup_time || event.start_time, round.start_minute)}–${clock(event.schedule.meetup_time || event.start_time, round.end_minute)}`, sidebarX, rowY + (compact ? 32 : 52));
+      const refText = round.referee_team
+        ? `${t.refTeam}: ${names.get(round.referee_team)}`
+        : event.schedule.referee_policy === 'external_ref_v1' ? t.externalRef : '';
+      const restText = round.rest_teams.length
+        ? `${t.bye}: ${round.rest_teams.map(number => names.get(number)).join(', ')}` : '';
+      if (compact) {
+        fitText(ctx, [refText, restText].filter(Boolean).join(' · '), sidebarX, rowY + rowHeight - 6,
+          sidebarWidth - 4, 10, 7, 'left', COLORS.goldLight, 'Inter');
+      } else {
+        if (refText) fitText(ctx, refText, sidebarX, rowY + 75, sidebarWidth - 4, 13, 9, 'left', COLORS.goldLight, 'Inter');
+        if (restText) {
+          fitText(ctx, restText, sidebarX, rowY + Math.min(rowHeight - 13, 98),
+            sidebarWidth - 4, 12, 8, 'left', COLORS.muted, 'Inter');
+        }
+      }
+
+      const matchX = sidebarX + sidebarWidth + 14;
+      const matchAreaWidth = x + width - 18 - matchX;
+      const matchGap = 10;
+      const matchWidth = (matchAreaWidth - matchGap * Math.max(0, round.matches.length - 1))
+        / Math.max(1, round.matches.length);
+      round.matches.forEach((match, index) => {
+        const cardX = matchX + index * (matchWidth + matchGap);
+        const cardY = rowY + (compact ? 5 : 10);
+        const cardHeight = rowHeight - (compact ? 10 : 20);
+        fillRounded(ctx, cardX, cardY, matchWidth, cardHeight, 13, 'rgba(16,43,87,.75)', 'rgba(179,193,217,.24)');
+        ctx.fillStyle = COLORS.muted;
+        font(ctx, compact ? 9 : 12, 800, 'Barlow Condensed');
+        ctx.textAlign = 'left';
+        ctx.fillText(`${t.game} ${match.number}`, cardX + 13, cardY + (compact ? 12 : 20));
+        ctx.textAlign = 'right';
+        ctx.fillText(`${t.court} ${match.court}`, cardX + matchWidth - 13, cardY + (compact ? 12 : 20));
+        const teamRows = [
+          { number: match.team_a, score: match.score_a },
+          { number: match.team_b, score: match.score_b },
+        ];
+        const firstY = compact ? cardY + 27 : cardY + Math.max(43, cardHeight * .57);
+        const teamGap = compact ? 14 : Math.min(31, Math.max(22, cardHeight * .28));
+        teamRows.forEach((team, teamIndex) => {
+          const rowY = firstY + teamIndex * teamGap;
+          ctx.fillStyle = teamColor(team.number);
+          ctx.beginPath();
+          ctx.arc(cardX + 15, rowY - 5, 4, 0, Math.PI * 2);
+          ctx.fill();
+          fitText(ctx, names.get(team.number), cardX + 27, rowY, matchWidth - 75,
+            compact ? 13 : 18, compact ? 8 : 10, 'left', COLORS.cloud);
+          if (mode === 'results') {
+            ctx.fillStyle = team.score === null ? COLORS.muted : COLORS.goldLight;
+            font(ctx, compact ? 14 : 20, 800, 'Inter');
+            ctx.textAlign = 'right';
+            ctx.fillText(team.score === null ? '—' : String(team.score), cardX + matchWidth - 13, rowY);
+          }
+        });
+      });
+    });
+    return top + height;
+  }
+
+  function drawPortraitSummary(ctx, event, t, mode, top) {
+    const x = 34;
+    const width = WIDTH - 68;
+    const bottom = 1850;
+    const height = bottom - top;
+    fillRounded(ctx, x, top, width, height, 25, 'rgba(7,26,56,.94)', 'rgba(54,91,142,.76)');
+    const recorded = allMatches(event).filter(match => match.score_a !== null && match.score_b !== null).length;
+    const hasTable = mode === 'results' && recorded > 0 && event.match_standings;
+    ctx.fillStyle = COLORS.goldLight;
+    font(ctx, 25, 800, 'Barlow Condensed');
+    ctx.textAlign = 'left';
+    ctx.fillText(hasTable ? t.table : t.schedule, x + 22, top + 40);
+    if (!hasTable) {
+      const start = event.schedule.meetup_time || event.start_time;
+      const finaleStart = event.schedule.finale_start_minute || event.schedule.duration_minutes;
+      const program = [
+        { time: `${clock(start, 0)}–${clock(start, event.schedule.warmup_minutes)}`, label: t.meetWarmup, detail: t.itineraryKicker },
+        { time: `${clock(start, event.schedule.warmup_minutes)}–${clock(start, finaleStart)}`, label: t.leagueGames,
+          detail: `${event.schedule.rounds.length} ${t.rounds} · ${allMatches(event).length} ${t.matches}` },
+        { time: `${clock(start, finaleStart)}–${clock(start, event.schedule.total_duration_minutes)}`, label: t.finale, detail: t.finaleAwards },
+      ];
+      const cardGap = 9;
+      const cardHeight = Math.max(64, Math.min(78, (height - 67 - cardGap * 2) / 3));
+      program.forEach((item, index) => {
+        const cardY = top + 54 + index * (cardHeight + cardGap);
+        fillRounded(ctx, x + 18, cardY, width - 36, cardHeight, 14, 'rgba(3,13,30,.9)', 'rgba(54,91,142,.58)');
+        ctx.fillStyle = COLORS.goldLight;
+        font(ctx, 24, 800, 'Bebas Neue');
+        ctx.textAlign = 'left';
+        ctx.fillText(item.time, x + 35, cardY + 31);
+        fitText(ctx, item.label, x + 250, cardY + 31, width - 300, 21, 13, 'left', COLORS.cloud);
+        fitText(ctx, item.detail, x + 250, cardY + 56, width - 300, 14, 10, 'left', COLORS.muted, 'Inter');
+      });
+      return;
+    }
+
+    const names = new Map(event.teams.map(team => [team.number, team.name]));
+    const placements = new Map(event.teams.map(team => [team.number, team.placement]));
+    const rows = [...event.match_standings.standings].sort((a, b) =>
+      (placements.get(a.team_number) || a.rank) - (placements.get(b.team_number) || b.rank));
+    const rowGap = 8;
+    const rowHeight = 58;
+    const cardWidth = (width - 52) / 2;
+    rows.forEach((row, index) => {
+      const column = index % 2;
+      const gridRow = Math.floor(index / 2);
+      const cardX = x + 18 + column * (cardWidth + 16);
+      const cardY = top + 53 + gridRow * (rowHeight + rowGap);
+      fillRounded(ctx, cardX, cardY, cardWidth, rowHeight, 13,
+        index === 0 ? 'rgba(212,150,26,.16)' : 'rgba(3,13,30,.9)',
+        index === 0 ? 'rgba(212,150,26,.7)' : 'rgba(54,91,142,.58)');
+      const rank = placements.get(row.team_number) || row.rank;
+      ctx.fillStyle = teamColor(row.team_number);
+      font(ctx, 28, 800, 'Bebas Neue');
+      ctx.textAlign = 'left';
+      ctx.fillText('#' + rank, cardX + 13, cardY + 36);
+      fitText(ctx, names.get(row.team_number), cardX + 65, cardY + 27, cardWidth - 150, 18, 11, 'left', COLORS.cloud);
+      ctx.fillStyle = COLORS.muted;
+      font(ctx, 11, 700, 'Inter');
+      ctx.fillText(`${t.played} ${row.played} · ${t.win} ${row.won} · ${t.draw} ${row.drawn} · ${t.loss} ${row.lost}`,
+        cardX + 65, cardY + 46);
+      ctx.fillStyle = COLORS.goldLight;
+      font(ctx, 17, 800, 'Inter');
+      ctx.textAlign = 'right';
+      ctx.fillText(`${row.table_points} ${t.points}`, cardX + cardWidth - 13, cardY + 36);
+    });
+    const standingsBottom = top + 53 + Math.ceil(rows.length / 2) * (rowHeight + rowGap);
+    const finale = [
+      event.finale_results?.men ? { label: t.lastMan, result: event.finale_results.men } : null,
+      event.finale_results?.women ? { label: t.lastWoman, result: event.finale_results.women } : null,
+    ].filter(Boolean);
+    finale.forEach((item, index) => {
+      const cardX = x + 18 + index * (cardWidth + 16);
+      const cardY = Math.min(bottom - 82, standingsBottom + 5);
+      fillRounded(ctx, cardX, cardY, cardWidth, 70, 13, 'rgba(212,150,26,.13)', 'rgba(212,150,26,.45)');
+      ctx.fillStyle = COLORS.goldLight;
+      font(ctx, 15, 800, 'Barlow Condensed');
+      ctx.textAlign = 'left';
+      ctx.fillText(item.label, cardX + 13, cardY + 23);
+      fitText(ctx, `${item.result.winner.display_name} +${item.result.winner.bonus_points} BP`,
+        cardX + 13, cardY + 45, cardWidth - 26, 16, 10, 'left', COLORS.cloud, 'Inter');
+      fitText(ctx, `#2 ${item.result.runner_up.display_name} +${item.result.runner_up.bonus_points} BP`,
+        cardX + 13, cardY + 63, cardWidth - 26, 12, 9, 'left', COLORS.muted, 'Inter');
+    });
+  }
+
+  function drawPortraitFooter(ctx, publicUrl, t) {
+    ctx.strokeStyle = 'rgba(179,193,217,.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(34, 1870);
+    ctx.lineTo(WIDTH - 34, 1870);
+    ctx.stroke();
+    ctx.fillStyle = COLORS.goldLight;
+    font(ctx, 15, 800, 'Barlow Condensed');
+    ctx.textAlign = 'left';
+    ctx.fillText(t.share, 34, 1899);
+    const short = cleanText(publicUrl).replace(/^https?:\/\//, '').replace(/\/$/, '');
+    fitText(ctx, short, WIDTH - 34, 1899, 540, 13, 9, 'right', COLORS.muted, 'Inter');
+  }
+
   function drawPoster(event, images, publicUrl, t, lang, mode) {
     const canvas = document.createElement('canvas');
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) fail('Canvas rendering is unavailable in this browser');
+    drawCoverImage(ctx, images.jubel, 0, 0, WIDTH, HEIGHT, .44);
     const background = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
-    background.addColorStop(0, COLORS.deep);
-    background.addColorStop(.54, COLORS.navy);
-    background.addColorStop(1, '#030b19');
+    background.addColorStop(0, 'rgba(6,19,41,.93)');
+    background.addColorStop(.54, 'rgba(11,32,67,.95)');
+    background.addColorStop(1, 'rgba(3,11,25,.98)');
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
     ctx.save();
     ctx.globalAlpha = .07;
     ctx.strokeStyle = COLORS.cyan;
     ctx.lineWidth = 3;
-    for (let offset = -700; offset < 2200; offset += 130) {
+    for (let offset = -1300; offset < 2200; offset += 130) {
       ctx.beginPath();
       ctx.moveTo(offset, 0);
       ctx.lineTo(offset + 760, HEIGHT);
       ctx.stroke();
     }
     ctx.restore();
-    drawHeader(ctx, event, images, t, lang, mode);
-    drawTeamPanel(ctx, event, images, t);
-    drawTree(ctx, event, t, mode);
-    drawStandings(ctx, event, t, mode);
-    drawFooter(ctx, publicUrl, t);
+    const layout = portraitLayout(event);
+    drawPortraitHeader(ctx, event, images, t, lang, mode);
+    drawPortraitTeams(ctx, event, t, mode, layout.teams_top);
+    drawPortraitFixtures(ctx, event, t, mode, layout.fixtures_top);
+    drawPortraitSummary(ctx, event, t, mode, layout.summary_top);
+    drawPortraitFooter(ctx, publicUrl, t);
     return canvas;
   }
 
@@ -652,84 +976,16 @@
     return { logo, match, jubel };
   }
 
-  function jpegBytes(canvas) {
+  function jpegBlob(canvas) {
     return new Promise((resolve, reject) => {
-      canvas.toBlob(async blob => {
+      canvas.toBlob(blob => {
         if (!blob) {
-          reject(new Error('The browser could not encode the PDF artwork'));
+          reject(new Error('The browser could not encode the image artwork'));
           return;
         }
-        resolve(new Uint8Array(await blob.arrayBuffer()));
+        resolve(blob);
       }, 'image/jpeg', .92);
     });
-  }
-
-  function asciiBytes(value) {
-    const bytes = new Uint8Array(value.length);
-    for (let index = 0; index < value.length; index++) bytes[index] = value.charCodeAt(index) & 255;
-    return bytes;
-  }
-
-  function concatBytes(parts) {
-    const size = parts.reduce((sum, part) => sum + part.length, 0);
-    const result = new Uint8Array(size);
-    let offset = 0;
-    for (const part of parts) {
-      result.set(part, offset);
-      offset += part.length;
-    }
-    return result;
-  }
-
-  function pdfFromJpegs(images, metadata = {}) {
-    if (!Array.isArray(images) || !images.length) fail('At least one PDF page is required');
-    const pageIds = images.map((_, index) => 5 + index * 3);
-    const infoId = 3 + images.length * 3;
-    const objectCount = infoId;
-    const chunks = [asciiBytes('%PDF-1.4\n%VI-PDF\n')];
-    const offsets = new Array(objectCount + 1).fill(0);
-    let length = chunks[0].length;
-    const add = part => {
-      const bytes = typeof part === 'string' ? asciiBytes(part) : part;
-      chunks.push(bytes);
-      length += bytes.length;
-    };
-    const object = (id, parts) => {
-      offsets[id] = length;
-      add(`${id} 0 obj\n`);
-      for (const part of parts) add(part);
-      add('\nendobj\n');
-    };
-    object(1, ['<< /Type /Catalog /Pages 2 0 R >>']);
-    object(2, [`<< /Type /Pages /Count ${images.length} /Kids [${pageIds.map(id => id + ' 0 R').join(' ')}] >>`]);
-    images.forEach((image, index) => {
-      const imageId = 3 + index * 3;
-      const contentId = imageId + 1;
-      const pageId = imageId + 2;
-      const name = 'PageImage' + (index + 1);
-      const landscape = image.width > image.height;
-      const pageWidth = landscape ? 841.89 : 595.28;
-      const pageHeight = landscape ? 595.28 : 841.89;
-      object(imageId, [
-        `<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.bytes.length} >>\nstream\n`,
-        image.bytes,
-        '\nendstream',
-      ]);
-      const command = `q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/${name} Do\nQ\n`;
-      object(contentId, [`<< /Length ${command.length} >>\nstream\n${command}endstream`]);
-      object(pageId, [
-        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] `,
-        `/Resources << /XObject << /${name} ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`,
-      ]);
-    });
-    const safeTitle = cleanText(metadata.title, 'Vienna Imperials League').replace(/[^\x20-\x7e]/g, '?')
-      .replace(/([\\()])/g, '\\$1');
-    object(infoId, [`<< /Title (${safeTitle}) /Author (Vienna Imperials) /Creator (Imperials Match Center) >>`]);
-    const xref = length;
-    add(`xref\n0 ${objectCount + 1}\n0000000000 65535 f \n`);
-    for (let id = 1; id <= objectCount; id++) add(String(offsets[id]).padStart(10, '0') + ' 00000 n \n');
-    add(`trailer\n<< /Size ${objectCount + 1} /Root 1 0 R /Info ${infoId} 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
-    return concatBytes(chunks);
   }
 
   async function create(event, options = {}) {
@@ -742,21 +998,25 @@
     const publicUrl = cleanText(options.publicUrl,
       new URL('/spieltag?event=' + encodeURIComponent(model.id), window.location.origin).href);
     const canvas = drawPoster(model, images, publicUrl, copy[lang], lang, mode);
-    const page = { bytes: await jpegBytes(canvas), width: canvas.width, height: canvas.height };
+    const width = canvas.width;
+    const height = canvas.height;
+    const blob = await jpegBlob(canvas);
     canvas.width = 1;
     canvas.height = 1;
-    const bytes = pdfFromJpegs([page], { title: model.title });
     return {
-      blob: new Blob([bytes], { type: 'application/pdf' }),
+      blob,
       filename: fileName(model, mode),
       pageCount: 1,
       mode,
-      byteLength: bytes.length,
+      width,
+      height,
+      byteLength: blob.size,
+      mimeType: 'image/jpeg',
     };
   }
 
   function save(result) {
-    if (!result || !(result.blob instanceof Blob)) fail('Create the PDF before downloading it');
+    if (!result || !(result.blob instanceof Blob)) fail('Create the image before downloading it');
     const url = URL.createObjectURL(result.blob);
     const link = document.createElement('a');
     link.href = url;
@@ -770,7 +1030,7 @@
 
   function asFile(result) {
     if (typeof File !== 'function') return null;
-    return new File([result.blob], result.filename, { type: 'application/pdf', lastModified: Date.now() });
+    return new File([result.blob], result.filename, { type: 'image/jpeg', lastModified: Date.now() });
   }
 
   function canShare(file) {
@@ -780,18 +1040,18 @@
   }
 
   function share(file, title) {
-    if (!canShare(file)) fail('PDF file sharing is unavailable in this browser');
+    if (!canShare(file)) fail('Image file sharing is unavailable in this browser');
     return navigator.share({ files: [file], title: cleanText(title, 'Vienna Imperials League') });
   }
 
-  window.LeaguePDF = {
+  window.LeaguePoster = {
     projectEvent,
     allMatches,
     exportMode,
     fileName,
     clock,
     pagePlan,
-    pdfFromJpegs,
+    portraitLayout,
     create,
     save,
     asFile,

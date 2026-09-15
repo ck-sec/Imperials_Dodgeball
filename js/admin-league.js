@@ -4,6 +4,8 @@
 
   const root = document.getElementById('tab-league');
   if (!root) return;
+  const ROTATING_REF_POLICY = 'rotating_team_v1';
+  const EXTERNAL_REF_POLICY = 'external_ref_v1';
   const $ = id => document.getElementById(id);
   const state = {
     data: { seasons: [], players: [], members: [], sessions: [], events: [] },
@@ -37,10 +39,16 @@
   const isLocked = () => cancelled() || (!!event() && (event().status !== 'draft' || lineupStarted()));
   const futureTraining = () => dateOnly(session()?.session_date || event()?.session_date) > today();
   const needsRosterReview = () => state.dirtyRoster || !!event()?.roster_stale;
-  const minimumRoster = () => state.size === 'auto' ? 6 : Number(state.size) * 3;
-  const draftSize = () => state.size === 'auto'
-    ? Math.min(6, Math.floor(state.selected.size / (state.maxTeams >= 5 && state.selected.size >= 10 ? 5 : 3)))
-    : Number(state.size);
+  const minimumRoster = () => state.size === 'auto'
+    ? (state.maxTeams === 2 ? 4 : 6) : Number(state.size) * (state.maxTeams === 2 ? 2 : 3);
+  const draftSize = () => {
+    if (state.size !== 'auto') return Number(state.size);
+    if (state.maxTeams === 2) {
+      return [6, 5, 4].find(size => state.selected.size >= size * 2 && state.selected.size % size === 0)
+        || [6, 5, 4, 3, 2].find(size => state.selected.size >= size * 2) || 2;
+    }
+    return Math.min(6, Math.floor(state.selected.size / (state.maxTeams >= 5 && state.selected.size >= 10 ? 5 : 3)));
+  };
   const hasChanges = () => state.dirtyRoster || state.dirtyTeams || state.dirtyResults ||
     state.dirtySchedule || state.dirtyBonus || Object.keys(state.matchEdits).length > 0 || Object.keys(state.formEdits).length > 0;
   const selectedAttr = (a, b) => String(a) === String(b) ? ' selected' : '';
@@ -521,14 +529,19 @@
 
   function planText() {
     const n = state.selected.size;
-    if (n < minimumRoster()) return `${n} selected. At least ${minimumRoster()} players are needed for three ${state.size === 'auto' ? '2' : state.size}-a-side teams. You may save an understrength draft, but not publish it.`;
+    const teamCount = state.maxTeams === 2 ? 2 : 3;
+    if (n < minimumRoster()) return `${n} selected. At least ${minimumRoster()} players are needed for ${teamCount === 2 ? 'two' : 'three'} ${state.size === 'auto' ? '2' : state.size}-a-side teams. You may save an understrength draft, but not publish it.`;
     if (n > 500) return `${n} selected. A training supports at most 500 players. Reduce this roster before drafting.`;
     const size = draftSize();
     const feasible = Math.min(state.maxTeams, Math.floor(n / size));
-    const count = feasible >= 5 ? 5 : feasible >= 3 ? 3 : feasible;
+    const count = state.maxTeams === 2 ? 2 : feasible >= 5 ? 5 : feasible >= 3 ? 3 : feasible;
     const min = Math.floor(n / count);
     const max = Math.ceil(n / count);
-    return `${n} players → ${count} referee-safe teams of ${min === max ? min : `${min}–${max}`}. ${state.size === 'auto' ? 'Auto selects ' : ''}${size} on court per team; ${count === 5 ? 'two courts can run while the fifth team refs.' : 'one court runs while the third team refs.'} ${max > size ? 'Larger squads rotate substitutes — nobody is left out.' : 'Everyone plays, nobody is left out.'}`;
+    const format = count === 2
+      ? 'head-to-head teams; an external Head Ref/admin must officiate.'
+      : count === 5 ? 'referee-safe teams; two courts can run while the fifth team refs.'
+        : 'referee-safe teams; one court runs while the third team refs.';
+    return `${n} players → ${count} ${format} Squads have ${min === max ? min : `${min}–${max}`} players. ${state.size === 'auto' ? 'Auto selects ' : ''}${size} on court per team. ${max > size ? 'Larger squads rotate substitutes — nobody is left out.' : 'Everyone plays, nobody is left out.'}`;
   }
 
   function playerFor(id) {
@@ -601,10 +614,10 @@
           ${[['auto', 'Auto · choose 2–6'], ...[2, 3, 4, 5, 6].map(n => [String(n), `${n} on court`])].map(([v, l]) => option(v, l, state.size)).join('')}
         </select></div>
         <div class="al-field">${label('al-max-teams', 'Maximum squads for next rebalance')}
-          <select id="al-max-teams"${disabled(locked)}>${[3, 4, 5].map(count => option(count, `${count} squads maximum`, state.maxTeams)).join('')}</select>
-          <p class="al-small">Generation prefers five squads for two courts, otherwise three for one court, so one whole team can referee every slot. Four is retained only when you deliberately keep a manual draft.</p></div></div>
+          <select id="al-max-teams"${disabled(locked)}>${[2, 3, 4, 5].map(count => option(count, `${count} squads maximum`, state.maxTeams)).join('')}</select>
+          <p class="al-small">Choose two for a head-to-head evening with an external Head Ref/admin. Otherwise generation prefers five squads for two courts or three for one court, leaving a whole team free to ref every slot. Four is retained only in a manual draft.</p></div></div>
       <p class="al-callout" id="al-plan" role="status">${planText()}</p>
-      <p class="al-small">A draft includes everyone. Gender and really-rookie distribution are balanced alongside hidden ELO. Ref-safe generation creates five teams when feasible, otherwise three; extra players rotate as substitutes.</p>
+      <p class="al-small">A draft includes everyone. Gender and really-rookie distribution are balanced alongside hidden ELO. Generation supports a deliberate two-team head-to-head exception; otherwise it creates five teams when feasible or three. Extra players rotate as substitutes.</p>
       <p class="al-small">Team names are chosen when the draft is generated and stay saved until you edit or regenerate them. Refreshing does not redraw names.</p>
       ${cancelled() ? '<p class="al-notice">This training is cancelled. Choose an active Thursday to edit.</p>' : ''}
       <div class="al-actions">
@@ -634,7 +647,7 @@
   }
 
   function scheduleSlots(count, courts) {
-    const activeCourts = Math.min(courts, Math.floor((count - 1) / 2));
+    const activeCourts = count === 2 ? 1 : Math.min(courts, Math.floor((count - 1) / 2));
     return {
       activeCourts,
       slots: (count % 2 ? count : count - 1) * Math.ceil(Math.floor(count / 2) / activeCourts)
@@ -642,13 +655,14 @@
   }
 
   function recommendedScheduleSettings(count) {
-    const teams = count >= 3 && count <= 5 ? count : 5;
-    const courts = teams === 3 ? 1 : 2;
+    const teams = count >= 2 && count <= 5 ? count : 5;
+    const courts = teams <= 3 ? 1 : 2;
     const { slots } = scheduleSlots(teams, courts);
-    const breakMinutes = slots <= 3 ? 7 : slots <= 5 ? 5 : slots <= 6 ? 3 : 1;
+    const breakMinutes = teams === 2 ? 0 : slots <= 3 ? 7 : slots <= 5 ? 5 : slots <= 6 ? 3 : 1;
     return {
       courts,
-      match_minutes: Math.max(1, Math.floor((120 - 15 - (slots - 1) * breakMinutes) / slots)),
+      match_minutes: teams === 2 ? 60
+        : Math.max(1, Math.floor((120 - 15 - (slots - 1) * breakMinutes) / slots)),
       break_minutes: breakMinutes,
       meetup_time: '18:00',
       warmup_minutes: 15,
@@ -659,7 +673,7 @@
 
   function scheduleEstimate(settings) {
     const count = state.teams.length;
-    if (count < 3 || count > 5) throw new Error('Generate three to five squads before planning this referee-safe round robin.');
+    if (count < 2 || count > 5) throw new Error('Generate two to five squads before planning this round robin.');
     if (typeof settings.meetup_time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(settings.meetup_time)) {
       throw new Error('Meetup time must use HH:MM.');
     }
@@ -683,7 +697,9 @@
     try {
       const estimate = scheduleEstimate(state.scheduleSettings);
       const buffer = state.scheduleSettings.available_minutes - estimate.duration;
-      const topology = estimate.activeCourts < state.scheduleSettings.courts
+      const topology = state.teams.length === 2
+        ? 'One court runs head-to-head; assign an external Head Ref/admin because neither team is free.'
+        : estimate.activeCourts < state.scheduleSettings.courts
         ? `${state.scheduleSettings.courts} courts are available, but only ${estimate.activeCourts} runs per slot so a team is always free to ref.`
         : `${estimate.activeCourts} court${estimate.activeCourts === 1 ? '' : 's'} run per slot with exactly one assigned ref team.`;
       return `Meet ${scheduleTime(0)} · warm-up to ${scheduleTime(state.scheduleSettings.warmup_minutes)} · ${estimate.slots} game slots / ${estimate.matches} matches until ${scheduleTime(estimate.duration)} · games cutoff ${scheduleTime(state.scheduleSettings.available_minutes)} · Last Man/Woman Standing ${scheduleTime(state.scheduleSettings.available_minutes)}–${scheduleTime(state.scheduleSettings.available_minutes + state.scheduleSettings.finale_minutes)}. ${topology} ${buffer < 0 ? `Does not fit: ${-buffer} minutes over the games window.` : `${buffer} minutes of game-window buffer remain.`}`;
@@ -700,12 +716,13 @@
   function renderSchedule() {
     const e = event();
     const editable = e?.status === 'draft' && !isLocked() && !state.dirtyTeams && !needsRosterReview();
+    const externalRef = e?.teams?.length === 2;
     return `<section class="al-card" id="al-schedule">
       ${heading(4, 'Plan the round robin')}
-      <p class="al-muted" id="al-schedule-heading" tabindex="-1">Target program: meet and warm up at 18:00, play from 18:15 until 20:00, then finish with a maximum 10-minute Last Man / Last Woman Standing finale. Every match slot assigns one non-playing team to referee.</p>
+      <p class="al-muted" id="al-schedule-heading" tabindex="-1">Target program: meet and warm up at 18:00, play from 18:15 until 20:00, then finish with a maximum 10-minute Last Man / Last Woman Standing finale. ${externalRef ? 'With two teams, assign an external Head Ref/admin.' : 'Every match slot assigns one non-playing team to referee.'}</p>
       ${!e ? '<p class="al-empty">Generate and save your balanced teams first.</p>' : `
         ${state.dirtyTeams || needsRosterReview() ? '<p class="al-notice">Save or regenerate the lineup first. Lineup changes can clear its saved schedule; generate the schedule again after those changes.</p>' : ''}
-        ${e.status !== 'draft' ? `<p class="al-callout">${lineupStarted() || e.status === 'finalized' ? 'Games have started or results are final: the schedule and lineup are locked.' : 'The schedule is published. Before the first recorded score, use Edit lineup to return to a private draft and change the schedule.'}</p>` : ''}
+        ${e.status !== 'draft' ? `<p class="al-callout">${lineupStarted() || e.status === 'finalized' ? 'Games have started or results are final: the schedule and lineup are locked.' : 'The schedule is published. Before the first recorded score, you can delete it below or use Edit lineup; either action returns this event to a private draft.'}</p>` : ''}
         <form data-al-form="schedule">
           <fieldset id="al-schedule-fields"${disabled(!editable)}>
             <legend class="al-sr-only">Schedule settings</legend>
@@ -728,10 +745,12 @@
               ${action('discard-schedule', 'Discard timing edits', ` id="al-discard-schedule"${disabled(!state.dirtySchedule)}`)}</div>
           </fieldset>
         </form>
-        ${e.schedule ? e.schedule.referee_policy
-          ? `<p class="al-small al-form-actions">Saved schedule: ${e.schedule.rounds.length} slots, ${allMatches().length} matches, games ending at ${esc(scheduleTime(e.schedule.duration_minutes, e.schedule.meetup_time))}; finale ${esc(scheduleTime(e.schedule.finale_start_minute, e.schedule.meetup_time))}–${esc(scheduleTime(e.schedule.total_duration_minutes, e.schedule.meetup_time))}. <a href="#al-matches">Review fixtures, ref teams and court times</a> before publishing.</p>`
+        ${e.schedule ? [ROTATING_REF_POLICY, EXTERNAL_REF_POLICY].includes(e.schedule.referee_policy)
+          ? `<p class="al-small al-form-actions">Saved schedule: ${e.schedule.rounds.length} slots, ${allMatches().length} matches, games ending at ${esc(scheduleTime(e.schedule.duration_minutes, e.schedule.meetup_time))}; finale ${esc(scheduleTime(e.schedule.finale_start_minute, e.schedule.meetup_time))}–${esc(scheduleTime(e.schedule.total_duration_minutes, e.schedule.meetup_time))}. <a href="#al-matches">Review fixtures, ${e.schedule.referee_policy === EXTERNAL_REF_POLICY ? 'the external-ref requirement' : 'ref teams'} and court times</a> before publishing.</p>`
           : '<p class="al-notice al-form-actions">This is a legacy schedule without assigned ref teams. Regenerate it before republishing.</p>'
           : '<p class="al-small al-form-actions">No schedule saved. Generate the referee-safe round robin before publishing the itinerary.</p>'}`}
+        ${e?.schedule && ['draft', 'published'].includes(e.status) && !lineupStarted()
+          ? `<div class="al-actions al-form-actions">${action('delete-schedule', e.status === 'published' ? 'Delete published schedule' : 'Delete saved schedule', ' id="al-delete-schedule"')}</div>` : ''}
     </section>`;
   }
 
@@ -765,7 +784,10 @@
       <p class="al-muted" id="al-matches-heading" tabindex="-1">${completed} / ${allMatches().length} matches scored. ${e.status === 'draft' ? 'Private schedule preview. Publish teams and this schedule before recording scores.' : e.status === 'finalized' ? 'Finalized scores are read-only. Reopen results in step 7 to make a correction.' : futureTraining() ? `This is a future training. Scores can be entered from ${esc(dateOnly(session()?.session_date || e.session_date))}, using the Vienna calendar date. Teams and fixtures can be published in advance.` : 'Enter the final points scored by each team, then save that match. Saving the first score permanently locks the lineup.'}</p>
       ${e.schedule.rounds.map(round => `<section class="al-round" aria-labelledby="al-round-${round.number}">
         <h4 id="al-round-${round.number}">Slot ${round.number} · ${esc(scheduleTime(round.start_minute))}–${esc(scheduleTime(round.end_minute))}</h4>
-        ${round.referee_team ? `<p class="al-callout"><strong>Ref team:</strong> ${esc(teamName(round.referee_team))}</p>` : '<p class="al-notice">Legacy slot: no ref team assigned. Regenerate before republishing.</p>'}
+        ${round.referee_team ? `<p class="al-callout"><strong>Ref team:</strong> ${esc(teamName(round.referee_team))}</p>`
+          : e.schedule.referee_policy === EXTERNAL_REF_POLICY
+            ? '<p class="al-callout"><strong>External ref:</strong> Head Ref/admin required — both teams are playing.</p>'
+            : '<p class="al-notice">Legacy slot: no ref team assigned. Regenerate before republishing.</p>'}
         ${round.rest_teams?.length ? `<p class="al-small">Resting: ${round.rest_teams.map(team => esc(teamName(team))).join(', ')}</p>` : ''}
         <div class="al-match-grid">${round.matches.map(match => {
           const draft = state.matchEdits[String(match.number)];
@@ -812,8 +834,8 @@
           status === 'finalized' ? '<a class="al-button al-secondary" href="#al-results">Correct final placements</a>' :
             `<button type="button" class="al-button" id="al-publish-button" data-al-action="publish"${disabled(!e || isLocked() || state.dirtyTeams || state.dirtySchedule || needsRosterReview() || !!publishWarning())}>Publish teams (public names)</button>`}
         ${e ? `<a class="al-button al-secondary" href="/spieltag?event=${encodeURIComponent(e.id)}" target="_blank" rel="noopener">Live-Spieltag / Ergebnisse <span class="al-sr-only">(opens a new tab; sign in there to enter scores)</span></a>` : ''}
-        ${e && ['published', 'finalized'].includes(status) ? `<a class="al-button" data-al-pdf="itinerary" href="/spieltag?event=${encodeURIComponent(e.id)}&export=itinerary" target="_blank" rel="noopener">Download / share fixtures PDF <span class="al-sr-only">(opens the public matchday and downloads the itinerary PDF)</span></a>` : ''}
-        ${e && status === 'finalized' ? `<a class="al-button" data-al-pdf="results" href="/spieltag?event=${encodeURIComponent(e.id)}&export=results" target="_blank" rel="noopener">Download / share results PDF <span class="al-sr-only">(opens the public matchday and downloads the final results PDF)</span></a>` : ''}
+        ${e && ['published', 'finalized'].includes(status) ? `<a class="al-button" data-al-poster="itinerary" href="/spieltag?event=${encodeURIComponent(e.id)}&export=itinerary" target="_blank" rel="noopener">Download / share fixtures image <span class="al-sr-only">(opens the public matchday and downloads the portrait itinerary image)</span></a>` : ''}
+        ${e && status === 'finalized' ? `<a class="al-button" data-al-poster="results" href="/spieltag?event=${encodeURIComponent(e.id)}&export=results" target="_blank" rel="noopener">Download / share results image <span class="al-sr-only">(opens the public matchday and downloads the portrait results image)</span></a>` : ''}
       </div>
       <p class="al-small al-form-actions">Publishing makes all selected player names public, including named guests. Let guests know before publishing. Ratings, gender labels and rookie tags remain admin-only and are never included in the public team view.</p>
     </section>`;
@@ -821,9 +843,15 @@
 
   function publishWarning() {
     if (!event()) return '';
-    if (state.selected.size < minimumRoster()) return `Cannot publish: ${state.selected.size} players; at least ${minimumRoster()} are required for three on-court teams and a rotating ref team. An understrength draft can still be saved.`;
-    if (state.teams.length < 3 || state.teams.length > 5) return 'Cannot publish: use three to five teams so every slot has a ref team.';
-    if (event().schedule && !event().schedule.referee_policy) return 'Cannot publish: regenerate this legacy schedule so every slot has an assigned ref team.';
+    if (state.teams.length < 2 || state.teams.length > 5) return 'Cannot publish: use two to five teams.';
+    const requiredPlayers = state.teams.length * draftSize();
+    if (state.selected.size < requiredPlayers) return `Cannot publish: ${state.selected.size} players; at least ${requiredPlayers} are required for ${state.teams.length} on-court teams. An understrength draft can still be saved.`;
+    if (event().schedule) {
+      const expectedPolicy = state.teams.length === 2 ? EXTERNAL_REF_POLICY : ROTATING_REF_POLICY;
+      if (event().schedule.referee_policy !== expectedPolicy) {
+        return `Cannot publish: regenerate this schedule for ${state.teams.length === 2 ? 'the external Head Ref format' : 'rotating ref-team assignments'}.`;
+      }
+    }
     if (state.teams.flatMap(t => t.player_ids).length !== state.selected.size) return 'Cannot publish: assign every selected player to a team.';
     const short = state.teams.find(t => t.player_ids.length < draftSize());
     if (short) return `Cannot publish: ${short.name || `Team ${short.number}`} has ${short.player_ids.length} players; needs ${draftSize()}. Add players, move players or choose a smaller on-court size.`;
@@ -1216,7 +1244,7 @@
   async function generate() {
     if (!season() || !state.sessionId || isLocked()) throw new Error('Choose an editable Season 2 Thursday first.');
     if (state.selected.size < minimumRoster() || state.selected.size > 500) throw new Error(`Select ${minimumRoster()}–500 players for this team size.`);
-    if (!Number.isInteger(state.maxTeams) || state.maxTeams < 3 || state.maxTeams > 5) throw new Error('Choose a maximum of three to five squads.');
+    if (!Number.isInteger(state.maxTeams) || state.maxTeams < 2 || state.maxTeams > 5) throw new Error('Choose a maximum of two to five squads.');
     if (event() && !window.confirm(`Rebalance this draft? Team names and all assignments will be replaced. To keep other players in place, cancel and use Save draft instead.${event().schedule || state.dirtySchedule ? ' The saved schedule and timing edits will be cleared.' : ''}`)) return;
     if (!await prepareProfiles()) return;
     await write('generate', {
@@ -1281,6 +1309,22 @@
           break_minutes: event().schedule.break_minutes, available_minutes: event().schedule.available_minutes
         } : { courts: 2, match_minutes: 20, break_minutes: 5, available_minutes: 120 };
         state.dirtySchedule = false; render(); break;
+      case 'delete-schedule': {
+        const current = event();
+        if (!current?.schedule || !['draft', 'published'].includes(current.status)) return;
+        if (lineupStarted()) throw new Error('A schedule cannot be deleted after a score was saved or results were finalized.');
+        if (state.dirtySchedule || state.dirtyTeams || state.dirtyRoster || state.dirtyBonus
+          || state.dirtyResults || Object.keys(state.matchEdits).length) {
+          throw new Error('Save or discard all local lineup, timing, BP and score edits before deleting the schedule.');
+        }
+        const published = current.status === 'published';
+        if (!window.confirm(`${published ? 'Delete this published schedule and hide the matchday?' : 'Delete this saved schedule?'} Timer state is removed too. The teams remain in a private draft so you can create and publish a replacement.`)) return;
+        await write('delete_schedule', { event_id: current.id, version: current.version }, {
+          message: 'Schedule deleted. Teams remain in a private draft; create a new schedule and publish again.',
+          focus: 'al-schedule-heading'
+        });
+        break;
+      }
       case 'swap': if (!isLocked()) adjustTeams(true); break;
       case 'move': if (!isLocked()) adjustTeams(false); break;
       case 'undo-draft': {
@@ -1398,10 +1442,10 @@
           .map(key => [key, Number(data.get(key))]))
       };
       const estimate = scheduleEstimate(settings);
-      if (estimate.duration > settings.available_minutes) throw new Error(`This referee-safe round robin needs ${estimate.duration} minutes from meetup, but games must finish by minute ${settings.available_minutes}. Shorten games or changeovers.`);
+      if (estimate.duration > settings.available_minutes) throw new Error(`This round robin needs ${estimate.duration} minutes from meetup, but games must finish by minute ${settings.available_minutes}. Shorten games or changeovers.`);
       if (event().schedule && !window.confirm('Replace the saved schedule with these court and timing settings? Review the new fixtures before publishing.')) return;
       await write('generate_schedule', { event_id: event().id, version: event().version, ...settings }, {
-        message: `Schedule saved: ${estimate.matches} matches, one ref team per slot, games ending ${scheduleTime(estimate.duration, settings.meetup_time)}, then the Last Man/Woman finale.`,
+        message: `Schedule saved: ${estimate.matches} match${estimate.matches === 1 ? '' : 'es'}, ${state.teams.length === 2 ? 'external Head Ref required' : 'one ref team per slot'}, games ending ${scheduleTime(estimate.duration, settings.meetup_time)}, then the Last Man/Woman finale.`,
         focus: 'al-matches-heading'
       });
     } else if (type === 'match') {

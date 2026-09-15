@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { MatchError, buildSchedule, matchStandings, resolvePlacements, updateMatchScore } = require('../lib/league-matches');
+const {
+  MatchError, REFEREE_POLICY, EXTERNAL_REFEREE_POLICY,
+  buildSchedule, matchStandings, resolvePlacements, updateMatchScore,
+} = require('../lib/league-matches');
 
 function finish(schedule, score) {
   const completed = structuredClone(schedule);
@@ -61,8 +64,38 @@ test('all referee-safe team/court counts cover every pair once and rotate one no
   }
 });
 
+test('two teams play one head-to-head fixture with an explicit external Head Ref', () => {
+  const schedule = buildSchedule(2);
+  assert.equal(schedule.referee_policy, EXTERNAL_REFEREE_POLICY);
+  assert.equal(schedule.active_courts, 1);
+  assert.equal(schedule.rounds.length, 1);
+  assert.equal(schedule.rounds[0].matches.length, 1);
+  assert.deepEqual(schedule.rounds[0].bye_teams, []);
+  assert.equal(schedule.rounds[0].referee_team, null);
+  assert.deepEqual(schedule.rounds[0].rest_teams, []);
+  assert.equal(schedule.rounds[0].start_minute, 15);
+  assert.equal(schedule.rounds[0].end_minute, 75);
+  assert.equal(schedule.finale_start_minute, 120);
+  assert.equal(schedule.total_duration_minutes, 130);
+
+  const completed = finish(schedule, () => [4, 2]);
+  const table = matchStandings(2, completed);
+  assert.equal(table.complete, true);
+  assert.deepEqual(table.placements, [
+    { team_number: completed.rounds[0].matches[0].team_a, placement: 1 },
+    { team_number: completed.rounds[0].matches[0].team_b, placement: 2 },
+  ]);
+  assert.equal(REFEREE_POLICY, 'rotating_team_v1');
+
+  const invalid = structuredClone(schedule);
+  invalid.rounds[0].referee_team = 1;
+  assert.throws(() => matchStandings(2, invalid), /external referee/);
+  const wrongPolicy = structuredClone(schedule);
+  wrongPolicy.referee_policy = REFEREE_POLICY;
+  assert.throws(() => matchStandings(2, wrongPolicy), /Referee team/);
+});
+
 test('infeasible budgets are rejected instead of silently shortening games', () => {
-  assert.throws(() => buildSchedule(2), /At least three teams/);
   assert.throws(() => buildSchedule(5, { courts: 1 }), /needs 230 minutes/);
   assert.throws(() => buildSchedule(5, { available_minutes: 119 }), /needs 120 minutes/);
   assert.throws(() => buildSchedule(6), /between 2 and 5/);

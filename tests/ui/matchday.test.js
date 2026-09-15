@@ -226,14 +226,14 @@ test('standalone page uses versioned local assets, external scripts, rewrite, an
   assert.match(html, /viewport/);
   assert.match(html, /fonts\/fonts.css\?v=20260912c/);
   assert.match(html, /league.css\?v=20260912d/);
-  assert.match(html, /matchday.css\?v=20260914d/);
-  assert.match(html, /league-pdf\.js\?v=20260914d/);
-  assert.match(html, /matchday\.js\?v=20260914d/);
-  assert.match(html, /id="matchdayPdf"/);
-  assert.match(html, /id="matchdayResultsPdf"/);
+  assert.match(html, /matchday.css\?v=20260914e/);
+  assert.match(html, /league-poster\.js\?v=20260914e/);
+  assert.match(html, /matchday\.js\?v=20260914e/);
+  assert.match(html, /id="matchdayPoster"/);
+  assert.match(html, /id="matchdayResultsPoster"/);
   assert.doesNotMatch(html, /publicsite.css|admin-auth.js|member-auth.js|\son[a-z]+=/);
   for (const script of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
-    assert.match(script[1], /src="\/js\/[^"]+\?v=202609(?:12[cd]|14d)"/);
+    assert.match(script[1], /src="\/js\/[^"]+\?v=202609(?:12[cd]|14e)"/);
     assert.equal(script[2].trim(), '');
   }
   assert.match(html, /id="matchdayLoginLink" href="\/member\?return_to=/);
@@ -244,7 +244,7 @@ test('standalone page uses versioned local assets, external scripts, rewrite, an
   assert.match(html, /data-site-language="en"/);
   assert.match(css, /min-height: 62px/);
   assert.match(css, /min-height: 50px/);
-  assert.match(css, /matchday-pdf/);
+  assert.match(css, /matchday-poster/);
   assert.match(source, /15000/);
   assert.match(source, /document.hidden/);
   assert.match(source, /beforeunload/);
@@ -275,6 +275,7 @@ test('public itinerary shows meetup, game window, finale awards and safely proje
   assert.equal(ui.scheduleClock(event, 15), '18:15');
   const copy = {
     program: 'Itinerary', meetWarmup: 'Meet & warm-up', gamesWindow: 'League games',
+    externalRef: 'External Head Ref / admin',
     finale: 'Last Man / Last Woman Standing', finaleAwards: 'Winner +1 BP · runner-up +0.5 BP',
     finaleResults: 'Finale results', winner: 'Winner', runnerUp: 'Runner-up',
     men: 'Last Man Standing', women: 'Last Woman Standing',
@@ -297,6 +298,22 @@ test('public itinerary shows meetup, game window, finale awards and safely proje
   assert.doesNotMatch(finale, /<Winner>/);
 });
 
+test('two-team fixtures and itinerary clearly require an external Head Ref', () => {
+  const event = fixture().event;
+  event.teams = event.teams.slice(0, 2);
+  event.schedule = buildSchedule(2);
+  const copy = {
+    program: 'Itinerary', meetWarmup: 'Meet & warm-up', gamesWindow: 'League games',
+    externalRef: 'External Head Ref / admin',
+    finale: 'Last Man / Last Woman Standing', finaleAwards: 'Winner +1 BP · runner-up +0.5 BP',
+  };
+  assert.match(ui.programMarkup(event, copy), /External Head Ref \/ admin/);
+  const markup = ui.fixtures(event, 'en');
+  assert.match(markup, /External Head Ref \/ admin/);
+  assert.equal((markup.match(/data-match-number=/g) || []).length, 1);
+  assert.doesNotMatch(markup, /Ref team not assigned/);
+});
+
 test('real schedule match numbers map to two labeled numeric controls, escaped team names, and explicit submit', () => {
   const event = fixture().event;
   event.teams[0].name = '<img src=x onerror="bad()">';
@@ -310,7 +327,7 @@ test('real schedule match numbers map to two labeled numeric controls, escaped t
   assert.match(markup, /aria-describedby="matchday-message-1"/);
   assert.match(markup, /&lt;img src=x onerror=&quot;bad\(\)&quot;&gt;/);
   assert.doesNotMatch(markup, /<img/);
-  assert.match(markup, /19:00/);
+  assert.match(markup, /18:15/);
   assert.equal((markup.match(/class="league-btn matchday-timer-link"/g) || []).length, 3);
   assert.match(markup, new RegExp('/timer\\?event=' + A + '&amp;match=1'));
   assert.equal(ui.timerPath(A, 1), '/timer?event=' + A + '&match=1');

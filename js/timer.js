@@ -38,6 +38,7 @@
       court: 'Feld',
       round: 'Runde',
       refTeam: 'Ref-Team',
+      externalRef: 'Externer Head Ref / Admin',
       scheduled: 'Geplant',
     },
     en: {
@@ -74,6 +75,7 @@
       court: 'Court',
       round: 'Round',
       refTeam: 'Ref team',
+      externalRef: 'External Head Ref / admin',
       scheduled: 'Scheduled',
     }
   };
@@ -375,7 +377,8 @@
         t().court + ' ' + data.match.court,
         t().round + ' ' + data.match.round_number,
         t().scheduled + ' ' + scheduledTime(data.event.start_time, data.match.start_minute),
-        data.match.referee_team ? t().refTeam + ' ' + data.match.referee_team.name : '',
+        data.match.referee_team ? t().refTeam + ' ' + data.match.referee_team.name
+          : data.match.external_referee ? t().externalRef : '',
       ].filter(Boolean).join(' · ');
       $('timerRole').textContent = role;
       $('timerTeamA').textContent = data.match.team_a.name;
