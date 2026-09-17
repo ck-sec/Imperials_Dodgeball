@@ -182,10 +182,16 @@ async function app(options = {}) {
       } else if (body.action === 'publish' || body.action === 'unpublish') {
         event.status = body.action === 'publish' ? 'published' : 'draft';
         event.version++;
+      } else if (body.action === 'add_late_player') {
+        event.teams.find(team => team.number === body.team_number).players.push(
+          store.players.find(player => player.id === body.player_id)
+        );
+        event.version++;
       }
       return response({ event_id: event?.id });
     }
   });
+  context.adminFetch = context.fetch;
   vm.runInContext(fs.readFileSync(path.join(rootPath, 'js', 'league-scoring.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(rootPath, 'js', 'league-ui.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(rootPath, 'js', 'league-schedule.js'), 'utf8'), context);
@@ -647,6 +653,31 @@ test('new trainings open Players; published and final events open Results withou
   }
 });
 
+test('Results assigns an unassigned last-minute player without rebuilding teams or scores', async () => {
+  const data = dataFixture();
+  data.events[0].status = 'published';
+  data.events[0].schedule = buildSchedule(2);
+  const a = await app({ data });
+  assert.match(a.html(), /Last-minute player/);
+  assert.match(a.html(), /Choose player/);
+  assert.match(a.html(), /value="p5"/);
+  await a.api.submit(a.form('late-player', { player_id: 'p5', team_number: '2' }));
+  assert.deepEqual(a.requests.find(request => request.body?.action === 'add_late_player').body, {
+    action: 'add_late_player', event_id: 'event-1', version: 3, player_id: 'p5', team_number: 2
+  });
+  assert.deepEqual(a.api.state.teams[1].player_ids, ['p3', 'p4', 'p5']);
+  assert.equal(a.store.events[0].schedule.rounds.length > 0, true);
+  await a.action('open-late-guest');
+  assert.equal(a.api.state.stage, 'players');
+  assert.equal(a.api.state.guestOpen, true);
+
+  const finalizedData = dataFixture();
+  finalizedData.events[0].status = 'finalized';
+  finalizedData.events[0].teams.forEach((team, index) => { team.placement = index + 1; });
+  const finalizedApp = await app({ data: finalizedData });
+  assert.match(finalizedApp.html(), /atomically recalculated without double-counting/);
+});
+
 test('cross-stage fixture links reveal the destination and keyboard focus before scrolling', async () => {
   const data = dataFixture();
   data.events[0].status = 'published';
@@ -766,8 +797,9 @@ test('two-team schedules need explicit external-ref confirmation before publishi
 test('admin assets cache-busted, role management title preserved, touch targets avoid HTML5-only dragging', () => {
   const html = fs.readFileSync(path.join(rootPath, 'admin.html'), 'utf8');
   const css = fs.readFileSync(path.join(rootPath, 'admin-league.css'), 'utf8');
-  assert.match(html, /admin-league\.js\?v=20260916a/);
-  assert.match(html, /admin-league\.css\?v=20260916a/);
+  assert.match(html, /admin-league\.js\?v=20260918/);
+  assert.match(html, /admin-statistics\.js\?v=20260917a/);
+  assert.match(html, /admin-league\.css\?v=20260918/);
   assert.match(html, /league-schedule\.js\?v=20260916a/);
   assert.match(html, /\/league\.css\?v=20260915/);
   assert.match(html, /\/js\/league-ui\.js\?v=20260915c/);
@@ -782,8 +814,35 @@ test('admin assets cache-busted, role management title preserved, touch targets 
   assert.match(source, /one assigned ref team/);
   assert.match(source, /external Head Ref required/);
   assert.match(source, /Last Man \/ Last Woman Standing · max 10 minutes/);
-  assert.match(html, /data-tab="members"[^>]+>Members<\/button>/);
+  assert.match(html, /data-tab="member-management"[^>]+>Member Management<\/button>/);
+  assert.match(html, /data-tab="statistics"[^>]+>Statistics<\/button>/);
   assert.match(css, /touch-action: none/);
   assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 96px/);
   assert.doesNotMatch(source, /draggable=|addEventListener\('dragstart'/);
+});
+
+test('normal Thursday flow is concise while roster, balancing, timing and checks stay available', async () => {
+  const a = await app();
+  const html = a.html();
+  assert.match(html, /Normal Thursday/);
+  assert.match(html, /Confirm players → generate balanced teams → use the recommended schedule → publish/);
+  assert.ok(html.indexOf('players selected') < html.indexOf('Adjust roster, add a guest or edit a player profile'));
+  assert.match(html, /<details class="al-details al-toolbox" id="al-roster-tools">/);
+  assert.match(html, /<details class="al-details al-toolbox" id="al-team-options">/);
+  assert.match(html, /<details class="al-details al-toolbox" id="al-team-tools">/);
+  assert.match(html, /<details class="al-details al-toolbox" id="al-timing-details">/);
+  assert.match(html, /<details class="al-details al-toolbox" id="al-publication-checklist-details">/);
+  assert.match(html, /<details class="al-details al-toolbox al-fixture-preview" id="al-fixture-preview">/);
+  assert.match(html, /Create recommended schedule/);
+  assert.match(html, /\d+\/6 checks ready/);
+  assert.match(source, /Last-minute player/);
+  const simpleTeams = html.slice(html.indexOf('id="al-teams"'), html.indexOf('id="al-team-tools"'));
+  assert.doesNotMatch(simpleTeams, /Private avg|data-al-handle|Remove/);
+
+  const teamTools = a.get('al-team-tools');
+  teamTools.open = true;
+  a.emit('toggle', teamTools);
+  assert.equal(a.api.state.teamToolsOpen, true);
+  assert.match(a.html(), /id="al-team-tools" open/);
+  assert.match(a.html(), /Private avg|data-al-handle/);
 });

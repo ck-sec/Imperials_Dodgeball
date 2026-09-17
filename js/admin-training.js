@@ -17,9 +17,7 @@ async function loadAdminTrainingSessions() {
   const container = document.getElementById('atSessionsList');
   container.innerHTML = '<p style="color:#8899bb; font-size:.9rem;">Loading sessions...</p>';
   try {
-    const res = await fetch('/api/admin/training?view=overview&range=month', {
-      headers: { 'Authorization': 'Bearer ' + getToken() }
-    });
+    const res = await adminFetch('/api/admin/training?view=overview&range=month');
     if (!res.ok) throw new Error('Failed');
     const data = await res.json();
     adminTrainingSessions = data.sessions || [];
@@ -93,9 +91,7 @@ async function toggleAdminDetail(id) {
   el.innerHTML = '<p style="color:#8899bb; font-size:.8rem;">Loading...</p>';
   el.classList.add('open');
   try {
-    const res = await fetch('/api/admin/training?view=detail&id=' + id, {
-      headers: { 'Authorization': 'Bearer ' + getToken() }
-    });
+    const res = await adminFetch('/api/admin/training?view=detail&id=' + id);
     if (!res.ok) throw new Error('Failed');
     const data = await res.json();
     const att = data.attendees.filter(a => a.status === 'attending');
@@ -179,9 +175,9 @@ async function submitSession() {
     : { action: 'create', title, session_date, start_time, end_time, location: sessionLocation, description, max_capacity };
 
   try {
-    const res = await fetch('/api/admin/training', {
+    const res = await adminFetch('/api/admin/training', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     if (!res.ok) throw new Error('Failed');
@@ -199,9 +195,9 @@ async function submitSession() {
 async function cancelSession(id) {
   if (!confirm('Cancel this session? Members will see it as cancelled.')) return;
   try {
-    const res = await fetch('/api/admin/training', {
+    const res = await adminFetch('/api/admin/training', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'cancel', id })
     });
     if (!res.ok) throw new Error('Failed');
@@ -215,10 +211,7 @@ async function cancelSession(id) {
 async function deleteSession(id) {
   if (!confirm('Permanently delete this session and all attendance data?')) return;
   try {
-    const res = await fetch('/api/admin/training?id=' + id, {
-      method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + getToken() }
-    });
+    const res = await adminFetch('/api/admin/training?id=' + id, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed');
     toast('Session deleted', 'info');
     await loadAdminTrainingSessions();
@@ -253,9 +246,9 @@ async function submitRecurring() {
   btn.textContent = 'Generating...';
 
   try {
-    const res = await fetch('/api/admin/training', {
+    const res = await adminFetch('/api/admin/training', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'generate', title, recurring_day, weeks, start_time, end_time, location: sessionLocation })
     });
     if (!res.ok) throw new Error('Failed');
@@ -276,9 +269,7 @@ async function loadAdminMatrix() {
   const container = document.getElementById('atMatrixContent');
   container.innerHTML = '<p style="color:#8899bb; font-size:.9rem;">Loading matrix...</p>';
   try {
-    const res = await fetch('/api/admin/training?view=matrix', {
-      headers: { 'Authorization': 'Bearer ' + getToken() }
-    });
+    const res = await adminFetch('/api/admin/training?view=matrix');
     if (!res.ok) throw new Error('Failed');
     const data = await res.json();
     const { sessions, matrix, attendance_rate } = data;

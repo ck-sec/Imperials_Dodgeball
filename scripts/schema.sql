@@ -32,6 +32,13 @@ ALTER TABLE users ALTER COLUMN is_active SET DEFAULT FALSE;
 UPDATE users SET status = 'approved' WHERE is_active = TRUE;
 UPDATE users SET status = 'pending' WHERE is_active = FALSE;
 
+CREATE TABLE IF NOT EXISTS admin_users (
+  user_id     UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  admin_key   VARCHAR(32) NOT NULL UNIQUE
+              CHECK (admin_key IN ('christoph-kopka', 'dominik-riedl')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS login_attempts (
   email_hash    VARCHAR(64) NOT NULL,
   attempt_count INTEGER DEFAULT 1,

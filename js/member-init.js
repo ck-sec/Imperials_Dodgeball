@@ -61,6 +61,11 @@ document.addEventListener('click', event => {
     loadMemberLeague(activeTab === 'league' && select ? select.value : '');
     return;
   }
+  if (event.target.closest('[data-member-stats-refresh]')) {
+    const select = byId('memberStatisticsSeason');
+    loadMemberLeague(select ? select.value : '');
+    return;
+  }
   if (event.target.closest('[data-member-standings-more]')) { memberStandingsVisible += 25; renderMemberLeague(); return; }
   if (event.target.closest('[data-archive-retry]')) { loadMemberArchive(); return; }
   if (event.target.closest('[data-archive-more]')) { archiveVisible += 30; renderMemberArchive(); }
@@ -70,13 +75,17 @@ document.querySelector('.dash-tabs').addEventListener('keydown', event => {
   const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
   if (!keys.includes(event.key)) return;
   event.preventDefault();
-  const tabs = ['training', 'league', 'account'];
+  const tabs = ['training', 'league', 'statistics', 'account'];
   const index = tabs.indexOf(activeTab);
-  const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowRight' ? 1 : 2)) % 3;
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 :
+    (index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
   switchTab(tabs[next], true);
 });
 byId('memberLeagueContent').addEventListener('change', event => {
   if (event.target.id === 'memberLeagueSeason') loadMemberLeague(event.target.value);
+});
+byId('memberStatisticsContent').addEventListener('change', event => {
+  if (event.target.id === 'memberStatisticsSeason') loadMemberLeague(event.target.value);
 });
 byId('seasonOneArchive').addEventListener('toggle', () => {
   if (byId('seasonOneArchive').open) loadMemberArchive();
@@ -98,6 +107,7 @@ document.addEventListener('site-language-change', () => {
   if (trainingLoaded) renderTrainingSessions();
   renderTrainingSummary();
   renderMemberLeague();
+  renderMemberStatistics();
   renderOtherMemberEvents();
   renderMemberArchive();
 });

@@ -21,6 +21,7 @@ async function loadMemberLeague(seasonId = '') {
     memberEvents = data.my_events;
     memberStandingsVisible = 15;
     renderMemberLeague();
+    renderMemberStatistics();
     renderTrainingSummary();
     if (trainingLoaded) renderTrainingSessions();
     renderOtherMemberEvents();
@@ -28,6 +29,7 @@ async function loadMemberLeague(seasonId = '') {
     if (request !== memberLeagueRequest || epoch !== memberEpoch || error.message === 'SESSION_EXPIRED') return;
     console.error('Member league load failed:', error);
     root.innerHTML = `<p class="league-error" role="alert">${mt('Liga konnte nicht geladen werden.', 'League could not be loaded.')}</p><button class="league-btn" type="button" data-member-league-refresh>${mt('Erneut versuchen', 'Try again')}</button>`;
+    byId('memberStatisticsContent').innerHTML = `<p class="league-error" role="alert">${mt('Statistik konnte nicht geladen werden.', 'Statistics could not be loaded.')}</p><button class="league-btn" type="button" data-member-stats-refresh>${mt('Erneut versuchen', 'Try again')}</button>`;
     if (!seasonId) byId('trainingLeagueSummary').innerHTML = `<p class="league-error" role="alert">${mt('Team- und Ligadaten nicht erreichbar.', 'Team and league data unavailable.')}</p><button class="league-btn" type="button" data-member-league-refresh>${mt('Erneut versuchen', 'Try again')}</button>`;
   } finally {
     if (request === memberLeagueRequest) root.removeAttribute('aria-busy');
@@ -97,6 +99,99 @@ function renderMemberLeague() {
         ${ui.bonus(entry, lang)}
       </li>`).join('')}</ol>` : `<p class="league-notice">${mt('Noch keine gewerteten Trainings.', 'No scored training yet.')}</p>`}
     </details>`;
+}
+
+function renderMemberStatistics() {
+  const root = byId('memberStatisticsContent');
+  const data = memberLeagueData;
+  if (!root) return;
+  if (!data) {
+    root.innerHTML = `<p class="league-notice" role="status">${mt('Statistik wird geladen …', 'Loading statistics …')}</p>`;
+    return;
+  }
+  if (!data.season) {
+    root.innerHTML = `<p class="league-notice">${mt('Noch keine Ligasaison veröffentlicht.', 'No league season has been published yet.')}</p>`;
+    return;
+  }
+  const stats = data.stats || {};
+  const performance = data.performance || {};
+  const history = data.history || [];
+  const teammates = Array.isArray(data.teammates) ? data.teammates : [];
+  const maxPoints = Math.max(1, ...history.map(entry => Number(entry.points || 0)));
+  const placements = performance.placement_counts || {};
+  const maxPlacementCount = Math.max(1, ...Object.values(placements).map(Number));
+  const maxTeammateTrainings = Math.max(1, ...teammates.map(teammate => Number(teammate.played_together || 0)));
+  const winRate = stats.played ? Math.round(Number(stats.wins || 0) / Number(stats.played) * 1000) / 10 : 0;
+  const number = value => Number(value || 0).toLocaleString(memberLang() === 'de' ? 'de-AT' : 'en-GB', { maximumFractionDigits: 2 });
+  root.innerHTML = `
+    <div class="league-toolbar">
+      <label class="league-field">${mt('Saison', 'Season')}<select class="league-input" id="memberStatisticsSeason">${window.LeagueUI.seasonOptions(data.seasons, data.season.id)}</select></label>
+      <button class="league-btn" type="button" data-member-stats-refresh>${mt('Aktualisieren', 'Refresh')}</button>
+    </div>
+    ${!data.player_linked ? `<p class="league-error" role="alert">${mt(
+      'Dein Konto ist noch keinem Spielerprofil zugeordnet. Bitte kontaktiere den Club, damit deine Ergebnisse verknüpft werden.',
+      'Your account is not linked to a player profile yet. Contact the club so your results can be connected.'
+    )}</p>` : ''}
+    <div class="member-stat-metrics">
+      <div class="member-stat-metric"><strong>${stats.rank !== null && stats.rank !== undefined ? '#' + escapeHtml(stats.rank) : '—'}</strong><span>${mt('Saisonrang', 'Season rank')}</span></div>
+      <div class="member-stat-metric"><strong>${number(stats.points)}</strong><span>${mt('Punkte', 'Points')}</span></div>
+      <div class="member-stat-metric"><strong>${escapeHtml(stats.played || 0)}</strong><span>${mt('Trainings', 'Trainings')}</span></div>
+      <div class="member-stat-metric"><strong>${number(winRate)}%</strong><span>${mt('Siegquote', 'Win rate')}</span></div>
+      <div class="member-stat-metric"><strong>${performance.average_placement ? number(performance.average_placement) : '—'}</strong><span>${mt('Ø Platz', 'Avg place')}</span></div>
+      <div class="member-stat-metric"><strong>${performance.best_placement ? '#' + escapeHtml(performance.best_placement) : '—'}</strong><span>${mt('Bester Platz', 'Best place')}</span></div>
+    </div>
+    ${history.length ? `
+      <div class="member-stat-grid">
+        <section class="member-stat-card">
+          <h3>${mt('Punkte pro Training', 'Points by training')}</h3>
+          <div class="member-stat-chart" role="img" aria-label="${mt('Punkte pro Training', 'Points by training')}">
+            ${[...history].reverse().map(entry => `<div class="member-stat-bar">
+              <span>${escapeHtml(window.LeagueUI.date(entry.session_date, memberLang()))}</span>
+              <div><i style="width:${Math.max(4, Number(entry.points || 0) / maxPoints * 100)}%"></i></div>
+              <strong>+${number(entry.points)}</strong>
+            </div>`).join('')}
+          </div>
+        </section>
+        <section class="member-stat-card">
+          <h3>${mt('Platzierungen', 'Placements')}</h3>
+          <div class="member-stat-chart" role="img" aria-label="${mt('Verteilung der Platzierungen', 'Placement distribution')}">
+            ${Object.keys(placements).sort((a, b) => Number(a) - Number(b)).map(place => `<div class="member-stat-bar">
+              <span>${mt('Platz', 'Place')} ${escapeHtml(place)}</span>
+              <div class="member-stat-place"><i style="width:${Math.max(4, Number(placements[place]) / maxPlacementCount * 100)}%"></i></div>
+              <strong>${escapeHtml(placements[place])}</strong>
+            </div>`).join('')}
+          </div>
+        </section>
+      </div>
+      <section class="member-stat-card">
+        <h3>${mt('Am häufigsten im Team', 'Most frequent teammates')}</h3>
+        <p class="league-copy">${mt(
+          'Gezählt werden gemeinsame Teams in finalisierten Trainings dieser Saison.',
+          'Counts shared teams in finalized trainings from this season.'
+        )}</p>
+        ${teammates.length ? `<div class="member-stat-chart" role="img" aria-label="${mt('Gemeinsame Trainings pro Mitspieler', 'Trainings played with each teammate')}">
+          ${teammates.map(teammate => {
+            const count = Number(teammate.played_together || 0);
+            const wins = Number(teammate.wins_together || 0);
+            return `<div class="member-stat-bar member-stat-teammate" title="${count} ${mt(count === 1 ? 'Training' : 'Trainings', count === 1 ? 'training' : 'trainings')} · ${wins} ${mt(wins === 1 ? 'Sieg' : 'Siege', wins === 1 ? 'win' : 'wins')}">
+              <span>${escapeHtml(teammate.display_name)}</span>
+              <div><i style="width:${Math.max(4, count / maxTeammateTrainings * 100)}%"></i></div>
+              <strong>${count}×</strong>
+            </div>`;
+          }).join('')}
+        </div>` : `<p class="league-notice">${mt(
+          'Noch keine gemeinsamen Teamaufstellungen aufgezeichnet.',
+          'No shared team lineups recorded yet.'
+        )}</p>`}
+      </section>
+      <section class="member-stat-card">
+        <h3>${mt('Deine Ergebnisse', 'Your results')}</h3>
+        <ol class="member-stat-history">${history.map(entry => `<li>
+          <div><strong>${escapeHtml(entry.title)}</strong><span>${escapeHtml(window.LeagueUI.date(entry.session_date, memberLang()))} · ${escapeHtml(entry.team_name)}</span></div>
+          <span class="league-chip league-chip-gold">${mt('Platz', 'Place')} ${escapeHtml(entry.placement)} · +${number(entry.points)} ${mt('Punkte', 'points')}</span>
+        </li>`).join('')}</ol>
+      </section>` :
+      `<p class="league-notice">${mt('Noch keine gewerteten Trainings in dieser Saison.', 'No scored trainings in this season yet.')}</p>`}`;
 }
 
 function memberEventForSession(sessionId) {

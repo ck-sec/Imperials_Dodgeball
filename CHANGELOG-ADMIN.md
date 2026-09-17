@@ -6,6 +6,67 @@ Hier steht das ganze Paket: das neue Season-2-System, der mobile Mitgliederberei
 die Website-Ueberarbeitung und die anschliessenden Verbesserungen fuer deinen
 Donnerstagsbetrieb. Also nicht nur die letzten Komfort-Aenderungen.
 
+## Update 18. September 2026: Admin-Konten und vereinfachte Teamerstellung
+
+- Das gemeinsame Admin-Passwort wurde vollstaendig entfernt. Der Admin-Bereich
+  wird jetzt ueber die normale Mitglieder-Anmeldung freigeschaltet und ist nur
+  fuer die fest hinterlegten Konten von **Christoph Kopka** und
+  **Dominik Riedl** zugaenglich.
+- Die Admin-Berechtigung ist dauerhaft an die unveraenderliche Konto-ID
+  gebunden, nicht an den spaeter aenderbaren Anzeigenamen. Bei jeder
+  Admin-Sitzungserneuerung wird erneut geprueft, ob das Konto freigeschaltet,
+  aktiv und weiterhin als Admin hinterlegt ist. Alte Sitzungen aus der
+  Passwort-Anmeldung werden abgewiesen.
+- Vor dem Deployment zuerst die neue, additive Migration pruefen und danach
+  gezielt auf die richtige Datenbank anwenden:
+  `node scripts\migrate-admin-access.js` und anschliessend
+  `node scripts\migrate-admin-access.js --apply --expected-host DEIN_DB_HOST`.
+  Die Anwendung bricht ohne Aenderung ab, falls fuer einen noch nicht
+  zugeordneten Admin kein eindeutig passendes, freigeschaltetes und aktives
+  Mitgliedskonto existiert.
+- Die Teamerstellung zeigt im normalen Donnerstagsablauf nur noch die
+  wesentlichen Schritte: Spieler bestaetigen, Teams automatisch ausgleichen,
+  den empfohlenen Spielplan erzeugen und veroeffentlichen.
+- Abweichungen bleiben moeglich, ueberladen aber nicht mehr die Standardansicht:
+  Gaeste und No-Shows, private Ratings und Profile, manuelle Teamwechsel,
+  Platzanzahl, Courts, Timing, Saisonoptionen, Head-Ref-Rollen und die
+  vollstaendige Veroeffentlichungspruefung liegen in klar benannten
+  **Advanced**-Bereichen.
+- Der komplette Fixture-Plan ist vor der Veroeffentlichung eingeklappt.
+  Ergebnis-Korrekturen und die Funktion **Last-minute player** bleiben
+  unveraendert im Schritt **Results** erhalten.
+
+## Update 17. September 2026: Admin-Sitzung, Mitgliederverwaltung und Statistik
+
+- Aktive Admin-Sitzungen erneuern ihr kurzlebiges Zugriffstoken automatisch
+  ueber ein geschuetztes HttpOnly-Cookie. Nach Ablauf der erneuerbaren Sitzung
+  wird sauber wieder die Anmeldung gezeigt, statt dass die Oberflaeche mit
+  "Invalid token" unbenutzbar bleibt.
+- Freigaben und laufende Mitgliederverwaltung sind jetzt getrennte Admin-Tabs.
+  In **Member Management** koennen freigeschaltete Konten mit bestehenden
+  Social-League-Spielerprofilen beziehungsweise Gastprofilen verknuepft werden.
+  Dabei werden vorhandene Identitaeten zusammengefuehrt; gespeicherte Punkte,
+  Platzierungen und historische Aufstellungen bleiben erhalten.
+- Die Zuordnung zum eingefrorenen Season-1-Archiv kann dort separat gepflegt
+  werden.
+- Der neue Admin-Tab **Statistics** zeigt Kennzahlen, Punktebalken,
+  Platzierungsverteilung, die Leistung aller Spieler und alle abgeschlossenen
+  Trainingsergebnisse je Saison. Grundlage sind ausschliesslich finalisierte,
+  bereits in der Ergebnis-Ledger gespeicherte Wertungen.
+- Jedes Mitglied hat im Portal einen eigenen Tab **Statistik** mit Saisonrang,
+  Punkten, Siegquote, Durchschnitts- und Bestplatzierung, Diagrammen und der
+  persoenlichen Ergebnis-Historie. Fehlt die Spieler-Verknuepfung, weist der Tab
+  sichtbar darauf hin.
+- Die persoenliche Statistik zeigt jetzt auch, mit welchen Mitspielern man in
+  finalisierten Trainings wie oft im selben Team stand. Im Admin-Statistik-Tab
+  kann dieselbe Auswertung fuer jeden Spieler ausgewaehlt werden.
+- Kommt jemand nach der Teamfreigabe kurzfristig dazu, kann die Person im
+  Admin-Schritt **Results** einem bestehenden Team hinzugefuegt werden.
+  Spielplan und bereits gespeicherte Match-Scores bleiben dabei unveraendert.
+  Bei einem bereits finalisierten Training ersetzt die Transaktion dessen
+  Punkte- und ELO-Ledger einmalig anhand der gespeicherten Platzierungen; Punkte
+  werden nicht doppelt addiert.
+
 ## Update 14. September 2026: Live-Match-Timer
 
 - Jeder veroeffentlichte Spielplan verlinkt jetzt pro Begegnung eine eigene

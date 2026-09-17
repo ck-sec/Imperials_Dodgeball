@@ -42,8 +42,8 @@ function fixtureApp(options = {}) {
   const docListeners = {};
   const translated = [element('translated')];
   translated[0].dataset = { de: 'Training wählen', en: 'Choose training' };
-  const tabs = ['training', 'league', 'account'].map(name => elements.get('tabButton-' + name));
-  const panels = ['training', 'league', 'account'].map(name => elements.get('tab-' + name));
+  const tabs = ['training', 'league', 'statistics', 'account'].map(name => elements.get('tabButton-' + name));
+  const panels = ['training', 'league', 'statistics', 'account'].map(name => elements.get('tab-' + name));
   const tablist = element();
   const resetToggle = element();
   resetToggle.setAttribute('aria-controls', 'resetPassword');
@@ -145,21 +145,51 @@ const season = {
 
 test('member page is German-first, training-first and versions every local style/script', () => {
   assert.match(html, /<html lang="de">/);
-  assert.equal((html.match(/role="tab"/g) || []).length, 3);
+  assert.equal((html.match(/role="tab"/g) || []).length, 4);
   assert.match(html, /data-tab="training" role="tab"[^>]+aria-selected="true"/);
-  assert.doesNotMatch(html, /href="\/#training-league"|data-tab="stats"|data-tab="settings"/);
+  assert.match(html, /data-tab="statistics" role="tab"/);
+  assert.doesNotMatch(html, /href="\/#training-league"|data-tab="settings"/);
   assert.match(html, /<details[^>]+id="seasonOneArchive"/);
-  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=202609(?:12[b-d]?|14[de]?|15[a-z]?)$/);
+  for (const match of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:css|js)[^"]*)"/g)) assert.match(match[1], /\?v=202609(?:12[b-d]?|14[de]?|15[a-z]?|17a?|18)$/);
   assert.ok(html.includes('/league.css?v=20260915'));
   assert.ok(html.includes('/js/league-scoring.js?v=20260915c'));
   assert.ok(html.includes('/js/league-ui.js?v=20260915c'));
-  assert.ok(html.includes('/js/member-league.js?v=20260915b'));
-  assert.ok(html.includes('/js/member-core.js?v=20260914'));
-  for (const asset of ['/js/member-dashboard.js', '/js/member-init.js']) assert.ok(html.includes(asset + '?v=20260912c'));
+  assert.ok(html.includes('/js/member-league.js?v=20260917a'));
+  assert.ok(html.includes('/js/member-core.js?v=20260918'));
+  assert.ok(html.includes('/js/member-dashboard.js?v=20260912c'));
+  assert.ok(html.includes('/js/member-init.js?v=20260917'));
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
   assert.ok(html.indexOf('member-recovery-token.js') < html.indexOf('<link'));
   assert.doesNotMatch(source('member-auth') + source('member-init') + source('member-recovery-token'), /localStorage|sessionStorage/);
   assert.doesNotMatch(source('member-core'), /localStorage/);
+});
+
+test('personal statistics render rank, placement visuals and recorded result history', () => {
+  const app = fixtureApp();
+  app.context.statisticsFixture = {
+    seasons: [season],
+    season,
+    player_linked: true,
+    stats: { rank: 2, points: 5, played: 2, wins: 1 },
+    performance: { average_placement: 1.5, best_placement: 1, podiums: 2, placement_counts: { 1: 1, 2: 1 } },
+    teammates: [{ display_name: 'Teammate One', played_together: 2, wins_together: 1 }],
+    history: [
+      { event_id: 'one', title: 'Training One', session_date: '2099-09-10', team_name: 'Gold', placement: 1, points: 3 },
+      { event_id: 'two', title: 'Training Two', session_date: '2099-09-17', team_name: 'Navy', placement: 2, points: 2 }
+    ]
+  };
+  app.run('memberLeagueData = statisticsFixture');
+  app.context.renderMemberStatistics();
+  const markup = app.node('memberStatisticsContent').innerHTML;
+  assert.match(markup, /Saisonrang/);
+  assert.match(markup, /#2/);
+  assert.match(markup, /50%/);
+  assert.match(markup, /member-stat-bar/);
+  assert.match(markup, /Training One/);
+  assert.match(markup, /Platz 1/);
+  assert.match(markup, /Am häufigsten im Team/);
+  assert.match(markup, /Teammate One/);
+  assert.match(markup, /2×/);
 });
 
 const returnEvent = '11111111-1111-4111-8111-111111111111';
@@ -171,16 +201,17 @@ function loginFields(app) {
   app.node('loginPassword').value = 'normalPassword123';
 }
 
-test('central login allowlists only local matchday and timer targets and rejects redirect tricks', () => {
+test('central login allowlists exact local matchday, timer and admin targets and rejects redirect tricks', () => {
   const app = fixtureApp();
   assert.equal(app.context.safeMemberReturn(returnPath), returnPath);
   assert.equal(app.context.safeMemberReturn('/spieltag'), '/spieltag');
+  assert.equal(app.context.safeMemberReturn('/admin'), '/admin');
   assert.equal(app.context.safeMemberReturn(timerReturnPath), timerReturnPath);
   assert.equal(app.context.safeMemberReturn('/timer?event=' + returnEvent.toUpperCase() + '&match=10'),
     '/timer?event=' + returnEvent + '&match=10');
   for (const target of [
     '//evil.example', 'https://evil.example/spieltag', 'https://vienna-imperials.at/spieltag',
-    '/\\evil.example', '/member', '/admin', '/spieltag/../admin', '/spieltag#token=x',
+    '/\\evil.example', '/member', '/admin.html', '/admin?next=/spieltag', '/spieltag/../admin', '/spieltag#token=x',
     '/spieltag?event=' + returnEvent + '&next=https://evil.example',
     '/spieltag?event=' + returnEvent + '&event=' + returnEvent,
     '/spieltag?event=bad', '/timer?match=1&event=' + returnEvent,
@@ -189,6 +220,14 @@ test('central login allowlists only local matchday and timer targets and rejects
     '/timer?event=' + returnEvent + '&match=1#token=x',
     '/spieltag\n', '%2Fspieltag', null, {}
   ]) assert.equal(app.context.safeMemberReturn(target), '');
+});
+
+test('admin return uses the approved member login flow without offering an anonymous destination', () => {
+  const app = fixtureApp({ search: '?return_to=%2Fadmin' });
+  app.context.initMemberReturn();
+  assert.equal(app.run('memberReturnTo'), '/admin');
+  assert.equal(app.node('memberReturnNotice').hidden, false);
+  assert.equal(app.node('memberReturnLink').hidden, true);
 });
 
 test('successful normal login returns to the same event without replacing the existing login request', async () => {

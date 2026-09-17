@@ -29,9 +29,9 @@ let rankVisible = 25;
 function save() {
   localStorage.setItem('vi_players', JSON.stringify(players));
   if (typeof isAdmin === 'function' && isAdmin()) {
-    fetch('/api/rankings', {
+    adminFetch('/api/rankings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(players)
     }).catch(err => console.error('Rankings save failed:', err));
   }

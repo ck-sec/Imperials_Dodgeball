@@ -21,7 +21,9 @@
     },
     dirtySchedule: false, matchEdits: {},
     profileId: '', profileSearch: '', scorekeeperSearch: '', seasonOpen: false, timingOpen: false, adminOptionsOpen: false,
-    profilesOpen: false, guestOpen: false, attendanceError: '', formEdits: {}
+    profilesOpen: false, guestOpen: false, rosterToolsOpen: false, teamOptionsOpen: false, teamToolsOpen: false,
+    fixturePreviewOpen: false,
+    attendanceError: '', formEdits: {}
   };
   const dateOnly = value => {
     const text = String(value || '');
@@ -65,7 +67,7 @@
     { id: 'teams', title: 'Teams', hint: 'Review a balanced draft. Save manual edits without reshuffling everyone.' },
     { id: 'schedule', title: 'Schedule', hint: 'Check court times and referee coverage before going public.' },
     { id: 'publish', title: 'Publish', hint: 'Complete the checks below, then make the teams visible to players.' },
-    { id: 'results', title: 'Results', hint: 'Save scores, award bonus points, then confirm the final standings.' }
+    { id: 'results', title: 'Results', hint: 'Add late arrivals, save scores, award bonus points, then confirm the final standings.' }
   ];
 
   function players() {
@@ -151,9 +153,9 @@
   }
 
   async function request(url, body) {
-    const response = await fetch(url, {
+    const response = await adminFetch(url, {
       method: body ? 'POST' : 'GET',
-      headers: { Authorization: 'Bearer ' + getToken(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: body ? { 'Content-Type': 'application/json' } : {},
       ...(body ? { body: JSON.stringify(body) } : {}),
       cache: 'no-store'
     });
@@ -401,18 +403,16 @@
     };
     const upcoming = available.filter(t => dateOnly(t.session_date) >= today());
     const past = available.filter(t => dateOnly(t.session_date) < today()).reverse();
-    return `<section class="al-card al-setup" id="al-setup">${heading('', 'Season 2 · Thursday training')}
-      <div class="al-grid">
-        <div class="al-field"><strong>Season 2</strong><span class="al-small">${esc(dateOnly(s?.start_date))} – ${esc(dateOnly(s?.end_date))} · Europe/Vienna</span></div>
-        <div class="al-field">${label('al-session-select', 'Thursday training — Season 2 only')}
-          <select id="al-session-select"${disabled(!available.length)}>
-            ${upcoming.length ? `<optgroup label="Upcoming Thursdays">${upcoming.map(renderOption).join('')}</optgroup>` : ''}
-            ${past.length ? `<optgroup label="Past Thursdays — results / corrections">${past.map(renderOption).join('')}</optgroup>` : ''}
-            ${!available.length ? '<option>No Thursday trainings in Season 2</option>' : ''}
-          </select></div>
-      </div>
-      ${selectedSession ? `<p class="al-small al-form-actions">${esc(selectedSession.location || 'No location specified')} · Members RSVP in the Training area. Past Thursdays remain available for corrections.</p>` : '<p class="al-callout">Schedule a Thursday within the existing Season 2 dates in the Training tab, then refresh.</p>'}
-      ${next ? `<p class="al-callout">Next active Thursday: <strong>${esc(dateOnly(next.session_date))}</strong>${next.id === state.sessionId ? ' · selected' : '. Your selected training has been kept.'}</p>` : ''}
+    return `<section class="al-card al-setup" id="al-setup">${heading('', 'Choose a Thursday')}
+      <div class="al-field">${label('al-session-select', 'Season 2 training')}
+        <select id="al-session-select"${disabled(!available.length)}>
+          ${upcoming.length ? `<optgroup label="Upcoming Thursdays">${upcoming.map(renderOption).join('')}</optgroup>` : ''}
+          ${past.length ? `<optgroup label="Past Thursdays — results / corrections">${past.map(renderOption).join('')}</optgroup>` : ''}
+          ${!available.length ? '<option>No Thursday trainings in Season 2</option>' : ''}
+        </select></div>
+      ${selectedSession ? `<p class="al-small al-form-actions">Season 2 · ${esc(dateOnly(s?.start_date))}–${esc(dateOnly(s?.end_date))} · ${esc(selectedSession.location || 'No location specified')} · Europe/Vienna</p>
+        <div class="al-quick-guide"><strong>Normal Thursday</strong><span>Confirm players → generate balanced teams → use the recommended schedule → publish.</span></div>` : '<p class="al-callout">Schedule a Thursday within the existing Season 2 dates in the Training tab, then refresh.</p>'}
+      ${next && next.id !== state.sessionId ? `<p class="al-small">Next active Thursday is ${esc(dateOnly(next.session_date))}; your selected training has been kept.</p>` : ''}
       ${cancelled() ? '<p class="al-notice" role="status">Cancelled training — read-only. Roster, bonus points, match scores and results cannot be changed here.</p>' : ''}
       <details class="al-details" id="al-admin-options"${state.adminOptionsOpen ? ' open' : ''}><summary>Advanced: season settings & Head Ref access</summary>
         ${scorekeeperRoles()}${seasonForm()}
@@ -506,35 +506,48 @@
     </label>`).join('') : '<p class="al-empty">No matching players. Clear the search or add a named guest below.</p>';
   }
 
+  function selectedRosterSummary() {
+    const selected = players().filter(player => state.selected.has(player.id));
+    if (!selected.length) return '<p class="al-empty">Nobody is selected yet. Open roster adjustments to add players.</p>';
+    return `<div class="al-player-summary" aria-label="Selected players">${selected.map(player =>
+      `<span class="al-player-pill">${esc(player.display_name)}${player.user_id ? '' : ' · guest'}</span>`
+    ).join('')}</div>`;
+  }
+
   function renderRoster() {
     return `<section class="al-card" id="al-roster">${heading('', 'Confirm everyone playing')}
-      <p class="al-muted">Start with member RSVPs, then check or uncheck anyone for last-minute changes. Guests need no account; use their existing profile next time to keep their stats together.</p>
-      ${isLocked() ? `<p class="al-callout">${cancelled() ? 'Cancelled: this training is read-only.' : event()?.status === 'finalized' ? 'Finalized: the roster and teams are locked. Results can still be corrected in Results.' : lineupStarted() ? 'Games have started or results were finalized: roster, guest additions to this training and team changes are permanently locked. Score corrections remain available.' : 'Published: the roster is locked. Before any match is scored, use “Edit lineup” in Publish to hide public teams and return to a draft.'}</p>` : ''}
+      <p class="al-muted">Attending member RSVPs are selected automatically. If the list is right, continue directly to Teams.</p>
+      ${isLocked() ? `<p class="al-callout">${cancelled() ? 'Cancelled: this training is read-only.' : event()?.status === 'finalized' ? 'Finalized: full roster edits are locked. An omitted last-minute player can still be appended to one team in Results; that training’s ledger is recalculated once.' : lineupStarted() ? 'Games have started: full roster and team edits are locked. Use “Last-minute player” in Results to append a late arrival to one team; score corrections remain available.' : 'Published: the roster is locked. Before any match is scored, use “Edit lineup” in Publish for full changes, or append one late arrival in Results.'}</p>` : ''}
       ${state.attendanceError ? `<p class="al-notice">${esc(state.attendanceError)}</p>` : ''}
       ${event()?.roster_stale && !isLocked() ? '<p class="al-notice">RSVPs changed. Review the attending labels and explicitly save this draft roster before publishing. No guests or manual selections have been changed.</p>' : ''}
-      <div class="al-actions">
-        ${action('add-rsvp', 'Include all attending members · keep guests', disabled(isLocked() || !state.sessionId || !!state.attendanceError))}
-        ${action('rsvp', 'Reset to RSVPs only', disabled(isLocked() || !state.sessionId || !!state.attendanceError))}
-        ${action('retry-rsvp', 'Refresh RSVPs', disabled(!state.sessionId))}
-        ${action('clear-roster', 'Clear selection', disabled(isLocked() || !state.sessionId))}
-      </div>
-      <div class="al-field al-form-actions">${label('al-roster-search', 'Search roster names')}
-        <input type="search" id="al-roster-search" value="${esc(state.search)}" placeholder="Member or guest name" autocomplete="off"></div>
-      <label class="al-check" for="al-selected-only"><input type="checkbox" id="al-selected-only"${state.selectedOnly ? ' checked' : ''}><span>Show selected players only</span></label>
       <p class="al-roster-count" id="al-roster-count" role="status">${state.selected.size} players selected · ${state.attending.size} RSVP attending</p>
-      <div class="al-roster-list" id="al-roster-list">${rosterRows()}</div>
-      <details class="al-details" id="al-guest-details"${state.guestOpen ? ' open' : ''}>
-        <summary>Add a named guest — no account needed</summary>
-        <form data-al-form="guest">
-          <p class="al-small">Creates a persistent league profile. Search above first to avoid duplicates.${isLocked() ? ' This training is locked; the new guest will be available for future drafts.' : ' The new guest is selected for this draft automatically.'}</p>
-          <p class="al-callout" id="al-guest-public-warning">Guest names become public when teams are published and can appear in season standings after results. Let the guest know before publishing. Ratings, gender and rookie tags stay admin-only.</p>
-          <div class="al-field">${label('al-guest-name', 'Guest display name — public after publishing')}
-            <input id="al-guest-name" name="display_name" autocomplete="off" maxlength="100" required placeholder="First and last name" aria-describedby="al-guest-public-warning"></div>
-          <div class="al-form-actions">${profileFields('guest', { gender: 'unspecified', is_rookie: false, initial_rating: season()?.default_rating ?? 1000 })}</div>
-          <button type="submit" class="al-button">Create guest profile${!isLocked() && state.sessionId ? ' & add to roster' : ''}</button>
-        </form>
+      ${selectedRosterSummary()}
+      <details class="al-details al-toolbox" id="al-roster-tools"${state.rosterToolsOpen ? ' open' : ''}>
+        <summary>Adjust roster, add a guest or edit a player profile</summary>
+        <p class="al-small">Use this only for no-shows, late changes, guests or profile maintenance.</p>
+        <div class="al-actions">
+          ${action('add-rsvp', 'Include all attending · keep guests', disabled(isLocked() || !state.sessionId || !!state.attendanceError))}
+          ${action('rsvp', 'Reset to RSVPs only', disabled(isLocked() || !state.sessionId || !!state.attendanceError))}
+          ${action('retry-rsvp', 'Refresh RSVPs', disabled(!state.sessionId))}
+          ${action('clear-roster', 'Clear selection', disabled(isLocked() || !state.sessionId))}
+        </div>
+        <div class="al-field al-form-actions">${label('al-roster-search', 'Search roster names')}
+          <input type="search" id="al-roster-search" value="${esc(state.search)}" placeholder="Member or guest name" autocomplete="off"></div>
+        <label class="al-check" for="al-selected-only"><input type="checkbox" id="al-selected-only"${state.selectedOnly ? ' checked' : ''}><span>Show selected players only</span></label>
+        <div class="al-roster-list" id="al-roster-list">${rosterRows()}</div>
+        <details class="al-details" id="al-guest-details"${state.guestOpen ? ' open' : ''}>
+          <summary>Add a named guest — no account needed</summary>
+          <form data-al-form="guest">
+            <p class="al-small">Creates a persistent league profile. Search above first to avoid duplicates.${isLocked() ? cancelled() ? ' This training is cancelled; the new guest will be available for future drafts.' : ' Full lineup editing is locked; the new guest will be available for “Last-minute player” in Results.' : ' The new guest is selected for this draft automatically.'}</p>
+            <p class="al-callout" id="al-guest-public-warning">Guest names become public when teams are published and can appear in season standings after results. Let the guest know before publishing. Ratings, gender and rookie tags stay admin-only.</p>
+            <div class="al-field">${label('al-guest-name', 'Guest display name — public after publishing')}
+              <input id="al-guest-name" name="display_name" autocomplete="off" maxlength="100" required placeholder="First and last name" aria-describedby="al-guest-public-warning"></div>
+            <div class="al-form-actions">${profileFields('guest', { gender: 'unspecified', is_rookie: false, initial_rating: season()?.default_rating ?? 1000 })}</div>
+            <button type="submit" class="al-button">Create guest profile${!isLocked() && state.sessionId ? ' & add to roster' : ''}</button>
+          </form>
+        </details>
+        ${profileEditor()}
       </details>
-      ${profileEditor()}
     </section>`;
   }
 
@@ -578,17 +591,17 @@
         <p class="al-small">Squad ${t.number}</p>
         ${!isLocked() ? `<div class="al-field">${label(`al-team-name-${t.number}`, 'Public team name')}<input id="al-team-name-${t.number}" data-al-team-name="${t.number}" value="${esc(t.name)}" maxlength="80" required></div>` : ''}
         <div class="al-team-stat">
-          <span class="al-chip">${list.length} players</span><span class="al-chip">Private avg ${avg} · draft snapshot</span>
+          <span class="al-chip">${list.length} players</span>${state.teamToolsOpen ? `<span class="al-chip">Private avg ${avg} · draft snapshot</span>
           <span class="al-chip">${female} female · ${male} male${list.length - female - male ? ` · ${list.length - female - male} unspecified` : ''}</span>
-          <span class="al-chip al-rookie">${rookie} really rookie</span>
+          <span class="al-chip al-rookie">${rookie} really rookie</span>` : ''}
         </div>
         ${subs ? `<p class="al-small">${subs} rotating substitute${subs === 1 ? '' : 's'} — all ${list.length} players receive this team’s placement points.</p>` : ''}
         <ul class="al-team-players">${list.map(p => `<li class="al-draft-player" data-al-drop-player="${esc(p.id)}">
-          ${!isLocked() ? playerHandle(p) : ''}
-          <span class="al-player-info">${esc(p.display_name)}${p.is_rookie ? ' <span class="al-chip al-rookie">Rookie</span>' : ''}<span class="al-small"> · private ${rating(p)}</span></span>
-          ${!isLocked() ? action(`remove-player:${p.id}`, 'Remove', ` aria-label="Remove ${esc(p.display_name)} from this training only"`) : ''}
+          ${!isLocked() && state.teamToolsOpen ? playerHandle(p) : ''}
+          <span class="al-player-info">${esc(p.display_name)}${state.teamToolsOpen && p.is_rookie ? ' <span class="al-chip al-rookie">Rookie</span>' : ''}${state.teamToolsOpen ? `<span class="al-small"> · private ${rating(p)}</span>` : ''}</span>
+          ${!isLocked() && state.teamToolsOpen ? action(`remove-player:${p.id}`, 'Remove', ` aria-label="Remove ${esc(p.display_name)} from this training only"`) : ''}
         </li>`).join('') || '<li class="al-small">Empty team — add players before publishing.</li>'}</ul>
-        ${!isLocked() ? action(`place-player:${t.number}`, 'Move selected player here', ` data-al-place-team="${t.number}"${disabled(!state.pickedPlayer)}`) : ''}
+        ${!isLocked() && state.teamToolsOpen ? action(`place-player:${t.number}`, 'Move selected player here', ` data-al-place-team="${t.number}"${disabled(!state.pickedPlayer)}`) : ''}
       </article>`;
     }).join('');
   }
@@ -630,23 +643,29 @@
   function renderDraft() {
     const locked = isLocked();
     return `<section class="al-card" id="al-draft">${heading('', 'Balance & review teams')}
-      <div class="al-grid"><div class="al-field">${label('al-team-size', 'Players on court per team')}
-        <select id="al-team-size"${disabled(locked)}>
-          ${[['auto', 'Auto · choose 2–6'], ...[2, 3, 4, 5, 6].map(n => [String(n), `${n} on court`])].map(([v, l]) => option(v, l, state.size)).join('')}
-        </select></div>
-        <div class="al-field">${label('al-max-teams', 'Maximum squads for next rebalance')}
-          <select id="al-max-teams"${disabled(locked)}>${[2, 3, 4, 5].map(count => option(count, `${count} squads maximum`, state.maxTeams)).join('')}</select>
-          <p class="al-small">Choose two for a head-to-head evening with an external Head Ref/admin. Otherwise generation prefers five squads for two courts or three for one court, leaving a whole team free to ref every slot. Four is retained only in a manual draft.</p></div></div>
+      <p class="al-muted">The automatic setup balances every selected player and keeps one team free to referee whenever possible.</p>
       <p class="al-callout" id="al-plan" role="status">${planText()}</p>
-      <p class="al-small">A draft includes everyone. Gender and really-rookie distribution are balanced alongside hidden ELO. Generation supports a deliberate two-team head-to-head exception; otherwise it creates five teams when feasible or three. Extra players rotate as substitutes.</p>
-      <p class="al-small">Team names are chosen when the draft is generated and stay saved until you edit or regenerate them. Refreshing does not redraw names.</p>
       ${cancelled() ? '<p class="al-notice">This training is cancelled. Choose an active Thursday to edit.</p>' : ''}
       <div class="al-actions">
         <button type="button" class="al-button${event() ? ' al-secondary' : ''}" data-al-action="generate" id="al-generate"${disabled(locked || !state.sessionId || state.selected.size < minimumRoster() || state.selected.size > 500)}>${event() ? 'Rebalance teams — optional, replaces assignments' : 'Generate balanced draft'}</button>
       </div>
+      <details class="al-details al-toolbox" id="al-team-options"${state.teamOptionsOpen ? ' open' : ''}>
+        <summary>Advanced team-generation options</summary>
+        <div class="al-grid"><div class="al-field">${label('al-team-size', 'Players on court per team')}
+          <select id="al-team-size"${disabled(locked)}>
+            ${[['auto', 'Auto · choose 2–6'], ...[2, 3, 4, 5, 6].map(n => [String(n), `${n} on court`])].map(([v, l]) => option(v, l, state.size)).join('')}
+          </select></div>
+          <div class="al-field">${label('al-max-teams', 'Maximum squads for next rebalance')}
+            <select id="al-max-teams"${disabled(locked)}>${[2, 3, 4, 5].map(count => option(count, `${count} squads maximum`, state.maxTeams)).join('')}</select></div></div>
+        <p class="al-small">Auto uses five squads for two courts or three for one court when feasible, so a full team can referee. Choose two only for a head-to-head evening with an external Head Ref/admin. Extra players rotate as substitutes.</p>
+      </details>
       <p class="al-dirty" id="al-dirty-roster"${needsRosterReview() ? '' : ' hidden'}>Roster or team size needs review. Assign any new players, then Save draft — no rebalance required.</p>
-      ${state.teams.length ? `${balanceSummary()}<div class="al-team-grid" id="al-teams">${teamCards()}</div>
-        ${!locked ? `${editTools()}<p class="al-dirty" id="al-dirty-teams"${state.dirtyTeams ? '' : ' hidden'}>Team edits are not saved yet.</p>
+      ${state.teams.length ? `<div class="al-team-grid" id="al-teams">${teamCards()}</div>
+        <details class="al-details al-toolbox" id="al-team-tools"${state.teamToolsOpen ? ' open' : ''}>
+          <summary>Advanced balance details & manual team changes</summary>
+          ${balanceSummary()}${!locked ? editTools() : '<p class="al-small">This lineup is locked.</p>'}
+        </details>
+        ${!locked ? `<p class="al-dirty" id="al-dirty-teams"${state.dirtyTeams ? '' : ' hidden'}>Team edits are not saved yet.</p>
         <div class="al-actions"><button type="button" class="al-button" id="al-save-teams" data-al-action="save-draft"${disabled(!state.dirtyTeams && !needsRosterReview())}>Save draft</button>
         ${action('undo-draft', 'Undo last draft change', ` id="al-undo-draft"${disabled(!state.draftUndo.length)}`)}
         ${action('discard-teams', 'Discard draft changes', disabled(!state.dirtyTeams && !state.dirtyRoster))}</div>` : ''}` :
@@ -774,14 +793,18 @@
         ${e.status !== 'draft' ? `<p class="al-callout">${lineupStarted() || e.status === 'finalized' ? 'Games have started or results are final: the schedule and lineup are locked.' : 'The schedule is published. Before the first recorded score, you can delete it below or use Edit lineup; either action returns this event to a private draft.'}</p>` : ''}
         <form data-al-form="schedule">
           <fieldset id="al-schedule-fields"${disabled(!editable)}>
-            <legend class="al-sr-only">Schedule settings</legend>
-            <div class="al-grid">
-              <div class="al-field">${label('al-schedule-meetup_time', 'Meet & warm-up time')}
-                <input type="time" id="al-schedule-meetup_time" name="meetup_time" data-al-schedule="meetup_time" value="${esc(state.scheduleSettings.meetup_time)}" required></div>
-              <div class="al-field">${label('al-schedule-courts', 'Available courts')}
-                <select id="al-schedule-courts" name="courts" data-al-schedule="courts">${[1, 2].map(count => option(count, `${count} court${count === 1 ? '' : 's'}`, state.scheduleSettings.courts)).join('')}</select></div>
+            <legend class="al-sr-only">Recommended schedule</legend>
+            <p class="al-callout" id="al-schedule-preview" role="status">${schedulePreviewText()}</p>
+            <div class="al-actions">
+              <button type="submit" class="al-button">${e.schedule ? 'Regenerate current schedule' : 'Create recommended schedule'}</button>
             </div>
-            <details class="al-details" id="al-timing-details"${state.timingOpen ? ' open' : ''}><summary>Adjust match lengths, warm-up & finale</summary>
+            <details class="al-details al-toolbox" id="al-timing-details"${state.timingOpen ? ' open' : ''}><summary>Advanced: change courts or timing</summary>
+              <div class="al-grid">
+                <div class="al-field">${label('al-schedule-meetup_time', 'Meet & warm-up time')}
+                  <input type="time" id="al-schedule-meetup_time" name="meetup_time" data-al-schedule="meetup_time" value="${esc(state.scheduleSettings.meetup_time)}" required></div>
+                <div class="al-field">${label('al-schedule-courts', 'Available courts')}
+                  <select id="al-schedule-courts" name="courts" data-al-schedule="courts">${[1, 2].map(count => option(count, `${count} court${count === 1 ? '' : 's'}`, state.scheduleSettings.courts)).join('')}</select></div>
+              </div>
               <div class="al-grid">
               ${[
                 ['warmup_minutes', 'Warm-up before games (minutes)', 0, 120],
@@ -791,11 +814,12 @@
                 ['finale_minutes', 'Last Man/Woman finale (max 10 minutes)', 1, 10]
               ].map(([key, text, min, max]) => `<div class="al-field">${label(`al-schedule-${key}`, text)}<input type="number" id="al-schedule-${key}" name="${key}" data-al-schedule="${key}" value="${state.scheduleSettings[key]}" min="${min}" max="${max}" step="1" required></div>`).join('')}
               </div>
+              <div class="al-actions al-form-actions">
+                <button type="submit" class="al-button al-secondary">Apply custom schedule</button>
+                ${action('discard-schedule', 'Discard timing edits', ` id="al-discard-schedule"${disabled(!state.dirtySchedule)}`)}
+              </div>
             </details>
-            <p class="al-callout" id="al-schedule-preview" role="status">${schedulePreviewText()}</p>
-            <p class="al-dirty" id="al-schedule-unsaved"${state.dirtySchedule ? '' : ' hidden'}>Unsaved timing changes. Generate the schedule or discard these edits before publishing.</p>
-            <div class="al-actions"><button type="submit" class="al-button">${e.schedule ? 'Regenerate match schedule' : 'Generate match schedule'}</button>
-              ${action('discard-schedule', 'Discard timing edits', ` id="al-discard-schedule"${disabled(!state.dirtySchedule)}`)}</div>
+            <p class="al-dirty" id="al-schedule-unsaved"${state.dirtySchedule ? '' : ' hidden'}>Unsaved timing changes. Apply the custom schedule or discard the edits under Advanced.</p>
           </fieldset>
         </form>
         ${e.schedule ? [ROTATING_REF_POLICY, EXTERNAL_REF_POLICY].includes(e.schedule.referee_policy)
@@ -877,6 +901,8 @@
   function renderPublish() {
     const e = event();
     const status = e?.status || 'not generated';
+    const checks = publicationChecks();
+    const readyChecks = checks.filter(check => check.ready).length;
     const text = status === 'finalized'
       ? 'Finalized: teams and results are public. Roster changes are locked; use Results for corrections.'
       : status === 'published'
@@ -886,7 +912,8 @@
       <div class="al-status"><span class="al-chip ${status === 'draft' || !e ? 'al-draft' : 'al-live'}">${esc(status)}</span>${e ? `<span class="al-small">Saved version ${number(e.version, 0)}</span>` : ''}</div>
       <p class="al-callout">${text}</p>
       ${eventAwardsSummary()}
-      ${!e || status === 'draft' ? `<div id="al-publication-checklist">${publicationChecklist()}</div>
+      ${!e || status === 'draft' ? `<p class="al-publish-progress" id="al-publish-progress"><strong>${readyChecks}/${checks.length} checks ready</strong> · Any remaining blocker is shown below.</p>
+        <details class="al-details al-toolbox" id="al-publication-checklist-details"><summary>View all publication checks</summary><div id="al-publication-checklist">${publicationChecklist()}</div></details>
         ${e?.schedule?.referee_policy === EXTERNAL_REF_POLICY ? `<label class="al-check">
           <input type="checkbox" id="al-referee-reviewed"${state.refereeReviewed ? ' checked' : ''}${disabled(isLocked())}>
           I have arranged an external Head Ref/admin for this two-team game.</label>` : ''}
@@ -1154,6 +1181,34 @@
     return choices.includes(Number(team.placement)) ? Number(team.placement) : '';
   }
 
+  function renderLatePlayerAssignment() {
+    const e = event();
+    if (!e || cancelled() || !['published', 'finalized'].includes(e.status)) return '';
+    const assigned = new Set(state.teams.flatMap(team => team.player_ids));
+    const available = players().filter(player => !player.uncreated && !assigned.has(player.id));
+    const finalized = e.status === 'finalized';
+    return `<div class="al-late-player" id="al-late-player">
+      <h4>Last-minute player</h4>
+      <p class="al-small">${finalized
+        ? 'Add a player who was omitted from the saved result. Their chosen team placement is applied immediately, and this training’s points and private ELO ledger are atomically recalculated without double-counting.'
+        : 'Assign a late arrival without changing the published fixtures or any saved match scores. They receive the chosen team’s placement when results are finalized.'}</p>
+      <form data-al-form="late-player" class="al-late-player-form">
+        <div class="al-field">${label('al-late-player-select', 'Player')}
+          <select id="al-late-player-select" name="player_id" required${disabled(!available.length)}>
+            ${option('', available.length ? 'Choose player' : 'No unassigned profiles', '')}
+            ${available.map(player => option(player.id, player.display_name, '')).join('')}
+          </select></div>
+        <div class="al-field">${label('al-late-team-select', 'Team')}
+          <select id="al-late-team-select" name="team_number" required>
+            ${option('', 'Choose team', '')}
+            ${state.teams.map(team => option(team.number, `${team.name} · ${team.player_ids.length} players`, '')).join('')}
+          </select></div>
+        <button type="submit" class="al-button"${disabled(!available.length)}>Assign player to team</button>
+      </form>
+      <div class="al-actions">${action('open-late-guest', 'Create a new guest profile')}</div>
+    </div>`;
+  }
+
   function renderResults() {
     const e = event();
     const enabled = e && !cancelled() && ['published', 'finalized'].includes(e.status);
@@ -1167,6 +1222,7 @@
       }) : null;
     return `<section class="al-card" id="al-results" tabindex="-1">${heading('', e?.status === 'finalized' ? 'Final results & corrections' : 'Review & finalize placements')}
       <p class="al-muted">${scheduled ? 'Final places follow match-table points, score difference and points scored. Non-tied places are filled automatically. Only teams exactly tied on all three metrics can be reordered within their shared places.' : `Manual-placement training: use each place from 1 to ${state.teams.length || 'the number of teams'} exactly once. For automatic placements from scores, generate a schedule before publishing.`}</p>
+      ${renderLatePlayerAssignment()}
       ${winner ? `<p class="al-callout"><strong>${e.status === 'finalized' ? 'Final winner' : 'Automatic winner'}: ${esc(winner.name)}</strong>${e.status === 'finalized' ? ' — from saved final placements.' : ' — finalize below to award season points.'}</p>` : ''}
       ${eventAwardsSummary()}
       ${enabled && finished ? `<form data-al-form="results">
@@ -1195,7 +1251,8 @@
     const draftFixtures = event()?.status === 'draft';
     const content = {
       players: renderRoster(), teams: renderDraft(),
-      schedule: renderSchedule() + (draftFixtures ? renderMatches() : ''),
+      schedule: renderSchedule() + (draftFixtures ? `<details class="al-details al-toolbox al-fixture-preview" id="al-fixture-preview"${state.fixturePreviewOpen ? ' open' : ''}>
+        <summary>Preview generated fixtures${event()?.schedule ? ` · ${allMatches().length} matches` : ''}</summary>${renderMatches()}</details>` : ''),
       publish: renderPublish(),
       results: (draftFixtures ? '' : renderMatches()) + renderBonus() + renderResults()
     };
@@ -1286,6 +1343,10 @@
   function updateDraftControls() {
     if ($('al-flow-context')) $('al-flow-context').innerHTML = workflowContext();
     if ($('al-publication-checklist')) $('al-publication-checklist').innerHTML = publicationChecklist();
+    if ($('al-publish-progress')) {
+      const checks = publicationChecks();
+      $('al-publish-progress').innerHTML = `<strong>${checks.filter(check => check.ready).length}/${checks.length} checks ready</strong> · Any remaining blocker is shown below.`;
+    }
     $('al-roster-count').textContent = `${state.selected.size} players selected · ${state.attending.size} RSVP attending`;
     $('al-plan').textContent = planText();
     $('al-dirty-roster').hidden = !needsRosterReview();
@@ -1470,6 +1531,12 @@
         if (isLocked()) return;
         if (state.selected.size && !window.confirm('Remove everyone from this local draft roster? No account or profile is deleted. The saved lineup stays unchanged until Save draft.')) return;
         changeRoster(new Set()); render(); break;
+      case 'open-late-guest':
+        if (cancelled() || !['published', 'finalized'].includes(event()?.status)) return;
+        state.guestOpen = true;
+        render();
+        focusInFlow('al-guest-details');
+        break;
       case 'retry-rsvp':
         setBusy(true, 'Refreshing RSVPs and saved league data…');
         try { await loadData({ preserve: true }); render(); }
@@ -1557,7 +1624,7 @@
     const data = new FormData(form);
     const type = form.dataset.alForm;
     const clearFormKey = formKey(form);
-    if (cancelled() && ['schedule', 'match', 'results', 'bonus'].includes(type)) throw new Error('Cancelled training — read-only. Choose an active Thursday.');
+    if (cancelled() && ['schedule', 'match', 'results', 'bonus', 'late-player'].includes(type)) throw new Error('Cancelled training — read-only. Choose an active Thursday.');
     if (type === 'season') {
       const points = String(data.get('placement_points')).split(',').map(s => s.trim());
       const scoringMode = data.get('scoring_mode');
@@ -1648,6 +1715,33 @@
         event_id: event().id, version: event().version, match_number: matchNumber, score_a: scoreA, score_b: scoreB
       }, { message: `Match ${matchNumber} score saved. Match table updated.`, retainMatchEdits: remainingEdits, focus: `al-save-match-${matchNumber}` });
       if (!saved && $(`al-save-match-${matchNumber}`)) $(`al-save-match-${matchNumber}`).textContent = `Save match ${matchNumber} score`;
+    } else if (type === 'late-player') {
+      const current = event();
+      if (!current || !['published', 'finalized'].includes(current.status)) {
+        throw new Error('Publish this training before assigning a last-minute player.');
+      }
+      if (state.dirtyTeams || state.dirtyRoster || state.dirtySchedule || state.dirtyBonus ||
+        state.dirtyResults || Object.keys(state.matchEdits).length) {
+        throw new Error('Save or discard all lineup, BP, score and placement edits before assigning a last-minute player.');
+      }
+      const playerId = String(data.get('player_id') || '');
+      const teamNumber = Number(data.get('team_number'));
+      const assigned = new Set(state.teams.flatMap(team => team.player_ids));
+      const player = players().find(candidate => !candidate.uncreated && candidate.id === playerId && !assigned.has(candidate.id));
+      const team = state.teams.find(candidate => candidate.number === teamNumber);
+      if (!player) throw new Error('Choose an available player who is not already assigned.');
+      if (!team) throw new Error('Choose the team the player joined.');
+      const finalized = current.status === 'finalized';
+      if (!window.confirm(`Assign “${player.display_name}” to “${team.name}”?\n\n${finalized
+        ? 'This finalized training’s saved points and private ELO adjustments will be replaced once using the existing final places. No points are added twice.'
+        : 'Published fixtures and saved match scores stay unchanged. The player will receive this team’s placement when the training is finalized.'}`)) return;
+      await write('add_late_player', {
+        event_id: current.id, version: current.version, player_id: player.id, team_number: team.number
+      }, {
+        clearFormKey,
+        message: `${player.display_name} assigned to ${team.name}.${finalized ? ' Finalized awards were recalculated without duplication.' : ' Existing fixtures and scores were preserved.'}`,
+        focus: 'al-late-player'
+      });
     } else if (type === 'profile' || type === 'guest') {
       const p = players().find(p => p.id === data.get('player_id'));
       const name = String(data.get('display_name') || '').trim();
@@ -1792,6 +1886,8 @@
       const target = $(id);
       if (target?.closest('[data-al-stage]')) {
         e.preventDefault();
+        const disclosure = target.closest('details');
+        if (disclosure && !disclosure.open) disclosure.open = true;
         focusInFlow(id);
         target.scrollIntoView({ block: 'start' });
       }
@@ -1939,6 +2035,13 @@
     if (e.target.id === 'al-season-details') state.seasonOpen = e.target.open;
     if (e.target.id === 'al-profiles-details') state.profilesOpen = e.target.open;
     if (e.target.id === 'al-guest-details') state.guestOpen = e.target.open;
+    if (e.target.id === 'al-roster-tools') state.rosterToolsOpen = e.target.open;
+    if (e.target.id === 'al-team-options') state.teamOptionsOpen = e.target.open;
+    if (e.target.id === 'al-team-tools' && state.teamToolsOpen !== e.target.open) {
+      state.teamToolsOpen = e.target.open;
+      render();
+    }
+    if (e.target.id === 'al-fixture-preview') state.fixturePreviewOpen = e.target.open;
   }, true);
   window.addEventListener('beforeunload', e => {
     if (!hasChanges()) return;

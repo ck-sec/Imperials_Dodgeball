@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="stylesheet" href="/shared.css?v=20260912" />
   <link rel="stylesheet" href="/league.css?v=20260915" />
-  <link rel="stylesheet" href="/member.css?v=20260912" />
+  <link rel="stylesheet" href="/member.css?v=20260917a" />
   <link rel="stylesheet" href="/fonts/fonts.css?v=20260912" />
 </head>
 <body>
@@ -30,7 +30,7 @@
   <main id="main-content" tabindex="-1">
     <noscript><p class="member-notice">Bitte aktiviere JavaScript für Anmeldung und Training. / Please enable JavaScript to sign in and RSVP.</p></noscript>
     <p class="member-notice" id="memberReturnNotice" hidden>
-      <span data-de="Nach erfolgreicher Anmeldung kehrst du zum Spieltag oder Timer zurück." data-en="After signing in, you’ll return to your matchday or timer.">Nach erfolgreicher Anmeldung kehrst du zum Spieltag oder Timer zurück.</span>
+      <span data-de="Nach erfolgreicher Anmeldung kehrst du zur angeforderten Seite zurück." data-en="After signing in, you’ll return to the requested page.">Nach erfolgreicher Anmeldung kehrst du zur angeforderten Seite zurück.</span>
       <a class="text-link" id="memberReturnLink" href="/spieltag" data-de="Ohne Anmeldung zusehen" data-en="Watch without signing in">Ohne Anmeldung zusehen</a>
     </p>
     <section class="auth-wrap" id="loginView" aria-labelledby="loginHeading">
@@ -157,6 +157,7 @@
       <div class="dash-tabs" role="tablist" aria-label="Mitglieder / Members">
         <button type="button" class="dash-tab active" id="tabButton-training" data-tab="training" role="tab" aria-controls="tab-training" aria-selected="true">Training</button>
         <button type="button" class="dash-tab" id="tabButton-league" data-tab="league" role="tab" aria-controls="tab-league" aria-selected="false" tabindex="-1" data-de="Liga" data-en="League">Liga</button>
+        <button type="button" class="dash-tab" id="tabButton-statistics" data-tab="statistics" role="tab" aria-controls="tab-statistics" aria-selected="false" tabindex="-1" data-de="Statistik" data-en="Statistics">Statistik</button>
         <button type="button" class="dash-tab" id="tabButton-account" data-tab="account" role="tab" aria-controls="tab-account" aria-selected="false" tabindex="-1" data-de="Konto" data-en="Account">Konto</button>
       </div>
       <div class="dash-content">
@@ -183,6 +184,14 @@
             <summary data-de="Season 1 · Archiv" data-en="Season 1 · Archive">Season 1 · Archiv</summary>
             <div id="memberArchiveContent"></div>
           </details>
+        </section>
+        <section class="tab-panel league" id="tab-statistics" role="tabpanel" aria-labelledby="tabButton-statistics" hidden>
+          <div class="section-heading">
+            <h2 data-de="Deine Statistik" data-en="Your statistics">Deine Statistik</h2>
+          </div>
+          <div id="memberStatisticsContent" aria-live="polite">
+            <p class="league-notice" role="status" data-de="Statistik wird geladen …" data-en="Loading statistics …">Statistik wird geladen …</p>
+          </div>
         </section>
         <section class="tab-panel" id="tab-account" role="tabpanel" aria-labelledby="tabButton-account" hidden>
           <div class="member-card">
@@ -212,13 +221,13 @@
     </div>
   </dialog>
   <script src="/js/site-language.js?v=20260912" defer></script>
-  <script src="/js/member-core.js?v=20260914" defer></script>
+  <script src="/js/member-core.js?v=20260918" defer></script>
   <script src="/js/member-auth.js?v=20260912" defer></script>
   <script src="/js/league-scoring.js?v=20260915c" defer></script>
   <script src="/js/league-ui.js?v=20260915c" defer></script>
-  <script src="/js/member-league.js?v=20260915b" defer></script>
+  <script src="/js/member-league.js?v=20260917a" defer></script>
   <script src="/js/member-dashboard.js?v=20260912c" defer></script>
   <script src="/js/member-training.js?v=20260912" defer></script>
-  <script src="/js/member-init.js?v=20260912c" defer></script>
+  <script src="/js/member-init.js?v=20260917" defer></script>
 </body>
 </html>

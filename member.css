@@ -48,7 +48,7 @@ input[type="checkbox"] { width: 22px; height: 22px; flex-shrink: 0; accent-color
 .dash-welcome { padding: 1.1rem 1rem; }
 .dash-welcome h1 { font-size: 1.5rem; overflow-wrap: anywhere; }
 .dash-welcome #dashName { color: var(--gold-lt); }
-.dash-tabs { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; background: var(--deep); padding: .5rem 1rem; border-bottom: 1px solid var(--border); }
+.dash-tabs { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; background: var(--deep); padding: .5rem 1rem; border-bottom: 1px solid var(--border); }
 .dash-tab { min-height: 48px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: #bccbe5; font-weight: 600; }
 .dash-tab.active { color: var(--gold-lt); border-color: var(--gold); background: rgba(212,150,26,.1); }
 .dash-content { padding: 1rem; }
@@ -63,6 +63,28 @@ input[type="checkbox"] { width: 22px; height: 22px; flex-shrink: 0; accent-color
 .member-summary-values { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1.25rem; color: var(--gold-lt); }
 .member-summary .league-movement { margin-top: .5rem; }
 .member-summary .league-movement-context { font-size: .75rem; }
+.member-stat-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .7rem; margin-bottom: 1rem; }
+.member-stat-metric, .member-stat-card { border: 1px solid var(--border); border-radius: 12px; background: var(--navy); }
+.member-stat-metric { padding: .85rem; }
+.member-stat-metric strong, .member-stat-metric span { display: block; }
+.member-stat-metric strong { color: var(--gold-lt); font: 1.65rem 'Barlow Condensed', sans-serif; }
+.member-stat-metric span { margin-top: .2rem; color: #b8c5df; font-size: .75rem; }
+.member-stat-grid { display: grid; gap: 1rem; }
+.member-stat-card { padding: 1rem; margin-bottom: 1rem; overflow: hidden; }
+.member-stat-card h3 { margin-bottom: .8rem; color: var(--gold-lt); }
+.member-stat-chart { display: grid; gap: .65rem; }
+.member-stat-bar { display: grid; grid-template-columns: minmax(74px,.8fr) minmax(90px,2fr) auto; gap: .5rem; align-items: center; font-size: .75rem; }
+.member-stat-bar > span { overflow: hidden; color: #cbd6e9; text-overflow: ellipsis; white-space: nowrap; }
+.member-stat-bar > div { height: 11px; overflow: hidden; border-radius: 999px; background: var(--deep); }
+.member-stat-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,var(--gold),var(--gold-lt)); }
+.member-stat-bar .member-stat-place i { background: linear-gradient(90deg,#3567c0,#73a7ff); }
+.member-stat-teammate strong { min-width: 2ch; color: var(--cloud); text-align: right; white-space: nowrap; }
+.member-stat-history { margin: 0; padding: 0; list-style: none; }
+.member-stat-history li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .7rem; padding: .75rem 0; border-top: 1px solid var(--border); }
+.member-stat-history li:first-child { border-top: 0; }
+.member-stat-history li div { min-width: 0; }
+.member-stat-history strong, .member-stat-history div span { display: block; overflow-wrap: anywhere; }
+.member-stat-history div span { margin-top: .2rem; color: #b8c5df; font-size: .78rem; }
 .session-card { background: var(--navy); border: 1px solid var(--border); border-radius: 14px; padding: 1rem; margin-bottom: 1rem; }
 .session-card:first-child { border-color: rgba(212,150,26,.4); }
 .session-card.cancelled { opacity: .7; }
@@ -109,6 +131,8 @@ dialog .auth-card { box-shadow: none; }
   .dash-tabs { padding: .5rem 1.5rem; }
   .session-card { padding: 1.25rem; }
   .league .league-metrics { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .member-stat-metrics { grid-template-columns: repeat(6,minmax(0,1fr)); }
+  .member-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 360px) { .nav-logo span { max-width: 105px; font-size: 1.15rem; } .auth-card { padding: 1rem; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition: none !important; animation: none !important; } }

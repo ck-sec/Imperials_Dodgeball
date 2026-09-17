@@ -2,7 +2,7 @@ const { getDb } = require('../lib/db');
 const { setCors } = require('../lib/cors');
 const { requireAdmin, requireMember } = require('../lib/auth');
 const { requireJSON } = require('../lib/validation');
-const { assert, uuid, validateAction, publicView, adminView } = require('../lib/league');
+const { assert, uuid, validateAction, publicView, adminView, adminStatisticsView } = require('../lib/league');
 const { readWorld, syncPlayers, applyAction, dbError } = require('../lib/league-db');
 const { scoringIdentity, scoringPermissions, scoringView } = require('../lib/league-scoring-access');
 
@@ -25,7 +25,7 @@ module.exports = async (req, res) => {
       assert(requireJSON(req), 'Content-Type must be application/json');
       const input = validateAction(req.body);
       const sql = getDb();
-      if (['save_player', 'link_player', 'generate'].includes(input.action)) await syncPlayers(sql);
+      if (['save_player', 'link_player', 'generate', 'add_late_player'].includes(input.action)) await syncPlayers(sql);
       const world = input.action === 'save_season' ? null : await readWorld(sql);
       if (matchWrite) {
         const permissions = scoringPermissions(world, actor);
@@ -38,9 +38,9 @@ module.exports = async (req, res) => {
     }
 
     const view = req.query.view || 'public';
-    assert(['admin', 'public', 'me', 'scoring'].includes(view), 'Invalid view');
+    assert(['admin', 'admin_stats', 'public', 'me', 'scoring'].includes(view), 'Invalid view');
     let userId;
-    if (view === 'admin' && !requireAdmin(req, res)) return;
+    if (['admin', 'admin_stats'].includes(view) && !requireAdmin(req, res)) return;
     if (view === 'me') {
       const member = requireMember(req, res);
       if (!member) return;
@@ -52,6 +52,7 @@ module.exports = async (req, res) => {
     if (view === 'admin') await syncPlayers(sql);
     const world = await readWorld(sql);
     if (view === 'scoring') return res.status(200).json(scoringView(world, eventId, scoringIdentity(req)));
+    if (view === 'admin_stats') return res.status(200).json(adminStatisticsView(world, seasonId));
     if (userId) {
       assert(world.users.some(u => u.id === userId && u.is_active && u.status === 'approved'),
         'Approved active membership required', 403);

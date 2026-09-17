@@ -206,6 +206,14 @@ test('finite numeric validation, real dates, bounds, booleans, UUIDs and version
   assert.throws(() => validateAction({ action: 'save_player', user_id: id(1), gender: 'male', is_rookie: 'false', initial_rating: 1000 }), LeagueError);
   assert.throws(() => validateAction({ action: 'generate', season_id: id(1), session_id: id(2), team_size: '6' }), LeagueError);
   assert.equal(validateAction({ action: 'generate', season_id: id(1), session_id: id(2), team_size: 'auto' }).team_size, 'auto');
+  assert.deepEqual(validateAction({
+    action: 'add_late_player', event_id: id(1), version: 2, player_id: id(3), team_number: 4,
+  }), { action: 'add_late_player', event_id: id(1), version: 2, player_id: id(3), team_number: 4 });
+  for (const patch of [{ player_id: 'bad' }, { team_number: 0 }, { team_number: '2' }]) {
+    assert.throws(() => validateAction({
+      action: 'add_late_player', event_id: id(1), version: 2, player_id: id(3), team_number: 2, ...patch,
+    }), LeagueError);
+  }
 });
 
 test('pairwise Elo is normalized, uses frozen squad means, and awards every substitute', () => {

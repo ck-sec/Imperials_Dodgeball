@@ -21,6 +21,7 @@ document.querySelectorAll('.dash-tab[data-tab]').forEach(function(btn) {
 
 // Members
 document.getElementById('refreshMembersBtn').addEventListener('click', function() { loadPendingMembers(); });
+document.getElementById('refreshMemberManagementBtn').addEventListener('click', function() { loadMemberManagement(); });
 
 // Training tab
 document.getElementById('createSessionBtn').addEventListener('click', function() { openCreateSessionModal(); });
@@ -38,7 +39,13 @@ document.getElementById('addPlayerBtn').addEventListener('click', function() { o
 document.getElementById('modalBackdrop').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
 document.getElementById('closeModalBtn').addEventListener('click', function() { closeModal(); });
 document.getElementById('cancelModalBtn').addEventListener('click', function() { closeModal(); });
-document.getElementById('playerForm').addEventListener('submit', function(e) { savePlayer(e); });
+document.getElementById('playerForm').addEventListener('submit', function(e) {
+  savePlayer(e).catch(function(error) {
+    if (error.message === 'ADMIN_SESSION_EXPIRED') return;
+    console.error('Ranking player save failed:', error);
+    toast(error.message || 'Player changes could not be saved.', 'danger');
+  });
+});
 
 // Delete confirm modal
 document.getElementById('confirmBackdrop').addEventListener('click', function(e) { if (e.target === this) closeConfirm(); });

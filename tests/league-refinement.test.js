@@ -272,6 +272,68 @@ test('unscheduled manual placements remain publishable and correctable without b
   assert.deepEqual(JSON.parse(results.values[1]), scoreEvent(event, corrected).ledger);
 });
 
+test('late players append to published teams and atomically replace finalized awards', async () => {
+  const publishedWorld = fixture(), publishedEvent = publishedWorld.events[0], publishedSql = recorder();
+  publishedEvent.status = 'published';
+  const originalTeamIds = publishedEvent.teams.find(team => team.number === 2).players.map(player => player.id);
+  const publishedResult = await applyAction(publishedSql, request('add_late_player', publishedEvent, {
+    player_id: id(5), team_number: 2,
+  }), publishedWorld);
+  assert.deepEqual(publishedResult, { event_id: publishedEvent.id, player_id: id(5), team_number: 2 });
+  const publishedQueries = publishedSql.transactions[0].queries;
+  const publishedUpdate = publishedQueries.find(query => /UPDATE league_events SET teams/.test(query.text));
+  const publishedTeams = JSON.parse(publishedUpdate.values[0]);
+  assert.deepEqual(publishedTeams[1].players.map(player => player.id), [...originalTeamIds, id(5)]);
+  assert.deepEqual(JSON.parse(publishedUpdate.values[1]).sort(), [...publishedEvent.roster_ids, id(5)].sort());
+  assert(!publishedUpdate.text.includes('schedule ='), 'A late arrival must not rebuild or clear saved fixtures');
+  assert(!publishedQueries.some(query => /(?:DELETE FROM|INSERT INTO) league_results/.test(query.text)));
+  assert(publishedQueries.some(query => query.text.includes('The late player or their rating changed')));
+
+  const finalizedWorld = fixture(), finalizedEvent = finalizedWorld.events[0], finalizedSql = recorder();
+  finalized(finalizedWorld, finalizedEvent);
+  const finalizedTeammateId = finalizedEvent.teams.find(team => team.number === 2).players[0].id;
+  finalizedWorld.sessions.push({
+    ...finalizedWorld.sessions[0], id: id(201), session_date: '2026-09-17',
+  });
+  finalizedWorld.events.push({
+    ...structuredClone(finalizedEvent), id: id(401), session_id: id(201), session_date: '2026-09-17',
+  });
+  finalizedWorld.results.push({
+    event_id: id(401), player_id: id(5), display_name: 'Player 4', team_number: 1,
+    placement: 1, points: 1.5, bonus_points: 0, rating_delta: 50,
+  });
+  await applyAction(finalizedSql, request('add_late_player', finalizedEvent, {
+    player_id: id(5), team_number: 2,
+  }), finalizedWorld);
+  const finalizedQueries = finalizedSql.transactions[0].queries;
+  const deletion = finalizedQueries.findIndex(query => query.text.includes('DELETE FROM league_results'));
+  const insertion = finalizedQueries.findIndex(query => query.text.includes('INSERT INTO league_results'));
+  const update = finalizedQueries.findIndex(query => /UPDATE league_events SET teams/.test(query.text));
+  assert(deletion >= 0 && deletion < insertion && insertion < update);
+  const ledger = JSON.parse(finalizedQueries[insertion].values[1]);
+  const lateResult = ledger.find(result => result.player_id === id(5));
+  const teammateResult = ledger.find(result => result.player_id === finalizedTeammateId);
+  assert.deepEqual(
+    { team_number: lateResult.team_number, placement: lateResult.placement, points: lateResult.points },
+    { team_number: teammateResult.team_number, placement: teammateResult.placement, points: teammateResult.points }
+  );
+  assert.equal(ledger.length, 5, 'The replacement ledger includes every original player and the late arrival once');
+  const finalizedTeams = JSON.parse(finalizedQueries[update].values[0]);
+  assert.equal(finalizedTeams.flatMap(team => team.players).find(player => player.id === id(5)).rating, 1000,
+    'A historical correction snapshots the late player before, not after, later finalized trainings');
+
+  await assert.rejects(applyAction(recorder(), request('add_late_player', publishedEvent, {
+    player_id: id(1), team_number: 2,
+  }), publishedWorld), /already assigned/);
+  await assert.rejects(applyAction(recorder(), request('add_late_player', publishedEvent, {
+    player_id: id(5), team_number: 99,
+  }), publishedWorld), /Team not found/);
+  publishedEvent.status = 'draft';
+  await assert.rejects(applyAction(recorder(), request('add_late_player', publishedEvent, {
+    player_id: id(5), team_number: 2,
+  }), publishedWorld), /only be added after teams are published/);
+});
+
 test('legacy schedules remain correctable with changed bookings but cannot be republished', async () => {
   const world = fixture(), event = world.events[0], sql = recorder();
   event.schedule = legacyTwoTeamSchedule();

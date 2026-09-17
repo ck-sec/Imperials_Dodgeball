@@ -12,6 +12,7 @@ let memberReturnTo = '';
 
 function safeMemberReturn(value) {
   if (typeof value !== 'string' || /[\s\\#]/.test(value)) return '';
+  if (value === '/admin') return value;
   const matchday = /^\/spieltag(?:\?event=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))?$/i.exec(value);
   if (matchday) return '/spieltag' + (matchday[1] ? '?event=' + matchday[1].toLowerCase() : '');
   const timer = /^\/timer\?event=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})&match=([1-9]|10)$/i.exec(value);
@@ -21,7 +22,7 @@ function safeMemberReturn(value) {
 function initMemberReturn() {
   const values = new URLSearchParams(window.location.search).getAll('return_to');
   memberReturnTo = values.length === 1 ? safeMemberReturn(values[0]) : '';
-  if (values.length && !memberReturnTo) console.error('Ignored invalid match return target.');
+  if (values.length && !memberReturnTo) console.error('Ignored invalid member return target.');
   try {
     if (values.length) {
       if (memberReturnTo) sessionStorage.setItem(MEMBER_RETURN_KEY, JSON.stringify({ target: memberReturnTo, expires: Date.now() + 30 * 60 * 1000 }));
@@ -35,6 +36,7 @@ function initMemberReturn() {
   }
   byId('memberReturnNotice').hidden = !memberReturnTo;
   byId('memberReturnLink').href = memberReturnTo || '/spieltag';
+  byId('memberReturnLink').hidden = memberReturnTo === '/admin';
 }
 
 function completeMemberReturn() {
@@ -131,7 +133,7 @@ function showView(view) {
 }
 
 function switchTab(tab, focus = false) {
-  if (!['training', 'league', 'account'].includes(tab)) tab = 'training';
+  if (!['training', 'league', 'statistics', 'account'].includes(tab)) tab = 'training';
   activeTab = tab;
   document.querySelectorAll('.dash-tab').forEach(button => {
     const selected = button.dataset.tab === tab;
@@ -142,6 +144,7 @@ function switchTab(tab, focus = false) {
   });
   document.querySelectorAll('.tab-panel').forEach(panel => { panel.hidden = panel.id !== 'tab-' + tab; });
   if (tab === 'training' && !trainingLoaded && !trainingLoading) loadTrainingSessions();
+  if (tab === 'statistics') renderMemberStatistics();
 }
 
 function clearErrors(formId) {
@@ -196,6 +199,6 @@ function clearMemberState() {
   byId('emailNotifToggle').disabled = false;
   setBusy('savePrefsBtn', false);
   ['accountMessage', 'settingsSaved', 'loginMessage', 'trainingLoading'].forEach(id => { byId(id).hidden = true; });
-  ['trainingList', 'otherMemberEvents', 'memberLeagueContent', 'trainingLeagueSummary', 'memberArchiveContent', 'accountName', 'accountEmail', 'dashName'].forEach(id => { byId(id).textContent = ''; });
+  ['trainingList', 'otherMemberEvents', 'memberLeagueContent', 'memberStatisticsContent', 'trainingLeagueSummary', 'memberArchiveContent', 'accountName', 'accountEmail', 'dashName'].forEach(id => { byId(id).textContent = ''; });
   document.querySelectorAll('input[type="password"]').forEach(input => { input.value = ''; });
 }

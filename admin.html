@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/tailwind.min.css?v=20260912" />
   <link rel="stylesheet" href="/shared.css?v=20260912" />
   <link rel="stylesheet" href="/league.css?v=20260915" />
-  <link rel="stylesheet" href="/admin-league.css?v=20260916a" />
+  <link rel="stylesheet" href="/admin-league.css?v=20260918" />
   <link rel="stylesheet" href="/fonts/fonts.css?v=20260912" />
 
   <style>
@@ -71,13 +71,16 @@
     .login-input { width: 100%; background: rgba(12,27,58,0.8); border: 1px solid var(--border); border-radius: 8px; padding: 11px 14px; font-family: 'Inter', sans-serif; font-size: 0.95rem; color: var(--cloud); outline: none; transition: border-color 0.2s ease; letter-spacing: 0.04em; }
     .login-input:focus { border-color: rgba(212,150,26,0.5); }
     .login-input::placeholder { color: rgba(244,247,255,0.2); }
-    .login-btn { width: 100%; margin-top: 1.25rem; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1rem; letter-spacing: 0.14em; text-transform: uppercase; padding: 12px; border-radius: 8px; border: none; background: linear-gradient(135deg, var(--gold), var(--gold-lt)); color: var(--deep); cursor: pointer; position: relative; overflow: hidden; transition: transform 0.15s ease, box-shadow 0.15s ease; box-shadow: 0 4px 20px rgba(212,150,26,0.3); }
+    .login-btn { width: 100%; margin-top: 1.25rem; display: flex; align-items: center; justify-content: center; text-decoration: none; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 1rem; letter-spacing: 0.14em; text-transform: uppercase; padding: 12px; border-radius: 8px; border: none; background: linear-gradient(135deg, var(--gold), var(--gold-lt)); color: var(--deep); cursor: pointer; position: relative; overflow: hidden; transition: transform 0.15s ease, box-shadow 0.15s ease; box-shadow: 0 4px 20px rgba(212,150,26,0.3); }
     .login-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(212,150,26,0.4); }
     .login-btn:active { transform: none; }
-    .login-error { margin-top: 0.75rem; font-size: 0.8rem; color: #F87171; text-align: center; font-weight: 600; opacity: 0; transition: opacity 0.2s ease; }
-    .login-error.show { opacity: 1; }
-    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
-    .shake { animation: shake 0.4s ease; }
+    .login-btn.secondary { margin-top: 0.75rem; border: 1px solid var(--border); background: rgba(12,27,58,0.8); color: var(--cloud); box-shadow: none; }
+    .login-btn:disabled { cursor: wait; opacity: 0.65; transform: none; }
+    .login-status { min-height: 2.6rem; margin-top: 0.75rem; padding: 0.7rem; border-radius: 8px; font-size: 0.82rem; line-height: 1.45; color: rgba(244,247,255,0.72); text-align: center; background: rgba(12,27,58,0.65); }
+    .login-status[data-tone="error"] { color: #FCA5A5; border: 1px solid rgba(248,113,113,0.28); }
+    .login-status[data-tone="success"] { color: #86EFAC; border: 1px solid rgba(74,222,128,0.25); }
+    .login-help { margin-top: 1rem; text-align: center; font-size: 0.8rem; }
+    .login-help a { color: var(--gold-lt); }
 
     /* ── Dashboard ── */
     .dashboard { display: none; padding-top: 72px; }
@@ -488,12 +491,12 @@
       <div class="login-logo">
         <img src="logo.webp" alt="Vienna Imperials" width="72" height="72" />
         <span class="login-title">Vienna Imperials</span>
-        <p class="login-sub">Admin Access</p>
+        <p class="login-sub">Admin access · approved accounts only</p>
       </div>
-      <label class="login-label" for="adminLoginPass">Admin Password</label>
-      <input class="login-input" type="password" id="adminLoginPass" placeholder="Enter password&hellip;" autocomplete="current-password" />
-      <button class="login-btn" id="loginBtn">Enter Admin Mode</button>
-      <p class="login-error" id="adminLoginError">Incorrect password. Try again.</p>
+      <p class="login-status" id="adminAccessStatus" role="status" aria-live="polite">Checking your member account&hellip;</p>
+      <a class="login-btn" id="adminMemberLoginLink" href="/member?return_to=%2Fadmin">Sign in with member account</a>
+      <button class="login-btn secondary" type="button" id="loginBtn">Check access again</button>
+      <p class="login-help"><a href="/member">Open member portal</a> to sign out or switch accounts.</p>
     </div>
   </div>
 
@@ -508,19 +511,33 @@
     <div class="dash-content">
       <!-- Tab Navigation -->
       <div class="dash-tabs al-dashboard-tabs" role="tablist">
-        <button class="dash-tab active" data-tab="members" role="tab" aria-selected="true">Members</button>
+        <button class="dash-tab active" data-tab="approvals" role="tab" aria-selected="true">Approvals</button>
+        <button class="dash-tab" data-tab="member-management" role="tab" aria-selected="false">Member Management</button>
         <button class="dash-tab" data-tab="training" role="tab" aria-selected="false">Training</button>
         <button class="dash-tab" id="al-tab-button" data-tab="league" role="tab" aria-controls="tab-league" aria-selected="false">Imperials Social League</button>
+        <button class="dash-tab" data-tab="statistics" role="tab" aria-selected="false">Statistics</button>
         <button class="dash-tab" data-tab="rankings" role="tab" aria-selected="false">Rankings</button>
       </div>
 
-      <!-- ── Members Tab ── -->
-      <div class="tab-panel active" id="tab-members" role="tabpanel">
+      <!-- ── Approvals Tab ── -->
+      <div class="tab-panel active" id="tab-approvals" role="tabpanel">
         <div class="section-header">
           <h3 class="section-title">MEMBER APPROVALS</h3>
           <button class="at-btn" id="refreshMembersBtn">Refresh</button>
         </div>
         <div id="pendingMembersList"></div>
+      </div>
+
+      <!-- ── Member Management Tab ── -->
+      <div class="tab-panel" id="tab-member-management" role="tabpanel">
+        <div class="section-header">
+          <div>
+            <h3 class="section-title">MEMBER MANAGEMENT</h3>
+            <p class="am-intro">Manage account-to-player links for Social League history and the Season 1 archive.</p>
+          </div>
+          <button class="at-btn" id="refreshMemberManagementBtn">Refresh</button>
+        </div>
+        <div id="memberManagementList"></div>
       </div>
 
       <!-- ── Training Tab ── -->
@@ -564,6 +581,17 @@
         <div id="al-notice" class="al-notice" role="alert" tabindex="-1" hidden></div>
         <p id="al-progress" class="al-muted" role="status" aria-live="polite"></p>
         <div id="al-app"><p class="al-empty">Open this tab to load Season 2 Thursdays, training RSVPs and teams.</p></div>
+      </div>
+
+      <!-- ── Statistics Tab ── -->
+      <div class="tab-panel" id="tab-statistics" role="tabpanel">
+        <div class="section-header">
+          <div>
+            <h3 class="section-title">LEAGUE STATISTICS</h3>
+            <p class="am-intro">Recorded placements, points and player performance from finalized trainings.</p>
+          </div>
+        </div>
+        <div id="adminStatisticsContent"></div>
       </div>
 
       <!-- ── Rankings Tab ── -->
@@ -882,17 +910,18 @@
   </div>
 
   <!-- ══ SCRIPTS ══ -->
-  <script src="/js/admin-auth.js?v=20260912" defer></script>
-  <script src="/js/rankings-data.js?v=20260912" defer></script>
+  <script src="/js/admin-auth.js?v=20260918" defer></script>
+  <script src="/js/rankings-data.js?v=20260917" defer></script>
   <script src="/js/rankings-render.js?v=20260912" defer></script>
-  <script src="/js/rankings-modals.js?v=20260912" defer></script>
+  <script src="/js/rankings-modals.js?v=20260917" defer></script>
   <script src="/js/rankings-import.js?v=20260912" defer></script>
-  <script src="/js/admin-members.js?v=20260912" defer></script>
-  <script src="/js/admin-training.js?v=20260912" defer></script>
+  <script src="/js/admin-members.js?v=20260917" defer></script>
+  <script src="/js/admin-training.js?v=20260917" defer></script>
   <script src="/js/league-scoring.js?v=20260915c" defer></script>
   <script src="/js/league-ui.js?v=20260915c" defer></script>
   <script src="/js/league-schedule.js?v=20260916a" defer></script>
-  <script src="/js/admin-league.js?v=20260916a" defer></script>
-  <script src="/js/admin-events.js?v=20260912" defer></script>
+  <script src="/js/admin-league.js?v=20260918" defer></script>
+  <script src="/js/admin-statistics.js?v=20260917a" defer></script>
+  <script src="/js/admin-events.js?v=20260917" defer></script>
 </body>
 </html>

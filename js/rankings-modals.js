@@ -6,17 +6,36 @@
 // ── Edit / Add Modal
 let membersList = null; // cached approved members
 
+async function rankingLinkRequest(body) {
+  const response = await adminFetch('/api/admin/members', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (response.ok) return;
+  let message = 'Member link could not be saved.';
+  try {
+    const data = await response.json();
+    if (data.error) message = data.error;
+  } catch {
+    message += ` HTTP ${response.status}.`;
+  }
+  throw new Error(message);
+}
+
 async function loadMembersForLinking() {
   if (membersList) return membersList;
   try {
-    const res = await fetch('/api/admin/members?status=approved', {
-      headers: { 'Authorization': 'Bearer ' + getToken() }
-    });
-    if (!res.ok) return [];
+    const res = await adminFetch('/api/admin/members?status=approved');
+    if (!res.ok) throw new Error(`Member accounts could not be loaded (HTTP ${res.status}).`);
     const data = await res.json();
     membersList = data.members || [];
     return membersList;
-  } catch { return []; }
+  } catch (error) {
+    console.error('Ranking member links could not be loaded:', error);
+    toast(error.message || 'Member accounts could not be loaded.', 'danger');
+    return [];
+  }
 }
 
 async function openModal(id = null) {
@@ -93,22 +112,14 @@ async function savePlayer(e) {
       if (membersList) {
         const prevLinked = membersList.find(m => m.ranking_player_name && m.ranking_player_name.toLowerCase() === (oldName || '').toLowerCase());
         if (prevLinked && prevLinked.id !== selectedUserId) {
-          await fetch('/api/admin/members', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
-            body: JSON.stringify({ user_id: prevLinked.id, action: 'link', ranking_player_name: '' })
-          }).catch(() => {});
+          await rankingLinkRequest({ user_id: prevLinked.id, action: 'link', ranking_player_name: '' });
           prevLinked.ranking_player_name = null;
         }
       }
 
       // Link the newly selected member
       if (selectedUserId) {
-        await fetch('/api/admin/members', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
-          body: JSON.stringify({ user_id: selectedUserId, action: 'link', ranking_player_name: data.name })
-        }).catch(() => {});
+        await rankingLinkRequest({ user_id: selectedUserId, action: 'link', ranking_player_name: data.name });
         if (membersList) {
           const m = membersList.find(x => x.id === selectedUserId);
           if (m) m.ranking_player_name = data.name;

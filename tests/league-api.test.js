@@ -89,6 +89,8 @@ test('public is anonymous, while admin GET and every POST require admin before a
   const count = app.calls.db;
   assert.equal((await app.request({ query: { view: 'admin' } })).statusCode, 401);
   assert.equal((await app.request({ query: { view: 'admin' }, testRole: 'member' })).statusCode, 403);
+  assert.equal((await app.request({ query: { view: 'admin_stats' } })).statusCode, 401);
+  assert.equal((await app.request({ query: { view: 'admin_stats' }, testRole: 'member' })).statusCode, 403);
   assert.equal((await app.request({ method: 'POST', body: { action: 'publish' } })).statusCode, 401);
   assert.equal((await app.request({ method: 'POST', testRole: 'member', body: {} })).statusCode, 403);
   assert.equal(app.calls.db, count);
@@ -283,7 +285,7 @@ test('mobile scoring endpoint is anonymous-safe with exact permissions and reche
 
 test('scorekeeper HTTP permissions never widen admin actions and transactional revocation returns forbidden', async () => {
   const world = scoringFixture(), event = world.events[0], app = harness(world);
-  for (const action of ['save_draft', 'save_teams', 'save_bonus_points', 'set_bonus', 'set_scorekeeper', 'save_season', 'publish', 'results', 'generate']) {
+  for (const action of ['save_draft', 'save_teams', 'save_bonus_points', 'set_bonus', 'set_scorekeeper', 'save_season', 'publish', 'results', 'generate', 'add_late_player']) {
     assert.equal((await app.request({ method: 'POST', testRole: 'member', body: { action } })).statusCode, 403);
   }
   assert.equal(app.calls.db, 0, 'Admin-only writes fail before accessing the database');
