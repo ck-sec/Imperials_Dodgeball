@@ -227,6 +227,11 @@ test('timer view exposes public fixture details but controls only to current-day
   event.status = 'finalized';
   assert.equal(timerView(world, event.id, 1, { is_admin: true }, null, AT, EVENT_DATE).permissions.can_control, false);
   assert.throws(() => timerView(world, event.id, 99, {}, null, AT, EVENT_DATE), error => error.status === 404);
+  const cancelled = fixture();
+  cancelled.events[0].cancelled_at = '2026-09-10T18:30:00.000Z';
+  assert.throws(() => timerView(
+    cancelled, cancelled.events[0].id, 1, { is_admin: true }, null, AT, EVENT_DATE
+  ), error => error.status === 404);
 
   const headToHead = fixture();
   headToHead.events[0].teams = balanceTeams(

@@ -92,6 +92,7 @@ module.exports = async (req, res) => {
       SELECT 1 FROM league_events event
       JOIN training_sessions session ON session.id = event.session_id
       WHERE event.id = ${event.id} AND event.status = 'published'
+        AND event.cancelled_at IS NULL
         AND event.session_date = session.session_date AND session.is_cancelled = false
         AND event.session_date = (NOW() AT TIME ZONE 'Europe/Vienna')::date
         AND EXTRACT(ISODOW FROM event.session_date) = 4

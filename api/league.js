@@ -21,11 +21,17 @@ module.exports = async (req, res) => {
       if (matchWrite) {
         actor = scoringIdentity(req);
         assert(actor.is_admin || actor.user_id, 'Authentication required', 401);
-      } else if (!requireAdmin(req, res)) return;
+      } else {
+        const admin = requireAdmin(req, res);
+        if (!admin) return;
+        actor = { is_admin: true, user_id: admin.sub || null };
+      }
       assert(requireJSON(req), 'Content-Type must be application/json');
       const input = validateAction(req.body);
       const sql = getDb();
-      if (['save_player', 'link_player', 'generate', 'add_late_player'].includes(input.action)) await syncPlayers(sql);
+      if (['save_player', 'link_player', 'generate', 'add_late_player', 'correct_lineup'].includes(input.action)) {
+        await syncPlayers(sql);
+      }
       const world = input.action === 'save_season' ? null : await readWorld(sql);
       if (matchWrite) {
         const permissions = scoringPermissions(world, actor);

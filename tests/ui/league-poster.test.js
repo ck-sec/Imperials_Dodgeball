@@ -136,6 +136,9 @@ test('poster projection accepts only public league data and strips private accou
   assert.equal(projected.finale_results.men.winner.display_name, 'Player A');
   assert.doesNotMatch(JSON.stringify(projected), /rating|user_id|gender|league_scorekeeper/);
   assert.throws(() => poster.projectEvent({ ...fixture(), status: 'draft' }), /Publish/);
+  const privateDraft = poster.projectEvent({ ...fixture('published'), status: 'draft' }, [], { allowDraft: true });
+  assert.equal(privateDraft.status, 'draft');
+  assert.doesNotMatch(JSON.stringify(privateDraft), /rating|user_id|gender|league_scorekeeper/);
   assert.throws(() => poster.projectEvent({ ...fixture(), schedule: null }), /schedule/);
 });
 
@@ -180,6 +183,19 @@ test('poster renderer creates direct 1080 by 1920 JPEGs in both modes', async ()
   assert.equal(results.width, 1080);
   assert.equal(results.height, 1920);
   await assert.rejects(poster.create(fixture('published'), { mode: 'results' }), /Finalize/);
+});
+
+test('authenticated Admin drafts can create an itinerary image without changing publication state', async () => {
+  const draft = { ...fixture('published'), status: 'draft' };
+  const result = await poster.create(draft, {
+    allowDraft: true,
+    mode: 'itinerary',
+    publicUrl: 'https://imperials.test/spieltag?event=' + EVENT,
+  });
+  assert.equal(draft.status, 'draft');
+  assert.equal(result.mode, 'itinerary');
+  assert.equal(result.filename, 'vienna-imperials-itinerary-2026-09-17.jpg');
+  assert.equal(result.mimeType, 'image/jpeg');
 });
 
 test('finalized itinerary images do not reveal placements or scores', async () => {

@@ -6,6 +6,32 @@ Hier steht das ganze Paket: das neue Season-2-System, der mobile Mitgliederberei
 die Website-Ueberarbeitung und die anschliessenden Verbesserungen fuer deinen
 Donnerstagsbetrieb. Also nicht nur die letzten Komfort-Aenderungen.
 
+## Update 19. September 2026: Live-Aufstellung, Absage und privates Spielplan-Bild
+
+- Im Admin-Schritt **Results** koennen Admins nach der Veroeffentlichung
+  Spieler zu einem bestehenden Team hinzufuegen, zwischen den vorhandenen
+  Teams verschieben oder aus genau diesem Spieltag entfernen. Teamnummern,
+  Spielplan, Ref-Zuordnung und bereits gespeicherte Match-Scores bleiben dabei
+  unveraendert.
+- Bei einem bereits finalisierten Spieltag ersetzt eine Aufstellungskorrektur
+  dessen Ergebnis-Ledger atomar anhand der gespeicherten Platzierungen.
+  Entfernte Spieler und ihre eventuellen Bonuspunkte werden aus diesem
+  Spieltag entfernt; Punkte oder ELO-Aenderungen werden nie doppelt addiert.
+- Ein kompletter veroeffentlichter oder finalisierter Spieltag kann jetzt
+  reversibel abgesagt werden. Er verschwindet sofort aus der oeffentlichen
+  Spieltag-Seite, Mitgliederhistorie, Tabelle und Statistik. Aufstellung,
+  Spielplan, Scores und Platzierungen bleiben fuer **Restore matchday**
+  erhalten; laufende Match-Timer werden bei der Absage gestoppt und
+  zurueckgesetzt.
+- Das Spielplan-Bild kann bereits aus dem authentifizierten privaten Draft
+  erzeugt, im Admin-Bereich geprueft und heruntergeladen werden. Dadurch wird
+  weder der Spieltag veroeffentlicht noch die oeffentliche Spieltag-Seite
+  befuellt. Der Bildschritt bleibt optional.
+- Vor einem Deployment zuerst die additive Migration offline pruefen und dann
+  gezielt auf die richtige Datenbank anwenden:
+  `node scripts\migrate-matchday-controls.js` und anschliessend
+  `node scripts\migrate-matchday-controls.js --apply --expected-host DEIN_DB_HOST`.
+
 ## Update 18. September 2026: Admin-Konten und vereinfachte Teamerstellung
 
 - Das gemeinsame Admin-Passwort wurde vollstaendig entfernt. Der Admin-Bereich

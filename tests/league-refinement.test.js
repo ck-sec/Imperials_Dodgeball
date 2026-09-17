@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  DEFAULTS, validateAction, balanceTeams, playerView, bonusAwards, scoreEvent, publicView, adminView,
+  DEFAULTS, validateAction, balanceTeams, playerView, bonusAwards, scoreEvent, publicView, adminView, adminStatisticsView,
   draftTeams, requirePublishableRoster, buildSchedule,
 } = require('../lib/league');
 const { applyAction, syncPlayers, dbError } = require('../lib/league-db');
@@ -295,6 +295,7 @@ test('late players append to published teams and atomically replace finalized aw
   finalizedWorld.sessions.push({
     ...finalizedWorld.sessions[0], id: id(201), session_date: '2026-09-17',
   });
+
   finalizedWorld.events.push({
     ...structuredClone(finalizedEvent), id: id(401), session_id: id(201), session_date: '2026-09-17',
   });
@@ -332,6 +333,111 @@ test('late players append to published teams and atomically replace finalized aw
   await assert.rejects(applyAction(recorder(), request('add_late_player', publishedEvent, {
     player_id: id(5), team_number: 2,
   }), publishedWorld), /only be added after teams are published/);
+});
+
+test('live lineup corrections move and remove players without changing fixtures or accumulating results', async () => {
+  const publishedWorld = fixture(), publishedEvent = publishedWorld.events[0], publishedSql = recorder();
+  publishedEvent.status = 'published';
+  publishedEvent.schedule = legacyTwoTeamSchedule();
+  publishedEvent.schedule.rounds[0].matches[0].score_a = 7;
+  publishedEvent.schedule.rounds[0].matches[0].score_b = 5;
+  const movedId = publishedEvent.teams[0].players[0].id;
+  const moved = inputTeams(publishedEvent);
+  moved[0].player_ids = moved[0].player_ids.filter(playerId => playerId !== movedId);
+  moved[1].player_ids.push(movedId);
+  await applyAction(publishedSql, request('correct_lineup', publishedEvent, {
+    teams: moved.map(({ number, player_ids }) => ({ number, player_ids })),
+  }), publishedWorld);
+  const publishedQueries = publishedSql.transactions[0].queries;
+  const publishedUpdate = publishedQueries.find(query => /UPDATE league_events SET teams/.test(query.text));
+  const publishedTeams = JSON.parse(publishedUpdate.values[0]);
+  assert.equal(publishedTeams[0].players.some(player => player.id === movedId), false);
+  assert.equal(publishedTeams[1].players.some(player => player.id === movedId), true);
+  assert(!publishedUpdate.text.includes('schedule ='));
+  assert.deepEqual(publishedEvent.schedule.rounds[0].matches[0], {
+    number: 1, team_a: 1, team_b: 2, court: 1, score_a: 7, score_b: 5,
+  });
+  assert(!publishedQueries.some(query => /(?:DELETE FROM|INSERT INTO) league_results/.test(query.text)));
+
+  const finalizedWorld = fixture(), finalizedEvent = finalizedWorld.events[0], finalizedSql = recorder();
+  finalized(finalizedWorld, finalizedEvent);
+  const removedId = id(1);
+  const source = finalizedEvent.teams.find(team => team.players.some(player => player.id === removedId));
+  assert(source.players.length > 1);
+  finalizedEvent.bonus_points = [{ player_id: removedId, points: 0.5 }];
+  const corrected = inputTeams(finalizedEvent).map(team => ({
+    number: team.number,
+    player_ids: team.player_ids.filter(playerId => playerId !== removedId),
+  }));
+  await applyAction(finalizedSql, request('correct_lineup', finalizedEvent, { teams: corrected }), finalizedWorld);
+  const finalizedQueries = finalizedSql.transactions[0].queries;
+  const deletion = finalizedQueries.findIndex(query => query.text.includes('DELETE FROM league_results'));
+  const insertion = finalizedQueries.findIndex(query => query.text.includes('INSERT INTO league_results'));
+  const update = finalizedQueries.findIndex(query => /UPDATE league_events SET teams/.test(query.text));
+  assert(deletion >= 0 && deletion < insertion && insertion < update);
+  const ledger = JSON.parse(finalizedQueries[insertion].values[1]);
+  assert.equal(ledger.length, 3);
+  assert.equal(ledger.some(result => result.player_id === removedId), false);
+  assert.equal(ledger.every(result => Number.isInteger(result.placement)), true);
+  assert.deepEqual(JSON.parse(finalizedQueries[update].values[2]), [],
+    'Removing a player also prunes their event bonus award');
+  assert(!finalizedQueries[update].text.includes('schedule ='));
+
+  const duplicate = inputTeams(publishedEvent).map(team => ({ number: team.number, player_ids: [...team.player_ids] }));
+  duplicate[1].player_ids.push(duplicate[0].player_ids[0]);
+  assert.throws(() => validateAction({
+    action: 'correct_lineup', event_id: publishedEvent.id, version: publishedEvent.version, teams: duplicate,
+  }), /exactly one team/);
+  const wrongNumbers = moved.map(({ number, player_ids }, index) => ({
+    number: index === 1 ? 3 : number,
+    player_ids,
+  }));
+  await assert.rejects(applyAction(recorder(), request('correct_lineup', publishedEvent, {
+    teams: wrongNumbers,
+  }), publishedWorld), /retain every existing team number/);
+});
+
+test('whole-matchday cancellation is reversible and excluded from every projected statistic', async () => {
+  const world = fixture(), event = world.events[0], cancelSql = recorder();
+  finalized(world, event);
+  const saved = structuredClone({
+    teams: event.teams,
+    schedule: event.schedule,
+    results: world.results,
+  });
+  await applyAction(cancelSql, request('cancel_matchday', event), world, {
+    is_admin: true, user_id: id(100),
+  });
+  const cancelQueries = cancelSql.transactions[0].queries;
+  assert(cancelQueries.some(query => /DELETE FROM league_match_timers/.test(query.text)));
+  assert(cancelQueries.some(query => /SET cancelled_at = NOW\(\), cancelled_by/.test(query.text)));
+  assert(!cancelQueries.some(query => /(?:DELETE FROM|INSERT INTO) league_results/.test(query.text)));
+
+  event.cancelled_at = '2026-09-10T21:00:00.000Z';
+  event.version++;
+  assert.deepEqual(event.teams, saved.teams);
+  assert.deepEqual(event.schedule, saved.schedule);
+  assert.deepEqual(world.results, saved.results);
+  const publicPayload = publicView(world, undefined, id(100));
+  assert.deepEqual(publicPayload.events, []);
+  assert.deepEqual(publicPayload.standings, []);
+  assert.deepEqual(publicPayload.history, []);
+  assert.deepEqual(publicPayload.my_events, []);
+  assert.equal(adminView(world).events[0].is_cancelled, true);
+  assert.deepEqual(adminStatisticsView(world, event.season_id).players, []);
+  assert(playerView(world).every(player => player.rating === 1000));
+  assert.throws(() => scoringView(world, event.id, { is_admin: true }), /not found/);
+  await assert.rejects(applyAction(recorder(), request('correct_lineup', event, {
+    teams: inputTeams(event).map(({ number, player_ids }) => ({ number, player_ids })),
+  }), world), /read-only until restored/);
+
+  const restoreSql = recorder();
+  await applyAction(restoreSql, request('restore_matchday', event), world, {
+    is_admin: true, user_id: id(100),
+  });
+  const restoreQueries = restoreSql.transactions[0].queries;
+  assert(restoreQueries.some(query => /SET cancelled_at = NULL, cancelled_by = NULL/.test(query.text)));
+  assert(!restoreQueries.some(query => /league_results|SET teams|SET schedule/.test(query.text)));
 });
 
 test('legacy schedules remain correctable with changed bookings but cannot be republished', async () => {

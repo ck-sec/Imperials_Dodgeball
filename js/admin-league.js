@@ -22,7 +22,7 @@
     dirtySchedule: false, matchEdits: {},
     profileId: '', profileSearch: '', scorekeeperSearch: '', seasonOpen: false, timingOpen: false, adminOptionsOpen: false,
     profilesOpen: false, guestOpen: false, rosterToolsOpen: false, teamOptionsOpen: false, teamToolsOpen: false,
-    fixturePreviewOpen: false,
+    fixturePreviewOpen: false, posterPreview: null,
     attendanceError: '', formEdits: {}
   };
   const dateOnly = value => {
@@ -52,6 +52,14 @@
     }
     return Math.min(6, Math.floor(state.selected.size / (state.maxTeams >= 5 && state.selected.size >= 10 ? 5 : 3)));
   };
+  const posterKey = value => value ? `${value.id}:${value.version}` : '';
+
+  function clearPosterPreview() {
+    if (state.posterPreview?.url && typeof URL.revokeObjectURL === 'function') {
+      URL.revokeObjectURL(state.posterPreview.url);
+    }
+    state.posterPreview = null;
+  }
   const hasChanges = () => state.dirtyRoster || state.dirtyTeams || state.dirtyResults ||
     state.dirtySchedule || state.dirtyBonus || Object.keys(state.matchEdits).length > 0 || Object.keys(state.formEdits).length > 0;
   const selectedAttr = (a, b) => String(a) === String(b) ? ' selected' : '';
@@ -216,6 +224,7 @@
       }
     }
     await loadRoster(preserve);
+    if (state.posterPreview && state.posterPreview.key !== posterKey(event())) clearPosterPreview();
     if (addPlayerId && !isLocked()) {
       changeRoster(new Set([...state.selected, addPlayerId]));
     }
@@ -280,6 +289,7 @@
     if (ask && hasChanges() && !window.confirm('Refresh and discard all unsaved roster, team, BP, result and form edits?')) return;
     state.formEdits = {};
     clearNotice();
+    clearPosterPreview();
     setBusy(true, 'Loading seasons, players and training RSVPs…');
     try {
       await loadData();
@@ -399,7 +409,8 @@
     const next = nextTraining();
     const renderOption = t => {
       const e = state.data.events.find(e => e.session_id === t.id);
-      return option(t.id, `${t.id === next?.id ? '★ Next · ' : ''}Thu ${dateOnly(t.session_date)} · ${String(t.start_time || '').slice(0, 5)} · ${t.title || 'Training'}${t.is_cancelled ? ' · Cancelled' : ''}${e ? ` · ${e.status}` : ''}`, state.sessionId);
+      const eventStatus = e?.is_cancelled ? 'cancelled' : e?.status;
+      return option(t.id, `${t.id === next?.id ? '★ Next · ' : ''}Thu ${dateOnly(t.session_date)} · ${String(t.start_time || '').slice(0, 5)} · ${t.title || 'Training'}${t.is_cancelled ? ' · Cancelled' : ''}${eventStatus ? ` · ${eventStatus}` : ''}`, state.sessionId);
     };
     const upcoming = available.filter(t => dateOnly(t.session_date) >= today());
     const past = available.filter(t => dateOnly(t.session_date) < today()).reverse();
@@ -413,7 +424,7 @@
       ${selectedSession ? `<p class="al-small al-form-actions">Season 2 · ${esc(dateOnly(s?.start_date))}–${esc(dateOnly(s?.end_date))} · ${esc(selectedSession.location || 'No location specified')} · Europe/Vienna</p>
         <div class="al-quick-guide"><strong>Normal Thursday</strong><span>Confirm players → generate balanced teams → use the recommended schedule → publish.</span></div>` : '<p class="al-callout">Schedule a Thursday within the existing Season 2 dates in the Training tab, then refresh.</p>'}
       ${next && next.id !== state.sessionId ? `<p class="al-small">Next active Thursday is ${esc(dateOnly(next.session_date))}; your selected training has been kept.</p>` : ''}
-      ${cancelled() ? '<p class="al-notice" role="status">Cancelled training — read-only. Roster, bonus points, match scores and results cannot be changed here.</p>' : ''}
+      ${cancelled() ? `<p class="al-notice" role="status">${event()?.is_cancelled ? 'Cancelled matchday — hidden publicly and read-only until restored from Publish.' : 'Cancelled training — read-only. Roster, bonus points, match scores and results cannot be changed here.'}</p>` : ''}
       <details class="al-details" id="al-admin-options"${state.adminOptionsOpen ? ' open' : ''}><summary>Advanced: season settings & Head Ref access</summary>
         ${scorekeeperRoles()}${seasonForm()}
       </details>
@@ -890,7 +901,7 @@
               <button type="submit" class="al-button al-secondary" id="al-save-match-${match.number}">Save match ${match.number} score</button>
               ${action(`discard-match:${match.number}`, 'Discard score edits', ` id="al-discard-match-${match.number}"${disabled(!draft)}`)}
             </form>` : `<p class="al-match-score">${scored ? `${match.score_a} – ${match.score_b}` : 'Awaiting scores'}</p><p class="al-small">${esc(result)}</p>`}
-            ${['published', 'finalized'].includes(e.status) ? `<a class="al-button al-secondary" href="/timer?event=${encodeURIComponent(e.id)}&match=${encodeURIComponent(match.number)}">Open match ${match.number} timer</a>` : ''}
+            ${!cancelled() && ['published', 'finalized'].includes(e.status) ? `<a class="al-button al-secondary" href="/timer?event=${encodeURIComponent(e.id)}&match=${encodeURIComponent(match.number)}">Open match ${match.number} timer</a>` : ''}
           </article>`;
         }).join('')}</div>
       </section>`).join('')}
@@ -900,19 +911,22 @@
 
   function renderPublish() {
     const e = event();
-    const status = e?.status || 'not generated';
+    const savedStatus = e?.status || 'not generated';
+    const status = e?.is_cancelled ? 'cancelled' : savedStatus;
     const checks = publicationChecks();
     const readyChecks = checks.filter(check => check.ready).length;
-    const text = status === 'finalized'
+    const text = e?.is_cancelled
+      ? `Cancelled: this ${savedStatus} matchday is hidden from the public Spieltag, member histories, standings and statistics. Teams, fixtures, scores and final placements remain saved for restoration.`
+      : status === 'finalized'
       ? 'Finalized: teams and results are public. Roster changes are locked; use Results for corrections.'
       : status === 'published'
         ? lineupStarted() ? 'Games have started or results were finalized. Teams and any guests in this lineup are locked; you cannot unpublish or change the roster. Record or correct match scores below.' : 'Teams and the saved schedule are public. Before any score is entered, reopen the lineup below to edit. This temporarily hides public teams until you publish again.'
         : 'Not published: public visitors see that teams are not yet published, not this draft or its names. Save your draft, then publish when ready.';
     return `<section class="al-card" id="al-publish">${heading('', 'Publish for players')}
-      <div class="al-status"><span class="al-chip ${status === 'draft' || !e ? 'al-draft' : 'al-live'}">${esc(status)}</span>${e ? `<span class="al-small">Saved version ${number(e.version, 0)}</span>` : ''}</div>
+      <div class="al-status"><span class="al-chip ${status === 'cancelled' ? 'al-cancelled' : status === 'draft' || !e ? 'al-draft' : 'al-live'}">${esc(status)}</span>${e ? `<span class="al-small">Saved version ${number(e.version, 0)}</span>` : ''}</div>
       <p class="al-callout">${text}</p>
       ${eventAwardsSummary()}
-      ${!e || status === 'draft' ? `<p class="al-publish-progress" id="al-publish-progress"><strong>${readyChecks}/${checks.length} checks ready</strong> · Any remaining blocker is shown below.</p>
+      ${!e || savedStatus === 'draft' ? `<p class="al-publish-progress" id="al-publish-progress"><strong>${readyChecks}/${checks.length} checks ready</strong> · Any remaining blocker is shown below.</p>
         <details class="al-details al-toolbox" id="al-publication-checklist-details"><summary>View all publication checks</summary><div id="al-publication-checklist">${publicationChecklist()}</div></details>
         ${e?.schedule?.referee_policy === EXTERNAL_REF_POLICY ? `<label class="al-check">
           <input type="checkbox" id="al-referee-reviewed"${state.refereeReviewed ? ' checked' : ''}${disabled(isLocked())}>
@@ -923,16 +937,42 @@
         </details>
         <label class="al-check al-form-actions"><input type="checkbox" id="al-names-reviewed"${state.namesReviewed ? ' checked' : ''}${disabled(!e || isLocked())}>
           I reviewed the public team and player names and let named guests know they will be visible.</label>` : ''}
+      ${renderPrivatePosterPreview()}
       <p class="al-notice" id="al-publish-warning"${publishWarning() ? '' : ' hidden'}>${esc(publishWarning())}</p>
       <div class="al-actions">
-        ${status === 'published' ? lineupStarted() ? '<a class="al-button al-secondary" href="#al-matches">Record or correct match scores</a>' : action('unpublish', 'Edit lineup — temporarily hide published teams', disabled(cancelled())) :
-          status === 'finalized' ? '<a class="al-button al-secondary" href="#al-results">Correct final placements</a>' :
+        ${!e?.is_cancelled && status === 'published' ? lineupStarted() ? '<a class="al-button al-secondary" href="#al-matches">Record or correct match scores</a>' : action('unpublish', 'Edit lineup — temporarily hide published teams', disabled(cancelled())) :
+          !e?.is_cancelled && status === 'finalized' ? '<a class="al-button al-secondary" href="#al-results">Correct final placements</a>' :
+            e?.is_cancelled ? action('restore-matchday', 'Restore matchday', disabled(session()?.is_cancelled)) :
             `<button type="button" class="al-button" id="al-publish-button" data-al-action="publish"${disabled(!e || isLocked() || state.dirtyTeams || state.dirtySchedule || needsRosterReview() || !!publishWarning())}>Publish teams (public names)</button>`}
-        ${e ? `<a class="al-button al-secondary" href="/spieltag?event=${encodeURIComponent(e.id)}" target="_blank" rel="noopener">Live-Spieltag / Ergebnisse <span class="al-sr-only">(opens a new tab; sign in there to enter scores)</span></a>` : ''}
-        ${e && ['published', 'finalized'].includes(status) ? `<a class="al-button" data-al-poster="itinerary" href="/spieltag?event=${encodeURIComponent(e.id)}&export=itinerary" target="_blank" rel="noopener">Download / share fixtures image <span class="al-sr-only">(opens the public matchday and downloads the portrait itinerary image)</span></a>` : ''}
-        ${e && status === 'finalized' ? `<a class="al-button" data-al-poster="results" href="/spieltag?event=${encodeURIComponent(e.id)}&export=results" target="_blank" rel="noopener">Download / share results image <span class="al-sr-only">(opens the public matchday and downloads the portrait results image)</span></a>` : ''}
+        ${e && !e.is_cancelled && ['published', 'finalized'].includes(savedStatus) ? `<a class="al-button al-secondary" href="/spieltag?event=${encodeURIComponent(e.id)}" target="_blank" rel="noopener">Live-Spieltag / Ergebnisse <span class="al-sr-only">(opens a new tab; sign in there to enter scores)</span></a>` : ''}
+        ${e && !e.is_cancelled && ['published', 'finalized'].includes(savedStatus) ? `<a class="al-button" data-al-poster="itinerary" href="/spieltag?event=${encodeURIComponent(e.id)}&export=itinerary" target="_blank" rel="noopener">Download / share fixtures image <span class="al-sr-only">(opens the public matchday and downloads the portrait itinerary image)</span></a>` : ''}
+        ${e && !e.is_cancelled && savedStatus === 'finalized' ? `<a class="al-button" data-al-poster="results" href="/spieltag?event=${encodeURIComponent(e.id)}&export=results" target="_blank" rel="noopener">Download / share results image <span class="al-sr-only">(opens the public matchday and downloads the portrait results image)</span></a>` : ''}
       </div>
+      ${e && !e.is_cancelled && ['published', 'finalized'].includes(savedStatus) ? `<div class="al-cancel-matchday">
+        <p class="al-small">Need to call off the whole Spieltag? Cancellation is reversible and does not delete its lineup, fixtures, scores or final places.</p>
+        <button type="button" class="al-button al-danger" data-al-action="cancel-matchday">Cancel whole matchday</button>
+      </div>` : ''}
       <p class="al-small al-form-actions">Publishing makes all selected player names public, including named guests. Let guests know before publishing. Ratings, gender labels and rookie tags remain admin-only and are never included in the public team view.</p>
+    </section>`;
+  }
+
+  function renderPrivatePosterPreview() {
+    const e = event();
+    if (!e || e.status !== 'draft') return '';
+    const preview = state.posterPreview?.key === posterKey(e) ? state.posterPreview : null;
+    return `<section class="al-private-poster" id="al-private-poster" aria-labelledby="al-private-poster-heading">
+      <h4 id="al-private-poster-heading">Private fixtures-image preview</h4>
+      <p class="al-small">${e.schedule
+        ? 'Create the WhatsApp portrait image from this authenticated draft before publishing. This does not publish teams or make the Spieltag page available.'
+        : 'Generate and save the fixture schedule first. The image remains private and optional.'}</p>
+      <div class="al-actions">
+        ${action('create-private-poster', preview ? 'Regenerate private preview' : 'Create private preview', disabled(!e.schedule || state.dirtyTeams || state.dirtyRoster || state.dirtySchedule))}
+        ${preview ? action('download-private-poster', 'Download fixtures image') : ''}
+      </div>
+      ${preview ? `<figure class="al-poster-preview">
+        <img src="${esc(preview.url)}" alt="Private preview of the fixtures poster for ${esc(e.title)}">
+        <figcaption>Private Admin preview · not yet published</figcaption>
+      </figure>` : ''}
     </section>`;
   }
 
@@ -1206,6 +1246,31 @@
         <button type="submit" class="al-button"${disabled(!available.length)}>Assign player to team</button>
       </form>
       <div class="al-actions">${action('open-late-guest', 'Create a new guest profile')}</div>
+      ${renderLiveLineupCorrection()}
+    </div>`;
+  }
+
+  function renderLiveLineupCorrection() {
+    const assigned = state.teams.flatMap(team => team.player_ids.map(playerId => ({
+      player: playerFor(playerId), team,
+    }))).sort((a, b) => a.player.display_name.localeCompare(b.player.display_name));
+    return `<div class="al-live-lineup" id="al-live-lineup">
+      <h4>Move or remove a player</h4>
+      <p class="al-small">Correct the live lineup while keeping every fixture, referee assignment and saved match score. A finalized matchday recalculates this event’s points and private ELO ledger exactly once.</p>
+      <form data-al-form="lineup-correction" class="al-late-player-form">
+        <div class="al-field">${label('al-lineup-player', 'Current player')}
+          <select id="al-lineup-player" name="player_id" required>
+            ${option('', 'Choose assigned player', '')}
+            ${assigned.map(({ player, team }) => option(player.id, `${player.display_name} · ${team.name}`, '')).join('')}
+          </select></div>
+        <div class="al-field">${label('al-lineup-destination', 'Correction')}
+          <select id="al-lineup-destination" name="destination" required>
+            ${option('', 'Choose destination', '')}
+            ${state.teams.map(team => option(team.number, `Move to ${team.name}`, '')).join('')}
+            ${option('remove', 'Remove from this matchday', '')}
+          </select></div>
+        <button type="submit" class="al-button">Apply correction</button>
+      </form>
     </div>`;
   }
 
@@ -1290,7 +1355,7 @@
     if (id === 'players') return !!session() && !cancelled() && state.selected.size > 0;
     if (id === 'teams') return !!event() && !state.dirtyTeams && !needsRosterReview() && !rosterPublishWarning();
     if (id === 'schedule') return !!event() && !state.dirtySchedule && (!!event().schedule || state.manualPlacements);
-    return ['published', 'finalized'].includes(event()?.status);
+    return !cancelled() && ['published', 'finalized'].includes(event()?.status);
   }
 
   function showStage(id, focus = true) {
@@ -1488,6 +1553,35 @@
     }, { message: 'Balanced draft saved. Review teams, plan matches, then publish.', stage: 'teams', focus: 'al-stage-title-teams' });
   }
 
+  async function createPrivatePoster() {
+    const current = event();
+    if (!current || current.status !== 'draft' || !current.schedule) {
+      throw new Error('Save a private draft and generate its fixture schedule before creating the image.');
+    }
+    if (state.dirtyTeams || state.dirtyRoster || state.dirtySchedule) {
+      throw new Error('Save or discard all local lineup and timing edits before creating the image.');
+    }
+    if (!window.LeaguePoster) throw new Error('The image designer did not load. Refresh the Admin page and try again.');
+    const key = posterKey(current);
+    setBusy(true, 'Creating private fixtures-image preview…');
+    try {
+      const result = await window.LeaguePoster.create(current, {
+        allowDraft: true,
+        lang: 'de',
+        mode: 'itinerary',
+        publicUrl: new URL(`/spieltag?event=${encodeURIComponent(current.id)}`, window.location.origin).href,
+      });
+      if (posterKey(event()) !== key) throw new Error('This draft changed while its image was being created. Generate a new preview.');
+      clearPosterPreview();
+      state.posterPreview = { key, result, url: URL.createObjectURL(result.blob) };
+      render();
+      toast('Private fixtures preview created. Review it below, then download or publish when ready.', 'success');
+      $('al-progress').textContent = 'Private image created without publishing the matchday.';
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleAction(name) {
     if (name === 'reload') { await reload(); return; }
     if (state.busy || state.conflict || !state.loaded) return;
@@ -1544,6 +1638,16 @@
         finally { setBusy(false); }
         break;
       case 'generate': await generate(); break;
+      case 'create-private-poster':
+        await createPrivatePoster();
+        break;
+      case 'download-private-poster':
+        if (!state.posterPreview?.result || !window.LeaguePoster) {
+          throw new Error('Create the private fixtures preview before downloading it.');
+        }
+        window.LeaguePoster.save(state.posterPreview.result);
+        toast('Fixtures image downloaded. The matchday is still private.', 'success');
+        break;
       case 'discard-schedule':
         state.scheduleSettings = savedScheduleSettings();
         state.dirtySchedule = false; render(); break;
@@ -1605,6 +1709,30 @@
         if (!window.confirm('Edit published teams? This immediately hides teams from the public and returns them to a draft. After editing, you must publish again.')) return;
         await write('unpublish', { event_id: event().id, version: event().version }, { message: 'Lineup is now a private draft. Republish after editing.', stage: 'teams', focus: 'al-generate' });
         break;
+      case 'cancel-matchday': {
+        const current = event();
+        if (!current || current.is_cancelled || !['published', 'finalized'].includes(current.status)) return;
+        if (hasChanges()) throw new Error('Save or discard all local edits before cancelling the whole matchday.');
+        if (!window.confirm(`Cancel this entire ${current.status} Spieltag?\n\nIt will immediately disappear from the public Spieltag, member histories, standings and statistics. The lineup, fixtures, scores and final places remain saved for restoration. Any live match timers are stopped and reset.\n\nYou can restore the matchday later.`)) return;
+        await write('cancel_matchday', { event_id: current.id, version: current.version }, {
+          message: 'Matchday cancelled and hidden publicly. Its saved league data can be restored.',
+          stage: 'publish',
+          focus: 'al-publish'
+        });
+        break;
+      }
+      case 'restore-matchday': {
+        const current = event();
+        if (!current?.is_cancelled) return;
+        if (session()?.is_cancelled) throw new Error('Restore the underlying training session before restoring this league matchday.');
+        if (hasChanges()) throw new Error('Discard local form edits before restoring this matchday.');
+        if (!window.confirm(`Restore this ${current.status} Spieltag?\n\nIts saved teams, fixtures, scores and final places will become public again. Match timers restart in a fresh ready state.`)) return;
+        await write('restore_matchday', { event_id: current.id, version: current.version }, {
+          message: 'Matchday restored with its saved lineup, fixtures and results.',
+          focus: 'al-publish'
+        });
+        break;
+      }
       case 'reopen-results':
         if (event()?.status !== 'finalized' || cancelled()) return;
         if (!window.confirm('Reopen this training’s results? Its previous season awards and rating adjustments will be temporarily removed. Match scores are retained and the roster stays locked. Correct scores or exact ties, then finalize again to restore updated awards.')) return;
@@ -1624,7 +1752,9 @@
     const data = new FormData(form);
     const type = form.dataset.alForm;
     const clearFormKey = formKey(form);
-    if (cancelled() && ['schedule', 'match', 'results', 'bonus', 'late-player'].includes(type)) throw new Error('Cancelled training — read-only. Choose an active Thursday.');
+    if (cancelled() && ['schedule', 'match', 'results', 'bonus', 'late-player', 'lineup-correction'].includes(type)) {
+      throw new Error('Cancelled matchday is read-only — restore it before making league changes.');
+    }
     if (type === 'season') {
       const points = String(data.get('placement_points')).split(',').map(s => s.trim());
       const scoringMode = data.get('scoring_mode');
@@ -1741,6 +1871,54 @@
         clearFormKey,
         message: `${player.display_name} assigned to ${team.name}.${finalized ? ' Finalized awards were recalculated without duplication.' : ' Existing fixtures and scores were preserved.'}`,
         focus: 'al-late-player'
+      });
+    } else if (type === 'lineup-correction') {
+      const current = event();
+      if (!current || !['published', 'finalized'].includes(current.status)) {
+        throw new Error('Publish this training before correcting its live lineup.');
+      }
+      if (state.dirtyTeams || state.dirtyRoster || state.dirtySchedule || state.dirtyBonus ||
+        state.dirtyResults || Object.keys(state.matchEdits).length) {
+        throw new Error('Save or discard all lineup, BP, score and placement edits before correcting the live lineup.');
+      }
+      const playerId = String(data.get('player_id') || '');
+      const destination = String(data.get('destination') || '');
+      const player = playerFor(playerId);
+      const source = state.teams.find(team => team.player_ids.includes(playerId));
+      if (!player || !source) throw new Error('Choose a player currently assigned to this matchday.');
+      const corrected = state.teams.map(team => ({ number: team.number, player_ids: [...team.player_ids] }));
+      const correctedSource = corrected.find(team => team.number === source.number);
+      const finalized = current.status === 'finalized';
+      let message;
+      if (destination === 'remove') {
+        if (source.player_ids.length <= 1) {
+          throw new Error(`${source.name} must retain at least one player because its saved fixtures cannot be removed.`);
+        }
+        const bonus = Number(current.bonus_points?.[playerId] || 0);
+        if (!window.confirm(`Remove “${player.display_name}” from this matchday?\n\nFixtures and scores stay unchanged.${bonus ? ` Their ${bonus} bonus points for this matchday will also be removed.` : ''}${finalized
+          ? ' This finalized event’s points and private ELO ledger will be recalculated once using the saved final places.'
+          : ' They will not receive this team’s placement when results are finalized.'}\n\nTheir member or guest profile is not deleted.`)) return;
+        correctedSource.player_ids = correctedSource.player_ids.filter(id => id !== playerId);
+        message = `${player.display_name} removed from this matchday. Fixtures and scores were preserved.`;
+      } else {
+        const target = state.teams.find(team => String(team.number) === destination);
+        if (!target) throw new Error('Choose a destination team or remove the player.');
+        if (target.number === source.number) throw new Error('Choose a different destination team.');
+        if (!window.confirm(`Move “${player.display_name}” from “${source.name}” to “${target.name}”?\n\nFixtures, referee assignments and scores remain unchanged.${finalized
+          ? ' This finalized event’s points and private ELO ledger will be recalculated once using the saved final places.'
+          : ' The player will receive the destination team’s placement when results are finalized.'}`)) return;
+        correctedSource.player_ids = correctedSource.player_ids.filter(id => id !== playerId);
+        corrected.find(team => team.number === target.number).player_ids.push(playerId);
+        message = `${player.display_name} moved to ${target.name}. Fixtures and scores were preserved.`;
+      }
+      await write('correct_lineup', {
+        event_id: current.id,
+        version: current.version,
+        teams: corrected,
+      }, {
+        clearFormKey,
+        message: `${message}${finalized ? ' Finalized awards were recalculated without duplication.' : ''}`,
+        focus: 'al-live-lineup'
       });
     } else if (type === 'profile' || type === 'guest') {
       const p = players().find(p => p.id === data.get('player_id'));
@@ -2044,6 +2222,7 @@
     if (e.target.id === 'al-fixture-preview') state.fixturePreviewOpen = e.target.open;
   }, true);
   window.addEventListener('beforeunload', e => {
+    clearPosterPreview();
     if (!hasChanges()) return;
     e.preventDefault();
     e.returnValue = '';

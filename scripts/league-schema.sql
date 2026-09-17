@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS league_events (
   schedule JSONB CHECK (schedule IS NULL OR jsonb_typeof(schedule) = 'object'),
   roster_locked BOOLEAN NOT NULL DEFAULT FALSE,
   status VARCHAR(10) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','finalized')),
+  cancelled_at TIMESTAMPTZ,
+  cancelled_by UUID REFERENCES users(id) ON DELETE SET NULL,
   version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
   settings JSONB NOT NULL,
   bonus_points JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(bonus_points) = 'array'),
@@ -97,6 +99,10 @@ CREATE TABLE IF NOT EXISTS league_match_timers (
 ALTER TABLE league_events ADD COLUMN IF NOT EXISTS max_teams INTEGER NOT NULL DEFAULT 5 CHECK (max_teams BETWEEN 2 AND 5);
 -- statement-breakpoint
 ALTER TABLE league_events ADD COLUMN IF NOT EXISTS schedule JSONB CHECK (schedule IS NULL OR jsonb_typeof(schedule) = 'object');
+-- statement-breakpoint
+ALTER TABLE league_events ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+-- statement-breakpoint
+ALTER TABLE league_events ADD COLUMN IF NOT EXISTS cancelled_by UUID REFERENCES users(id) ON DELETE SET NULL;
 -- statement-breakpoint
 -- Set on first recorded match or finalization; reopening results never unlocks the roster.
 ALTER TABLE league_events ADD COLUMN IF NOT EXISTS roster_locked BOOLEAN NOT NULL DEFAULT FALSE;

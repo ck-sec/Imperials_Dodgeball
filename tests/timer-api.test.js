@@ -151,6 +151,7 @@ test('Head Refs and admins start timers with transaction guards, separate revisi
     const queries = app.calls.transactions[0].queries;
     assert(queries.some(query => /INSERT INTO league_match_timers/.test(query.text)));
     assert(queries.some(query => /revision = \?/.test(query.text)));
+    assert(queries.some(query => /event\.cancelled_at IS NULL/.test(query.text)));
     assert(!queries.some(query => /UPDATE league_events SET roster_locked = true/.test(query.text)));
     assert(!queries.some(query => /UPDATE league_events SET schedule/.test(query.text)));
     if (role === 'headref') assert(queries.some(query => /league_scorekeeper = true/.test(query.text)));
@@ -170,6 +171,13 @@ test('timer writes reject anonymous, ordinary members, wrong dates, malformed in
 
   app = harness();
   assert.equal((await app.request({ method: 'POST', testRole: 'member', body: body(app) })).statusCode, 403);
+  assert.equal(app.calls.transactions.length, 0);
+
+  const cancelledWorld = worldFixture();
+  cancelledWorld.events[0].cancelled_at = '2026-09-10T17:30:00.000Z';
+  app = harness({ world: cancelledWorld });
+  assert.equal((await app.request()).statusCode, 404);
+  assert.equal((await app.request({ method: 'POST', testRole: 'admin', body: body(app) })).statusCode, 404);
   assert.equal(app.calls.transactions.length, 0);
 
   const pastWorld = worldFixture();

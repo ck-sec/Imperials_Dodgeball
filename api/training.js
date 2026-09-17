@@ -35,8 +35,10 @@ module.exports = async (req, res) => {
             s.id, s.title, s.description, s.location,
             s.session_date::text AS session_date, s.start_time, s.end_time,
             s.max_capacity, s.is_cancelled,
-            (SELECT e.status FROM league_events e WHERE e.session_id = s.id) AS league_status,
-            (SELECT e.id FROM league_events e WHERE e.session_id = s.id) AS league_event_id,
+            (SELECT e.status FROM league_events e
+              WHERE e.session_id = s.id AND e.cancelled_at IS NULL) AS league_status,
+            (SELECT e.id FROM league_events e
+              WHERE e.session_id = s.id AND e.cancelled_at IS NULL) AS league_event_id,
             EXISTS(SELECT 1 FROM league_events e WHERE e.session_id = s.id
               AND e.status IN ('published', 'finalized')) AS rsvp_locked,
             MAX(CASE WHEN ta.user_id = ${userId} THEN ta.status END) AS my_status,
@@ -68,8 +70,10 @@ module.exports = async (req, res) => {
             s.id, s.title, s.description, s.location,
             s.session_date::text AS session_date, s.start_time, s.end_time,
             s.max_capacity, s.is_cancelled,
-            (SELECT e.status FROM league_events e WHERE e.session_id = s.id) AS league_status,
-            (SELECT e.id FROM league_events e WHERE e.session_id = s.id) AS league_event_id,
+            (SELECT e.status FROM league_events e
+              WHERE e.session_id = s.id AND e.cancelled_at IS NULL) AS league_status,
+            (SELECT e.id FROM league_events e
+              WHERE e.session_id = s.id AND e.cancelled_at IS NULL) AS league_event_id,
             EXISTS(SELECT 1 FROM league_events e WHERE e.session_id = s.id
               AND e.status IN ('published', 'finalized')) AS rsvp_locked,
             a.status AS my_status

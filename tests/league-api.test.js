@@ -51,7 +51,7 @@ function harness(world = emptyWorld(), options = {}) {
       if (name === '../lib/auth') return {
         requireAdmin(req, res) {
           calls.admin++;
-          if (req.testRole === 'admin') return { role: 'admin' };
+          if (req.testRole === 'admin') return { role: 'admin', sub: userId };
           res.status(req.testRole ? 403 : 401).json({ error: 'Admin required' });
           return null;
         },
@@ -281,6 +281,54 @@ test('mobile scoring endpoint is anonymous-safe with exact permissions and reche
   assert.equal((await app.request({ method: 'POST', body, testRole: 'member' })).statusCode, 403);
   assert.equal((await app.request({ method: 'POST', body, testRole: 'admin' })).statusCode, 200);
   assert.equal((await app.request({ query: { view: 'scoring' }, testRole: 'member' })).body.permissions.is_scorekeeper, false);
+});
+
+test('admin API dispatches live lineup correction and reversible cancellation only after authorization', async () => {
+  const world = scoringFixture();
+  const event = world.events[0];
+  const denied = harness(world);
+  const correction = {
+    action: 'correct_lineup',
+    event_id: event.id,
+    version: event.version,
+    teams: event.teams.map(team => ({
+      number: team.number,
+      player_ids: team.players.map(player => player.id),
+    })),
+  };
+  assert.equal((await denied.request({ method: 'POST', testRole: 'member', body: correction })).statusCode, 403);
+  assert.equal(denied.calls.db, 0);
+
+  const corrected = harness(world);
+  const correctionResponse = await corrected.request({ method: 'POST', testRole: 'admin', body: correction });
+  assert.equal(correctionResponse.statusCode, 200);
+  assert.equal(correctionResponse.body.event_id, event.id);
+  assert(corrected.calls.transactions.some(queries =>
+    queries.some(query => /UPDATE league_events SET teams/.test(query.text))));
+
+  const cancelled = harness(world);
+  const cancelResponse = await cancelled.request({
+    method: 'POST',
+    testRole: 'admin',
+    body: { action: 'cancel_matchday', event_id: event.id, version: event.version },
+  });
+  assert.equal(cancelResponse.statusCode, 200);
+  assert(cancelled.calls.transactions.some(queries =>
+    queries.some(query => /SET cancelled_at = NOW\(\), cancelled_by/.test(query.text))));
+
+  event.cancelled_at = '2026-01-01T21:00:00.000Z';
+  event.version++;
+  const hidden = harness(world);
+  assert.equal((await hidden.request({ query: { view: 'scoring', event_id: event.id } })).statusCode, 404);
+  assert.equal((await hidden.request()).body.events.length, 0);
+  const restored = await hidden.request({
+    method: 'POST',
+    testRole: 'admin',
+    body: { action: 'restore_matchday', event_id: event.id, version: event.version },
+  });
+  assert.equal(restored.statusCode, 200);
+  assert(hidden.calls.transactions.some(queries =>
+    queries.some(query => /SET cancelled_at = NULL, cancelled_by = NULL/.test(query.text))));
 });
 
 test('scorekeeper HTTP permissions never widen admin actions and transactional revocation returns forbidden', async () => {

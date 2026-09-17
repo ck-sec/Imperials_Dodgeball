@@ -60,8 +60,8 @@ test('both training views expose nullable league status/event ID and retain RSVP
       assert.equal(session.league_event_id, status ? eventId : null);
       assert.equal(session.rsvp_locked, ['published', 'finalized'].includes(status));
       const query = app.queries.find(q => q.includes('AS league_status'));
-      assert.match(query, /\(SELECT e\.status FROM league_events e WHERE e\.session_id = s\.id\) AS league_status/);
-      assert.match(query, /\(SELECT e\.id FROM league_events e WHERE e\.session_id = s\.id\) AS league_event_id/);
+      assert.match(query, /\(SELECT e\.status FROM league_events e\s+WHERE e\.session_id = s\.id AND e\.cancelled_at IS NULL\) AS league_status/);
+      assert.match(query, /\(SELECT e\.id FROM league_events e\s+WHERE e\.session_id = s\.id AND e\.cancelled_at IS NULL\) AS league_event_id/);
       assert(!query.includes('e.teams'), 'Training metadata must not expose draft squads');
     }
   }

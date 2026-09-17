@@ -132,22 +132,31 @@ async function app(options = {}) {
   };
   const store = clone(options.data || dataFixture());
   const requests = [];
+  const posterCalls = [];
   const frames = new Map();
   const scrolls = [];
   let frameId = 0;
   const window = {
     confirm: options.confirm || (() => true), listeners: {}, innerHeight: 700,
+    location: { origin: 'https://imperials.test' },
     requestAnimationFrame(fn) { frames.set(++frameId, fn); return frameId; },
     cancelAnimationFrame(id) { frames.delete(id); },
     scrollBy(value) { scrolls.push(value); },
     addEventListener(type, fn) { this.listeners[type] = fn; }
+  };
+  window.LeaguePoster = options.poster || {
+    async create(event, settings) {
+      posterCalls.push({ event: clone(event), settings: clone(settings) });
+      return { blob: new Blob(['private-poster'], { type: 'image/jpeg' }), filename: 'fixtures.jpg' };
+    },
+    save(result) { posterCalls.push({ saved: result.filename }); },
   };
   class FixedDate extends Date {
     constructor(...args) { super(...(args.length ? args : [options.now || '2026-09-16T22:15:00Z'])); }
     static now() { return new Date(options.now || '2026-09-16T22:15:00Z').getTime(); }
   }
   const context = vm.createContext({
-    window, document, console, Date: FixedDate, Map, Set,
+    window, document, console, Date: FixedDate, Map, Set, URL, Blob,
     getToken: () => 'admin-test-token', esc: escape, toast() {},
     FormData: class { constructor(form) { this.fields = form.fields || {}; } get(name) { return this.fields[name] ?? null; } has(name) { return name in this.fields; } },
     fetch: async (url, opts) => {
@@ -187,6 +196,20 @@ async function app(options = {}) {
           store.players.find(player => player.id === body.player_id)
         );
         event.version++;
+      } else if (body.action === 'correct_lineup') {
+        event.teams = body.teams.map(team => ({
+          ...event.teams.find(saved => saved.number === team.number),
+          players: team.player_ids.map(id => store.players.find(player => player.id === id)),
+        }));
+        event.version++;
+      } else if (body.action === 'cancel_matchday') {
+        event.is_cancelled = true;
+        event.cancelled_at = '2026-09-17T18:30:00.000Z';
+        event.version++;
+      } else if (body.action === 'restore_matchday') {
+        event.is_cancelled = false;
+        event.cancelled_at = null;
+        event.version++;
       }
       return response({ event_id: event?.id });
     }
@@ -199,7 +222,7 @@ async function app(options = {}) {
   const api = window.testAdmin;
   if (!options.skipLoad) { await api.loadData(); api.render(); }
   return {
-    api, store, requests, window, get, frames, scrolls, html: () => rendered,
+    api, store, requests, posterCalls, window, get, frames, scrolls, html: () => rendered,
     action: name => api.handleAction(name),
     emit: (type, target, extra = {}) => leagueRoot.listeners[type]({ target, preventDefault() {}, ...extra }),
     hit: value => { hit = value; },
@@ -226,7 +249,8 @@ test('fixed exact Season 2, Vienna civil Thursdays, chronological upcoming and n
   assert.match(a.html(), /Upcoming Thursdays/);
   assert.match(a.html(), /needed for three 2-a-side teams/);
   assert.doesNotMatch(a.html(), /al-season-select|new-season|Create another season|value="monday"|value="outside"/);
-  assert.match(a.html(), /\/spieltag\?event=event-1/);
+  assert.doesNotMatch(a.html(), /Live-Spieltag|\/spieltag\?event=event-1/);
+  assert.match(a.html(), /Private fixtures-image preview/);
   for (const size of [2, 3, 4, 5, 6]) assert.match(a.html(), new RegExp(`value="${size}"[^>]*>${size} on court`));
   const late = await app({ now: '2026-10-02T10:00:00Z' });
   assert.match(late.html(), /Past Thursdays — results \/ corrections/);
@@ -678,6 +702,91 @@ test('Results assigns an unassigned last-minute player without rebuilding teams 
   assert.match(finalizedApp.html(), /atomically recalculated without double-counting/);
 });
 
+test('Results moves and removes live players while retaining the saved schedule', async () => {
+  const data = dataFixture();
+  data.events[0].status = 'published';
+  data.events[0].schedule = buildSchedule(2);
+  data.events[0].schedule.rounds[0].matches[0].score_a = 4;
+  data.events[0].schedule.rounds[0].matches[0].score_b = 2;
+  const savedSchedule = clone(data.events[0].schedule);
+  const a = await app({ data });
+  assert.match(a.html(), /Move or remove a player/);
+  await a.api.submit(a.form('lineup-correction', { player_id: 'p1', destination: '2' }));
+  const move = a.requests.find(request => request.body?.action === 'correct_lineup').body;
+  assert.deepEqual(move, {
+    action: 'correct_lineup',
+    event_id: 'event-1',
+    version: 3,
+    teams: [
+      { number: 1, player_ids: ['p2'] },
+      { number: 2, player_ids: ['p3', 'p4', 'p1'] },
+    ],
+  });
+  assert.deepEqual(a.store.events[0].schedule, savedSchedule);
+  assert.deepEqual(a.api.state.teams.map(team => team.player_ids), [['p2'], ['p3', 'p4', 'p1']]);
+
+  await a.api.submit(a.form('lineup-correction', { player_id: 'p4', destination: 'remove' }));
+  const corrections = a.requests.filter(request => request.body?.action === 'correct_lineup');
+  assert.deepEqual(corrections[1].body.teams, [
+    { number: 1, player_ids: ['p2'] },
+    { number: 2, player_ids: ['p3', 'p1'] },
+  ]);
+  assert.deepEqual(a.store.events[0].schedule, savedSchedule);
+  assert.equal(a.store.players.some(player => player.id === 'p4'), true,
+    'Removing someone from one matchday must not delete their profile');
+});
+
+test('Admin privately previews draft fixtures before publishing', async () => {
+  const data = dataFixture();
+  data.events[0].schedule = buildSchedule(2);
+  const a = await app({ data });
+  assert.match(a.html(), /Create private preview/);
+  assert.doesNotMatch(a.html(), /Live-Spieltag/);
+  await a.action('create-private-poster');
+  assert.equal(a.posterCalls.length, 1);
+  assert.equal(a.posterCalls[0].event.status, 'draft');
+  assert.equal(a.posterCalls[0].settings.allowDraft, true);
+  assert.equal(a.posterCalls[0].settings.mode, 'itinerary');
+  assert.equal(a.requests.some(request => request.body?.action === 'publish'), false);
+  assert.match(a.html(), /Private Admin preview · not yet published/);
+  assert.match(a.html(), /Download fixtures image/);
+  await a.action('download-private-poster');
+  assert.deepEqual(a.posterCalls[1], { saved: 'fixtures.jpg' });
+  assert.equal(a.store.events[0].status, 'draft');
+});
+
+test('whole-matchday cancellation hides live actions and restores the exact saved event', async () => {
+  const data = dataFixture();
+  data.events[0].status = 'finalized';
+  data.events[0].schedule = buildSchedule(2);
+  data.events[0].teams.forEach((team, index) => { team.placement = index + 1; });
+  const saved = clone(data.events[0]);
+  const a = await app({ data });
+  assert.match(a.html(), /Cancel whole matchday/);
+  assert.match(a.html(), /Live-Spieltag/);
+  await a.action('cancel-matchday');
+  assert.deepEqual(a.requests.find(request => request.body?.action === 'cancel_matchday').body, {
+    action: 'cancel_matchday', event_id: 'event-1', version: 3,
+  });
+  assert.equal(a.store.events[0].is_cancelled, true);
+  assert.deepEqual(a.store.events[0].teams, saved.teams);
+  assert.deepEqual(a.store.events[0].schedule, saved.schedule);
+  assert.match(a.html(), /Cancelled matchday — hidden publicly and read-only until restored from Publish/);
+  assert.match(a.html(), /Thursday · cancelled/);
+  assert.match(a.html(), /hidden from the public Spieltag, member histories, standings and statistics/);
+  assert.match(a.html(), /Restore matchday/);
+  assert.doesNotMatch(a.html(), /Live-Spieltag|Open match 1 timer|Move or remove a player/);
+
+  await a.action('restore-matchday');
+  assert.deepEqual(a.requests.find(request => request.body?.action === 'restore_matchday').body, {
+    action: 'restore_matchday', event_id: 'event-1', version: 4,
+  });
+  assert.equal(a.store.events[0].is_cancelled, false);
+  assert.deepEqual(a.store.events[0].teams, saved.teams);
+  assert.deepEqual(a.store.events[0].schedule, saved.schedule);
+  assert.match(a.html(), /Live-Spieltag/);
+});
+
 test('cross-stage fixture links reveal the destination and keyboard focus before scrolling', async () => {
   const data = dataFixture();
   data.events[0].status = 'published';
@@ -797,9 +906,10 @@ test('two-team schedules need explicit external-ref confirmation before publishi
 test('admin assets cache-busted, role management title preserved, touch targets avoid HTML5-only dragging', () => {
   const html = fs.readFileSync(path.join(rootPath, 'admin.html'), 'utf8');
   const css = fs.readFileSync(path.join(rootPath, 'admin-league.css'), 'utf8');
-  assert.match(html, /admin-league\.js\?v=20260918/);
+  assert.match(html, /league-poster\.js\?v=20260919/);
+  assert.match(html, /admin-league\.js\?v=20260919/);
   assert.match(html, /admin-statistics\.js\?v=20260917a/);
-  assert.match(html, /admin-league\.css\?v=20260918/);
+  assert.match(html, /admin-league\.css\?v=20260919/);
   assert.match(html, /league-schedule\.js\?v=20260916a/);
   assert.match(html, /\/league\.css\?v=20260915/);
   assert.match(html, /\/js\/league-ui\.js\?v=20260915c/);

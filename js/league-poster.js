@@ -55,7 +55,7 @@
       minutes: 'Minuten',
       more: 'weitere',
       share: 'FÜR DIE WHATSAPP-GRUPPE',
-      generated: 'Öffentliche Spieltagsdaten · keine privaten Ratings oder Kontodaten',
+      generated: 'Spieltagsdaten · keine privaten Ratings oder Kontodaten',
     },
     en: {
       itinerary: 'FIXTURES & ITINERARY',
@@ -91,7 +91,7 @@
       minutes: 'minutes',
       more: 'more',
       share: 'MADE FOR YOUR WHATSAPP GROUP',
-      generated: 'Public matchday data · no private ratings or account data',
+      generated: 'Matchday data · no private ratings or account data',
     },
   };
 
@@ -109,9 +109,10 @@
     return Number.isInteger(number) ? number : fallback;
   }
 
-  function projectEvent(event, standings = []) {
+  function projectEvent(event, standings = [], options = {}) {
     if (!event || typeof event !== 'object' || !UUID.test(event.id || '')) fail('A valid published league event is required');
-    if (!['published', 'finalized'].includes(event.status)) fail('Publish the league before exporting its image');
+    const allowedStatuses = options.allowDraft === true ? ['draft', 'published', 'finalized'] : ['published', 'finalized'];
+    if (!allowedStatuses.includes(event.status)) fail('Publish the league before exporting its image');
     if (!Array.isArray(event.teams) || event.teams.length < 2) fail('The league needs at least two published teams');
     if (!event.schedule || !Array.isArray(event.schedule.rounds) || !event.schedule.rounds.length) {
       fail('Generate a fixture schedule before exporting its image');
@@ -990,7 +991,7 @@
 
   async function create(event, options = {}) {
     const lang = options.lang === 'en' ? 'en' : 'de';
-    const model = projectEvent(event, options.standings);
+    const model = projectEvent(event, options.standings, { allowDraft: options.allowDraft === true });
     const mode = exportMode(model, options.mode);
     if (mode === 'results' && model.status !== 'finalized') fail('Finalize the league before exporting final results');
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
