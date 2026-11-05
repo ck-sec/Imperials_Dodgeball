@@ -82,6 +82,7 @@
   <link rel="stylesheet" href="/league.css?v=20260915" />
   <link rel="stylesheet" href="/club-content.css?v=20260912" />
   <link rel="stylesheet" href="/public-ui.css?v=20260912b" />
+  <link rel="stylesheet" href="/league-video.css?v=20261105" />
 </head>
 <body>
   <a href="#main" class="public-skip" data-en="Skip to content">Zum Inhalt springen</a>
@@ -284,6 +285,29 @@
       </div>
 
       <p class="section-body public-season-note" data-en="14 September 2026–2 July 2027 inclusive. No training during Vienna school holidays or Austrian public holidays.">14.09.2026–02.07.2027. Ausgenommen: Wiener Schulferien und gesetzliche Feiertage.</p>
+      <figure class="league-video reveal" data-league-video>
+        <div class="league-video-frame">
+          <video class="league-video-media" muted playsinline loop preload="none" poster="/video/imperials-intro-poster.jpg" width="1280" height="720" aria-label="Animiertes Intro der Vienna Imperials im Videospiel-Stil: Logo, Spielerauswahl, erste Runde, Infos zur Social League und Saison-Ränge" data-en-aria-label="Animated Vienna Imperials intro in video game style: logo, player select, round one, Social League details and season ranks">
+            <source data-src="/video/imperials-intro.webm" type="video/webm" />
+            <source data-src="/video/imperials-intro.mp4" type="video/mp4" />
+          </video>
+          <div class="league-video-controls">
+            <button type="button" class="league-video-btn" data-video-pause aria-pressed="false" aria-label="Video pausieren" data-en-aria-label="Pause video">
+              <svg class="icon-off" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+              <svg class="icon-on" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button type="button" class="league-video-btn" data-video-sound aria-pressed="false" aria-label="Ton" data-en-aria-label="Sound">
+              <svg class="icon-off" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9l5 6M21 9l-5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <svg class="icon-on" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <figcaption class="league-video-copy">
+          <p class="league-video-eyebrow">Press Start</p>
+          <h3 class="league-video-title" data-en="Your Thursday, level by level">Dein Donnerstag, Level für Level</h3>
+          <p class="league-video-text" data-en="Pick your player, start the round, rank up from Bronze to Diamond: this is the Imperials Social League. All levels welcome.">Spieler wählen, Runde starten, von Bronze bis Diamond aufsteigen: Das ist die Imperials Social League. Alle Levels willkommen.</p>
+        </figcaption>
+      </figure>
       <div class="league-cards">
         <!-- Card 1 -->
         <div class="league-card reveal reveal-delay-1">
@@ -671,5 +695,6 @@
   <script src="/js/league-ui.js?v=20260915c" defer></script>
   <script src="/js/league-archive.js?v=20260912" defer></script>
   <script src="/js/site-league.js?v=20260915b" defer></script>
+  <script src="/js/league-video.js?v=20261105" defer></script>
 </body>
 </html>

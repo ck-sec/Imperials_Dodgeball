@@ -1,0 +1,81 @@
+/* Social League intro video (index.html #league) */
+.league-video {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  gap: 2.5rem;
+  align-items: center;
+  margin: 0 0 3rem;
+}
+.league-video-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0C1B3A;
+  border: 1px solid rgba(240, 184, 48, 0.35);
+  box-shadow: 0 30px 60px -30px rgba(212, 150, 26, 0.45), 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+.league-video-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.league-video-controls {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+.league-video-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(240, 184, 48, 0.45);
+  background: rgba(12, 27, 58, 0.8);
+  color: #F0B830;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.league-video-btn:hover { transform: scale(1.06); background: rgba(212, 150, 26, 0.25); }
+.league-video-btn:active { transform: scale(0.95); }
+.league-video-btn:focus-visible { outline: 2px solid #F0B830; outline-offset: 2px; }
+.league-video-btn svg { width: 20px; height: 20px; }
+.league-video-btn .icon-on,
+.league-video-btn[aria-pressed="true"] .icon-off { display: none; }
+.league-video-btn[aria-pressed="true"] .icon-on { display: block; }
+.league-video-eyebrow {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #F0B830;
+}
+.league-video-title {
+  margin-top: 0.5rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-weight: 400;
+  font-size: clamp(2rem, 3.4vw, 2.75rem);
+  letter-spacing: 0.03em;
+  line-height: 1;
+  color: #F4F7FF;
+}
+.league-video-text {
+  margin-top: 0.9rem;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: rgba(244, 247, 255, 0.72);
+}
+@media (max-width: 960px) {
+  .league-video { grid-template-columns: 1fr; gap: 1.25rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .league-video-btn { transition: none; }
+}

@@ -77,7 +77,7 @@ test('public scripts comply with self-only CSP without executable inline handler
     for (const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
       if (/type="application\/ld\+json"/.test(script[1])) JSON.parse(script[2]);
       else {
-        assert.match(script[1], /src="\/js\/[^"]+\?v=202609(?:12[b-d]?|14[de]|15[a-z]?)"/, file);
+        assert.match(script[1], /src="\/js\/[^"]+\?v=(?:202609(?:12[b-d]?|14[de]|15[a-z]?)|20261105)"/, file);
         assert.equal(script[2].trim(), '', file);
       }
     }
@@ -330,4 +330,25 @@ test('one season selector opens frozen 125-player archive without current compar
   assert.match(page.content.innerHTML, /Hall of Fame/);
   assert.doesNotMatch(page.content.innerHTML, /league-comparison|Latest &lt;training&gt;/);
   assert.doesNotMatch(page.nodes['[data-league-standings]'].innerHTML, /league-movement/);
+});
+
+test('league intro video is lazy, muted, captioned and self-hosted', () => {
+  const home = read('index.html');
+  const block = home.match(/<figure class="league-video[\s\S]*?<\/figure>/);
+  assert.ok(block, 'league video block present');
+  const html = block[0];
+  assert.match(html, /<video[^>]*\bmuted\b[^>]*\bplaysinline\b[^>]*preload="none"[^>]*poster="\/video\/imperials-intro-poster\.jpg"/);
+  assert.doesNotMatch(html, /\bautoplay\b/);
+  assert.doesNotMatch(html, /<source[^>]*\ssrc=/, 'sources load lazily via data-src');
+  assert.match(html, /data-src="\/video\/imperials-intro\.webm" type="video\/webm"/);
+  assert.match(html, /data-src="\/video\/imperials-intro\.mp4" type="video\/mp4"/);
+  assert.match(html, /data-video-pause[^>]*aria-label="[^"]+"[^>]*data-en-aria-label="Pause video"/);
+  assert.match(html, /data-video-sound[^>]*aria-label="[^"]+"[^>]*data-en-aria-label="Sound"/);
+  assert.match(html, /<video[^>]*data-en-aria-label="[^"]+"/);
+  for (const file of ['video/imperials-intro.webm', 'video/imperials-intro.mp4', 'video/imperials-intro-poster.jpg']) {
+    assert.ok(fs.statSync(path.join(root, file)).size < 5 * 1024 * 1024, file + ' stays under 5 MB');
+  }
+  assert.match(home, /league-video\.css\?v=20261105"/);
+  assert.match(home, /\/js\/league-video\.js\?v=20261105" defer/);
+  assert.match(read('js/league-video.js'), /prefers-reduced-motion: reduce/);
 });
