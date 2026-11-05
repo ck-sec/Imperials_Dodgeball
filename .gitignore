@@ -26,3 +26,7 @@ Imperials-Website*.webp
 *.xlsx
 temp screen.png
 mobile.png
+
+# Video source projects (rendered output lives in video/)
+reel/
+game/
